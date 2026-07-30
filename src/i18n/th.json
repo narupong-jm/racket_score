@@ -1,0 +1,120 @@
+{
+  "language": {
+    "english": "อังกฤษ",
+    "thai": "ไทย"
+  },
+  "app": {
+    "playersHeading": "ผู้เล่น",
+    "tournamentsHeading": "ทัวร์นาเมนต์"
+  },
+  "gender": {
+    "male": "ชาย",
+    "female": "หญิง"
+  },
+  "level": {
+    "beginner": "มือใหม่",
+    "intermediate": "ปานกลาง",
+    "advanced": "มือดี",
+    "pro": "มืออาชีพ"
+  },
+  "tournamentType": {
+    "singles": "เดี่ยว",
+    "doubles": "คู่"
+  },
+  "tournamentStatus": {
+    "active": "กำลังดำเนินการ",
+    "completed": "จบแล้ว"
+  },
+  "players": {
+    "loading": "กำลังโหลดรายชื่อผู้เล่น...",
+    "loadError": "โหลดรายชื่อผู้เล่นไม่สำเร็จ",
+    "empty": "ยังไม่มีผู้เล่น",
+    "columnName": "ชื่อ",
+    "columnGender": "เพศ",
+    "columnLevel": "ระดับ",
+    "form": {
+      "nameLabel": "ชื่อ",
+      "genderLabel": "เพศ",
+      "levelLabel": "ระดับ",
+      "submit": "เพิ่มผู้เล่น"
+    },
+    "editableLevel": {
+      "ariaLabel": "ระดับของ {{name}}",
+      "save": "บันทึก"
+    }
+  },
+  "tournaments": {
+    "form": {
+      "nameLabel": "ชื่อ",
+      "typeLabel": "ประเภท",
+      "gamesPerMatchLabel": "จำนวนเกมต่อแมตช์",
+      "pointsPerGameLabel": "คะแนนต่อเกม",
+      "deuceCap": "เพดานดิวซ์: {{cap}}",
+      "submit": "สร้างทัวร์นาเมนต์"
+    },
+    "list": {
+      "activeGroup": "กำลังดำเนินการ",
+      "completedGroup": "จบแล้ว",
+      "groupEmpty": "ยังไม่มี",
+      "loading": "กำลังโหลดทัวร์นาเมนต์...",
+      "loadError": "โหลดทัวร์นาเมนต์ไม่สำเร็จ",
+      "empty": "ยังไม่มีทัวร์นาเมนต์",
+      "itemLabel": "{{name}} ({{type}})"
+    },
+    "detail": {
+      "notFound": "ไม่พบทัวร์นาเมนต์",
+      "summary": "ประเภท: {{type}} · สถานะ: {{status}}",
+      "endTournament": "จบทัวร์นาเมนต์",
+      "createdAt": "สร้างเมื่อ: {{date}}",
+      "endedAt": "จบเมื่อ: {{date}}",
+      "participantsHeading": "ผู้เข้าร่วม",
+      "drawHeading": "จับคู่แข่งขัน",
+      "standingsHeading": "ตารางคะแนน"
+    },
+    "participants": {
+      "currentHeading": "ผู้เข้าร่วมปัจจุบัน",
+      "empty": "ยังไม่มีผู้เข้าร่วม",
+      "addExistingHeading": "เพิ่มผู้เล่นเดิม",
+      "searchLabel": "ค้นหาผู้เล่น",
+      "add": "เพิ่ม",
+      "createHeading": "สร้างผู้เล่นใหม่แล้วเพิ่ม",
+      "newNameLabel": "ชื่อผู้เล่นใหม่",
+      "newGenderLabel": "เพศผู้เล่นใหม่",
+      "newLevelLabel": "ระดับผู้เล่นใหม่",
+      "createAndAdd": "สร้างและเพิ่ม"
+    }
+  },
+  "matches": {
+    "draw": {
+      "currentHeading": "แมตช์ปัจจุบัน",
+      "noCurrentMatch": "ยังไม่มีแมตช์ปัจจุบัน",
+      "queuedHeading": "แมตช์ที่รอคิว",
+      "noQueuedMatch": "ยังไม่มีแมตช์รอคิว",
+      "drawNext": "จับคู่แมตช์ถัดไป",
+      "courtFull": "สนามเต็มแล้ว (มี 2 แมตช์ที่รอคิว/กำลังเล่นอยู่) -- ทำแมตช์ใดแมตช์หนึ่งให้เสร็จก่อน",
+      "notEnoughPlayersWithCount": "ผู้เล่นไม่พอสำหรับจับคู่แมตช์ ต้องการอย่างน้อย {{needed}} คน มีอยู่ {{have}} คน",
+      "notEnoughPlayers": "ผู้เล่นไม่พอสำหรับจับคู่แมตช์",
+      "drawFailed": "จับคู่แมตช์ไม่สำเร็จ",
+      "matchup": "{{team1}} พบ {{team2}}"
+    },
+    "result": {
+      "gapError": "กรอกผลแต่ละเกมตามลำดับ ห้ามข้ามเกม",
+      "missingScoreError": "กรุณากรอกคะแนนของทั้งสองทีม",
+      "invalidNumberError": "คะแนนต้องเป็นจำนวนเต็ม 0 หรือมากกว่า",
+      "ruleViolationError": "คะแนนของเกมนี้ไม่ถูกต้อง (เป้าหมาย {{pointsPerGame}} คะแนน ต้องนำอย่างน้อย {{winBy}} คะแนน เพดานสูงสุด {{cap}})",
+      "notDecidedError": "คะแนนที่กรอกยังตัดสินผลแมตช์ไม่ได้",
+      "gameTeam1Label": "เกมที่ {{n}} - ทีม 1",
+      "gameTeam2Label": "เกมที่ {{n}} - ทีม 2",
+      "submit": "บันทึกผล"
+    },
+    "standings": {
+      "loading": "กำลังโหลดตารางคะแนน...",
+      "loadError": "โหลดตารางคะแนนไม่สำเร็จ",
+      "empty": "ยังไม่มีตารางคะแนน",
+      "columnPlayer": "ผู้เล่น",
+      "columnGamesWon": "เกมที่ชนะ",
+      "columnGamesPlayed": "เกมที่เล่น",
+      "columnPointDiff": "ผลต่างคะแนน"
+    }
+  }
+}

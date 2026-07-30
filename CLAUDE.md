@@ -44,8 +44,14 @@ Read these three files first, in this order, before doing any implementation wor
 Commands: `npm run dev`, `npm run build` (runs `tsc -b && vite build`), `npm run lint` (ESLint
 flat config), `npm run format` (Prettier — `.prettierignore` excludes the root planning docs so it
 never reformats them), `npm run test` (Vitest). Single test file: `npx vitest run
-src/App.test.tsx`; single test case: `npx vitest run -t "test name"`. Type-check only: `npx tsc
---noEmit`.
+src/App.test.tsx`; single test case: `npx vitest run -t "test name"`. Type-check only: `npx tsc -b`
+(build mode, not `--noEmit`). **Do not use plain `npx tsc --noEmit`** — the root `tsconfig.json`
+has `"files": []` with only `references`, so non-build-mode `tsc` checks an empty file list against
+the root config and silently exits 0 without checking any project files, even with real type errors
+present. Only `-b`/`--build` mode (or `npm run build`, which runs `tsc -b && vite build`) actually
+traverses the referenced `tsconfig.app.json`/`tsconfig.node.json` projects. This was discovered the
+hard way after several steps' "clean type-check" claims turned out to be no-ops; `tsc -b --force`
+surfaced real pre-existing errors once actually run.
 
 ## Architecture (target shape, per PLAN.md)
 

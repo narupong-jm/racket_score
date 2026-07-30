@@ -1,0 +1,120 @@
+{
+  "language": {
+    "english": "English",
+    "thai": "Thai"
+  },
+  "app": {
+    "playersHeading": "Players",
+    "tournamentsHeading": "Tournaments"
+  },
+  "gender": {
+    "male": "Male",
+    "female": "Female"
+  },
+  "level": {
+    "beginner": "Beginner",
+    "intermediate": "Intermediate",
+    "advanced": "Advanced",
+    "pro": "Pro"
+  },
+  "tournamentType": {
+    "singles": "Singles",
+    "doubles": "Doubles"
+  },
+  "tournamentStatus": {
+    "active": "Active",
+    "completed": "Completed"
+  },
+  "players": {
+    "loading": "Loading players...",
+    "loadError": "Failed to load players.",
+    "empty": "No players yet.",
+    "columnName": "Name",
+    "columnGender": "Gender",
+    "columnLevel": "Level",
+    "form": {
+      "nameLabel": "Name",
+      "genderLabel": "Gender",
+      "levelLabel": "Level",
+      "submit": "Add player"
+    },
+    "editableLevel": {
+      "ariaLabel": "Level for {{name}}",
+      "save": "Save"
+    }
+  },
+  "tournaments": {
+    "form": {
+      "nameLabel": "Name",
+      "typeLabel": "Type",
+      "gamesPerMatchLabel": "Games per match",
+      "pointsPerGameLabel": "Points per game",
+      "deuceCap": "Deuce cap: {{cap}}",
+      "submit": "Create tournament"
+    },
+    "list": {
+      "activeGroup": "Active",
+      "completedGroup": "Completed",
+      "groupEmpty": "None yet.",
+      "loading": "Loading tournaments...",
+      "loadError": "Failed to load tournaments.",
+      "empty": "No tournaments yet.",
+      "itemLabel": "{{name}} ({{type}})"
+    },
+    "detail": {
+      "notFound": "Tournament not found.",
+      "summary": "Type: {{type}} · Status: {{status}}",
+      "endTournament": "End tournament",
+      "createdAt": "Created: {{date}}",
+      "endedAt": "Ended: {{date}}",
+      "participantsHeading": "Participants",
+      "drawHeading": "Draw",
+      "standingsHeading": "Standings"
+    },
+    "participants": {
+      "currentHeading": "Current participants",
+      "empty": "No participants yet.",
+      "addExistingHeading": "Add existing player",
+      "searchLabel": "Search players",
+      "add": "Add",
+      "createHeading": "Create new player and add",
+      "newNameLabel": "New player name",
+      "newGenderLabel": "New player gender",
+      "newLevelLabel": "New player level",
+      "createAndAdd": "Create & add"
+    }
+  },
+  "matches": {
+    "draw": {
+      "currentHeading": "Current match",
+      "noCurrentMatch": "No current match.",
+      "queuedHeading": "Queued match",
+      "noQueuedMatch": "None queued.",
+      "drawNext": "Draw next match",
+      "courtFull": "Court is full (2 matches queued/in progress) -- finish one first.",
+      "notEnoughPlayersWithCount": "Not enough players to draw a match. Need at least {{needed}}, have {{have}}.",
+      "notEnoughPlayers": "Not enough players to draw a match.",
+      "drawFailed": "Failed to draw a match.",
+      "matchup": "{{team1}} vs {{team2}}"
+    },
+    "result": {
+      "gapError": "Fill games in order, without gaps.",
+      "missingScoreError": "Enter a score for both teams.",
+      "invalidNumberError": "Scores must be whole numbers, 0 or higher.",
+      "ruleViolationError": "Invalid score for this game (target {{pointsPerGame}}, win by {{winBy}}, cap {{cap}}).",
+      "notDecidedError": "The games entered do not add up to a decided match.",
+      "gameTeam1Label": "Game {{n}} - Team 1",
+      "gameTeam2Label": "Game {{n}} - Team 2",
+      "submit": "Submit result"
+    },
+    "standings": {
+      "loading": "Loading standings...",
+      "loadError": "Failed to load standings.",
+      "empty": "No standings yet.",
+      "columnPlayer": "Player",
+      "columnGamesWon": "Games Won",
+      "columnGamesPlayed": "Games Played",
+      "columnPointDiff": "Point Diff"
+    }
+  }
+}
