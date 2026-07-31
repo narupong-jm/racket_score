@@ -1,6 +1,14 @@
 # Badminton Battle & Scoreboard App — Specification
 
 Confirmed: 2026-07-30
+Updated: 2026-07-31 — added §8 (Final Tournament Scoreboard) and §9
+(Application Flow / Pages), based on post-launch UI feedback.
+Updated: 2026-07-31 (later same day) — superseded by `IMPROVEMENT.md`'s
+navigation/flow overhaul (5-tab bottom nav, mandatory create-time-only
+participant selection, unified win-rate scoreboard, new cross-tournament
+Overall Scoreboard, placeholder avatars). §3, §4, §6-§9 revised below;
+this replaces the single-scroll / 4-page flow from the previous update,
+which was never implemented.
 
 ## 1. Overview
 
@@ -25,7 +33,12 @@ history/stats and standings within each tournament.
 
 - Players are created once in a shared pool and reused across tournaments.
   Cross-tournament history/stats are tracked per player.
-- Fields: **name, gender, skill level**.
+- Fields: **name, gender, skill level**. A photo is displayed everywhere a
+  player/member is listed (member list, tournament participant checklist,
+  scoreboards), but for now this is always a **generated placeholder
+  avatar** (initials + a color derived from the name) — there is no photo
+  upload capability or `photo`/`avatar_url` column in this phase. Real
+  upload (Supabase Storage) is explicitly deferred (see Out of scope).
 - **Skill level:**
   - New players (fewer than 3 recorded matches, tournament or otherwise)
     self-select an initial level: `Beginner / Intermediate / Advanced / Pro`.
@@ -47,9 +60,12 @@ history/stats and standings within each tournament.
   - Deuce rule: must win by 2 points, capped at a ceiling scaled to the
     target (mirrors BWF's 21-point-target/30-cap ratio). Score entry is
     validated against this rule.
-- **Players can be added to an in-progress tournament at any time.** New
-  entrants start at 0 matches played and immediately join the fairness
-  pool for future draws.
+- **Participants are selected once, at creation time, from the member
+  pool — and only then.** There is no way to add a player to an
+  in-progress tournament; the participant list is fixed for the
+  tournament's lifetime. (This reverses an earlier draft of this spec,
+  which allowed late joins — the organizer now finalizes the roster
+  before the first match is drawn.)
 - **Single court**: matches are played one at a time. The system does not
   need to track concurrent in-progress matches across multiple courts,
   though the organizer can pre-generate the next match into a queue while
@@ -83,13 +99,114 @@ match in advance). Selection priority, in order:
   (e.g. `21-15`, `18-21`, `21-19`) — no live point-by-point scoring.
 - Entered scores are validated against the tournament's configured
   scoring rules (target points, win-by-2, cap).
+- Before saving, the organizer reviews the two sides and the entered
+  score in a confirmation dialog ("Confirm this result? It can't be
+  edited after." / Cancel / Confirm). **Once confirmed, a result is
+  permanently locked** — there is no edit affordance for a completed
+  match anywhere in the app, and no admin-override path. Getting a score
+  wrong means it stays wrong; this is a deliberate simplification, not an
+  oversight.
 
-## 7. Standings / Ranking
+## 7. Tournament Scoreboard (per tournament)
 
-Within a tournament, players are ranked by:
+A single ranking view, scoped to one tournament, that works identically
+whether the tournament is still active or already ended — there is no
+separate "live standings" screen and "final scoreboard" screen; they are
+the same view at different points in the tournament's life. (This
+replaces the earlier draft's split between an in-progress games-won
+standings table and a separate post-end scoreboard.)
 
-1. **Total games won** (cumulative across all their matches) — primary.
-2. **Point differential** (total points scored minus conceded) — tiebreaker.
+Participants are ranked by:
+
+1. **Match win rate within this tournament** — matches won ÷ matches
+   played in this tournament, descending. A participant with 0 matches
+   played ranks below one who has played and lost every match (i.e. a
+   real 0% win rate outranks "hasn't played yet").
+2. **Point differential** (total points scored minus conceded) —
+   tiebreaker.
+
+Each row shows: photo/avatar, name, matches played, matches won, point
+differential, win rate. Ranks 1–3 get a medal icon instead of a plain
+number.
+
+Reached by: opening a tournament from the History tab's tournament list
+(works for both active and ended tournaments, showing the live/partial
+ranking for an active one), or automatically right after confirming "End
+tournament" (§9).
+
+## 8. Overall Scoreboard (cross-tournament)
+
+A second, separate ranking — the app's main tab-3 destination — computed
+across **all of a player's matches, in all tournaments**, not scoped to
+any single tournament:
+
+1. **Overall match win rate** — total matches won ÷ total matches played,
+   descending, across every tournament the player has participated in.
+2. **Point differential** — tiebreaker, same aggregation scope.
+
+Each row shows: photo/avatar, name, matches played, matches won, **total
+points scored** (cumulative points scored across all their matches — not
+a differential), win rate. Ranks 1–3 get a medal icon.
+
+**Filters**, two independent, freely-combinable groups:
+- **Period**: All time / This month (calendar month, i.e. matches
+  completed since the 1st of the current month).
+- **Match type**: All / Singles / Doubles (a player's doubles-tournament
+  matches vs. singles-tournament matches).
+
+All displayed columns (matches played/won, points, win rate) recompute
+for the active period × type combination, not just the win-rate sort.
+
+## 9. Application Flow (Navigation & Pages)
+
+The app uses a 5-tab bottom navigation bar, always visible, present at
+every screen size (not a responsive top-nav on wider viewports):
+
+1. **Create** — create a new tournament: name, type (§4), games per
+   match, points per game, and a checklist of all members to select as
+   participants (each row shows photo/avatar, name, level — this is the
+   **only** place participants are ever chosen, per §4). On submit: the
+   tournament and its participants are created, the first match is drawn
+   immediately per the Match Generator (§5) and shown in a confirmation
+   popup, and the organizer is taken directly into that tournament's
+   Manage screen (tab 2's drill-down, below) — the new tournament also
+   appears in tab 2's list automatically.
+2. **Active** — list of tournaments currently in progress. Each card:
+   name, type, current round number (e.g. "Round 7" — there is no fixed
+   total round count and therefore no round-progress fraction/bar).
+   Tapping a card opens **Manage tournament** for it:
+   - **Current match** — the two sides playing now, each side's name
+     directly above its own score input (unambiguous which input belongs
+     to which side), and a **Save result** button. Empty state ("No
+     match in progress") when nothing is running.
+   - **Next match** — independent of Current match, starts empty. A
+     **Randomize** button draws the next pairing (§5) into this card —
+     manually, on demand, for every match including the tournament's
+     first one is drawn automatically at creation time per tab 1, but
+     every match after that requires an explicit Randomize tap. Once a
+     pairing exists here, a **Start match** button appears and moves it
+     into Current match (replacing whatever was there, resetting score
+     inputs), clearing Next match back to empty.
+   - **Save result** opens a confirmation dialog (§6) before locking the
+     result in; on confirm, it's appended to **Rounds played** (newest
+     first, showing round label, both sides, winning side bolded/accented,
+     final score), the round counter increments, and Current match
+     returns to empty (Next match's pairing, if any, is not
+     auto-promoted — the organizer must tap Start match).
+   - **End tournament** (danger-styled) opens a confirm dialog; on
+     confirm the tournament's status flips to ended and the organizer
+     lands on that tournament's Scoreboard (§7).
+3. **Scoreboard** — the Overall Scoreboard (§8).
+4. **History** — two always-visible sections: **by match** (every
+   completed match across all tournaments, active or ended, newest
+   first, same row format as Rounds played) and **by tournament** (every
+   tournament, active and ended; tapping one opens its per-tournament
+   Scoreboard, §7).
+5. **Member** — the central player pool: an "add member" form (name,
+   gender as an icon-toggle, level as a dropdown, no photo upload per
+   §3) above a list of all current members (photo/avatar, name, level).
+   This tab is **only** for managing the member pool — it has no
+   tournament-participation controls (see §4's create-time-only rule).
 
 ## Out of scope / explicitly deferred
 
@@ -99,3 +216,7 @@ Within a tournament, players are ranked by:
 - Multi-court scheduling and match-conflict detection.
 - Persistent doubles "teams" as a first-class entity.
 - Live, point-by-point scoreboard mode.
+- Real player photo upload/storage — placeholder avatars only for now
+  (§3).
+- Any edit or admin-override path for a confirmed match result (§6).
+- Adding a participant to a tournament after it has started (§4).

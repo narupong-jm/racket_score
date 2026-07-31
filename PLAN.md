@@ -294,6 +294,324 @@ teammatePairs: Set<canonical-id-pair>}`. _Test:_ `tsc --noEmit` only.
 5. [x] **Final security check** — `get_advisors` + `get_logs` spot-check for
    regressions/errors from the smoke-test traffic.
 
+## Phase 13 — 5-Tab Navigation Rework (Create / Active / Scoreboard /
+## History / Member)
+
+Superseded twice before any code was written: first drafted as a 3-page
+nav, then revised to 4 pages, and now fully replaced per `IMPROVEMENT.md`
+(a user-authored concept doc) with a **5-tab bottom-navigation** structure
+and several behavior changes that also required revising `SPEC.md` §3-§9
+(see that file's 2026-07-31 "later same day" update note). This is a
+navigation/flow overhaul, not a patch — most of the previous draft's
+pages/routes are gone, though several lower-level pieces (the `IconChoice`
+picker, the `Modal` component, the win-rate view extension, the
+create-tournament-with-first-draw orchestration) carry over unchanged in
+design, just wired into new pages.
+
+**Tabs, always at the bottom of the viewport at every screen size (not a
+responsive top-nav):** 1) **Create** — new-tournament form incl. the
+participant checklist (the *only* place participants are ever chosen —
+see below) — 2) **Active** — in-progress tournaments, drill in to
+**Manage Tournament** — 3) **Scoreboard** — Overall, cross-tournament
+ranking — 4) **History** — by-match and by-tournament lists, the latter
+drilling into a **per-tournament Scoreboard** — 5) **Member** — add +
+list the player pool.
+
+**Confirmed decisions/behavior changes (this session):**
+- **No more mid-tournament "add participant."** Participants are chosen
+  once, in the Create-tournament checklist, and that roster is fixed for
+  the tournament's life. `ParticipantsSection.tsx`'s add-existing/
+  create-and-add UI and `useCreatePlayerAndAddParticipant.ts` are
+  **deleted**, not just unused.
+- **First match still auto-drawn + confirmation popup** on tournament
+  creation (kept from the previous draft) — but on confirm, the organizer
+  lands **directly on that tournament's Manage screen**, not an "Active"
+  list; the tournament simply also appears in the Active tab's list via
+  the usual query invalidation. Every match after the first requires an
+  explicit, manual **Randomize** tap in Manage Tournament — no more
+  auto-drawing subsequent matches.
+- **No fixed round count.** Active tournament cards and Manage
+  Tournament show "Round N" (current count) only — no "Round N of M", no
+  fractional progress bar.
+- **Photos are always a generated placeholder avatar** (initials + a
+  color derived from the name) — no upload capability, no new `players`
+  column, no Supabase Storage bucket this phase.
+- **The old in-progress "Standings" (games-won/point-diff) view is gone.**
+  Replaced everywhere by one **win-rate-based Tournament Scoreboard**
+  (per `SPEC.md` §7) that works identically for an active or ended
+  tournament. `StandingsTable.tsx`, `useStandings.ts`, `sortStandings.ts`,
+  and `getStandings()` are **deleted**, superseded by the scoreboard
+  pieces built in this phase (which reuse the `tournament_standings`
+  view's win-rate columns instead).
+- **Confirmed results are permanently locked** — no edit path, no admin
+  override, anywhere (already true in the current app; this phase just
+  keeps it that way deliberately, via a confirm-dialog step before every
+  save).
+- Selecting participants no longer needs to survive a page navigation
+  (it's local state within the single Create-tournament page/component),
+  so the previous draft's cross-page `DraftParticipantsContext` is **not
+  needed** — a nice simplification versus the prior plan.
+
+1. [ ] **Dependencies + asset groundwork.** `npm install react-router-dom`
+   (`^7.18.2`, compatible with installed `react@^18.3.1`). `git mv Material
+   src/assets/icons` (Vite can't import from outside `src/`) — **7
+   files**: `male.png`, `female.png`, `single_badminton.png`,
+   `double_badminton.png`, `scoreboard_winner1.png`,
+   `scoreboard_winner2.png`, `scoreboard_winner3.png`. Delete dead
+   `src/App.css`. _Test:_ `npm run build` succeeds; `git status` shows
+   only the rename + deletion + package files.
+2. [ ] **Remove the late-join feature.** Delete
+   `src/features/tournaments/ParticipantsSection.tsx` and
+   `useCreatePlayerAndAddParticipant.ts`; remove `ParticipantsSection`
+   from `TournamentDetail.tsx`'s render (the participants list itself
+   moves into the redesigned Manage Tournament in step 19, read-only).
+   `useAddParticipant`/`addParticipant` stay — still used internally by
+   the creation-time orchestration (step 17). _Test:_ `npm run build &&
+   npm run lint` clean; existing `TournamentDetail.test.tsx` cases that
+   asserted add-participant behavior are removed/updated accordingly.
+3. [ ] **Delete the old in-progress Standings.** Remove
+   `src/features/matches/StandingsTable.tsx` (+ its test),
+   `useStandings.ts`, `sortStandings.ts` (+ its test), and `getStandings`
+   from `matchesApi.ts` — superseded by the win-rate Scoreboard built in
+   steps 11-14. _Test:_ `npm run build` clean (no dangling imports).
+4. [ ] **Avatar placeholder utility.** New `src/lib/avatarColor.ts` — a
+   pure function deriving a stable color from a name (e.g. hash → hue).
+   New `src/components/Avatar.tsx` — renders initials (first letters of
+   up to two name words) on that color, fixed size prop. _Test:_
+   `avatarColor.test.ts` (same name → same color, reasonable spread
+   across names); `Avatar.test.tsx` (renders correct initials).
+5. [ ] **Centralize `TournamentType`.** New
+   `src/features/tournaments/tournamentType.ts` mirroring
+   `src/features/players/playerLevels.ts`. Update `CreateTournamentForm.tsx`
+   to import from it. _Test:_ `CreateTournamentForm.test.tsx` passes
+   unmodified.
+6. [ ] **Reusable `IconChoice` component.** New `src/components/IconChoice.tsx`
+   — `<fieldset>`/`<legend>` + visually-hidden native radios, each
+   `<label>` wrapping an `<img alt="">` + caption. `.visually-hidden` +
+   `.icon-choice*` styles in `src/index.css` using existing theme
+   variables. _Test:_ `IconChoice.test.tsx` — group/radio roles, click
+   calls `onChange`, `checked`/`disabled` reflect props.
+7. [ ] **Wire `IconChoice` for Gender and Tournament Type.** Gender in
+   `CreatePlayerForm.tsx` only now (its one remaining call site, since
+   step 2 deleted the other). Type in `CreateTournamentForm.tsx`. Update
+   both components' tests to click radios instead of `selectOptions`.
+   _Test:_ updated tests pass; `npm run lint && npm run build` clean.
+8. [ ] **`Modal` component.** New `src/components/Modal.tsx` wrapping
+   native `<dialog>` — `open`/`onClose` props, `showModal()`/`close()`
+   via `useEffect`, `cancel`/`close` listeners for Esc/backdrop. No
+   external dependency. _Test:_ `Modal.test.tsx` — content presence,
+   `onClose` fires from a close button (assert behavior, not native
+   `dialog.open` state — jsdom support is inconsistent).
+9. [ ] **Router shell + bottom tab bar.** Wrap `<App/>` in
+   `<BrowserRouter>` (`src/main.tsx`). New `src/components/AppLayout.tsx`
+   — a bottom-fixed tab bar (Create/Active/Scoreboard/History/Member,
+   `NavLink`s) + `<Outlet/>` above it; existing `LanguageToggle` moves
+   into a small header or the Member tab (pick one, not both — a nav bar
+   with 5 tabs plus a language toggle needs a deliberate spot, decide
+   during step 20's CSS pass). Add `nav.create`/`nav.active`/
+   `nav.scoreboard`/`nav.history`/`nav.member` i18n keys (both
+   `en.json`/`th.json`). Rewrite `App.tsx`: one temporary route (`/`
+   under `AppLayout`) rendering a placeholder, to isolate this step's
+   diff to routing plumbing. _Test:_ `App.test.tsx` under
+   `<MemoryRouter>` — all 5 tab links present with correct text/`href`s.
+10. [ ] **Member page.** New `src/pages/MemberPage.tsx` (or
+    `src/features/players/MemberPage.tsx`) — heading relabeled to
+    "Member"/"Add member" (new i18n keys, `players.form.submit` copy
+    updated), `CreatePlayerForm` (now using `IconChoice` for gender, per
+    step 7) above `PlayerList.tsx` updated to render `Avatar` + name +
+    level per row (no selection checkboxes — selection now lives only in
+    Create, step 12). _Test:_ `PlayerList.test.tsx` updated for the
+    avatar column; `MemberPage.test.tsx` new, basic render check.
+11. [ ] **Win-rate migration.** Extend `tournament_standings` (via
+    `apply_migration`) adding `matches_won` and `win_rate` (`NULL` when
+    `matches_played = 0`, else `ROUND(matches_won::numeric /
+    matches_played::numeric, 4)`) — exact `CREATE OR REPLACE VIEW` SQL
+    unchanged from the previous plan iteration (a `match_won` boolean per
+    `participant_match_stats` row, `games_won > games_lost`, aggregated).
+    Follow with `generate_typescript_types`. _Test:_ `execute_sql` seed
+    fixture, hand-verify arithmetic incl. the `NULL` case;
+    `get_advisors` spot-check.
+12. [ ] **Overall-scoreboard data layer.** New view `player_match_history`
+    (one row per player per completed match: `player_id`, `match_id`,
+    `tournament_id`, `tournament_type`, `completed_at`, `won boolean`,
+    `points_for`) built from the same `team_games_won`-style CTE as
+    `tournament_standings`, joined through `tournaments.type`. New
+    `listPlayerMatchHistory({ since?, tournamentType? })` in a new
+    `src/features/scoreboard/scoreboardApi.ts` (Supabase query with
+    optional `.gte('completed_at', ...)`/`.eq('tournament_type', ...)`
+    filters — filtering happens at the query level, not by fetching
+    everything). New `aggregateScoreboard(rows, players)` pure function
+    (mirrors `assembleDrawInputs`'s "fetch raw, compute in JS" pattern) —
+    groups by `player_id`, computing `matches_played`, `matches_won`,
+    `total_points` (sum of `points_for`), `win_rate`. New
+    `useOverallScoreboard(period, type)` hook combining the two. _Test:_
+    `aggregateScoreboard.test.ts` — grouping/summing correctness, a
+    player with 0 matches in the filtered set is excluded or zeroed
+    (decide and assert one behavior), win_rate math.
+13. [ ] **Shared `ScoreboardTable` component + medal icons.** New
+    `src/features/scoreboard/ScoreboardTable.tsx` — generic ranked table
+    (rank incl. medal icons for 0/1/2 via `scoreboard_winner1/2/3.png`,
+    `Avatar`, name, matches played/won, a configurable "points" column
+    (label + value per row, since Overall shows total points scored but
+    per-tournament shows point differential — same component, different
+    column config), win rate %). _Test:_ component test — row order,
+    medal icons on top 3, correct column values for both a
+    "total points" and a "point diff" config.
+14. [ ] **Overall Scoreboard page (tab 3).** New
+    `src/pages/OverallScoreboardPage.tsx` — two independent filter
+    button-groups (Period: All time/This month; Type: All/Singles/
+    Doubles, freely combinable), wired to `useOverallScoreboard`,
+    rendering `ScoreboardTable` with the "total points" column config.
+    _Test:_ selecting a filter combination calls the hook with the right
+    args; empty-state when no matches match the filter.
+15. [ ] **Per-tournament Scoreboard route.** New
+    `src/features/tournaments/TournamentScoreboardRoute.tsx`
+    (`/tournaments/:id/scoreboard`) — fetches `tournament_standings` for
+    the id (new `getTournamentStandingsRanked` or reuse a trimmed query),
+    renders `ScoreboardTable` with the "point diff" column config, sorted
+    win_rate desc (`-1` null-sentinel) → point_diff desc → player_id asc
+    (new `sortScoreboard.ts`, mirroring the deleted `sortStandings.ts`'s
+    shape but for win_rate). No filter bar (tournament itself is the
+    scope). _Test:_ `sortScoreboard.test.ts`; route component test
+    mocking the query.
+16. [ ] **Active tab.** New `src/pages/ActivePage.tsx` — list of
+    `status === 'active'` tournaments only, each card: name, type,
+    "Round N" (`matches.length` for that tournament, no total/no
+    progress bar), tap → `/tournaments/:id`. Empty state: plain "No
+    active tournaments" (no apology copy, per `IMPROVEMENT.md`). _Test:_
+    card click navigates; empty state renders the exact copy.
+17. [ ] **Orchestration mutation + first-match popup.** New
+    `src/features/tournaments/useCreateTournamentWithFirstDraw.ts` — same
+    design as the previous plan iteration: `createTournament` →
+    sequential `addParticipant` per selected id (a mid-loop failure
+    throws a `PartialTournamentCreationError` carrying the created
+    tournament, for recovery rather than a dead end) →
+    `assembleDrawInputs` → `generateNextMatch` → `createMatch(id, 1,
+    ...)`. Invalidates `['tournaments']`, `['tournamentParticipants',
+    id]`, `['drawInputs', id]`, `['matches', id]`. New
+    `FirstMatchDrawnPopup.tsx` built on `Modal`, reusing
+    `matches.draw.matchup`-style team-vs-team formatting; "Go to Manage
+    Tournament" navigates to `/tournaments/${id}` (not the Active tab).
+    The `drawResult.ok === false` branch is unreachable in practice
+    (verified against `selectCandidatePool.ts`/`pickDoublesQuartet.ts`/
+    `splitIntoTeams.ts` for an exactly-sized, all-zero pool) but still
+    handled defensively. _Test:_ hook test — happy path, partial-failure
+    path; popup component test — both content branches, button callback.
+18. [ ] **Create Tournament page (tab 1).** New
+    `src/pages/CreateTournamentPage.tsx` — settings fields (name, type
+    via `IconChoice`, games/match, points/game, computed deuce cap) +
+    a participant checklist of all members (`Avatar` + name + level per
+    row, plain `useState<Set<string>>` local to this page/component — no
+    context needed). Submit blocked + inline error
+    (`tournaments.form.notEnoughSelected`) when selected count <
+    `getNeededPlayerCount(type)`. On valid submit, calls
+    `useCreateTournamentWithFirstDraw`; success opens
+    `FirstMatchDrawnPopup`. _Test:_ 2 selected + Doubles → error; 4
+    selected + Doubles → succeeds, popup shows correct matchup and
+    navigates to the tournament's Manage screen on confirm.
+19. [ ] **Manage Tournament redesign.** Rewrite
+    `src/features/tournaments/TournamentDetail.tsx` (still prop-driven,
+    `tournamentId` + optional `onEnded`, no router coupling added
+    directly — new `TournamentDetailRoute.tsx` wraps it with
+    `useParams`/`useNavigate`, redirecting to
+    `/tournaments/:id/scoreboard` via `<Navigate replace>` if already
+    `completed`, mirroring the previous plan's router-free-component
+    pattern):
+    - **Current match card**: empty state ("No match in progress —
+      start the next match below") or the two sides with each side's
+      name directly above its own score input, and **Save result** →
+      opens a `Modal` confirm dialog (review both sides + entered score,
+      Cancel/Confirm) before calling `recordMatchResult` — replaces the
+      old inline `ResultEntryForm` submit-directly behavior.
+    - **Next match card** (new, replaces `DrawSection.tsx`'s combined
+      current+queue display): empty ("Not picked yet") until
+      **Randomize** is tapped (calls the matchmaking draw, same
+      `generateNextMatch` pattern, but only ever fills this "next" slot
+      — never auto-promotes). Once populated, a **Start match** button
+      appears alongside Randomize; tapping it moves the pairing into
+      Current match (resetting score inputs to 0) and clears Next match
+      back to empty. This replaces the old "Draw next match" auto-fill /
+      auto-promote-on-completion behavior from `useMatchQueue.ts` with
+      explicit manual steps — `useMatchQueue.ts` is reworked accordingly
+      (current vs. next become two independently-managed pieces of
+      state/queries instead of one array).
+    - **Rounds played list** (was "Match History" implicitly): completed
+      rounds, newest first, round label + both sides ("vs") + winning
+      side bold/accented + final score.
+    - **End tournament** button, danger-styled, opens a `Modal` confirm
+      dialog ("End this tournament? ... you'll be taken to its final
+      scoreboard."); on confirm, `endTournament.mutate` then `onEnded?.()`
+      → `TournamentDetailRoute` navigates to
+      `/tournaments/${id}/scoreboard`.
+    - Read-only participants list stays (no add/remove UI — roster is
+      fixed per step 2).
+    _Test:_ rewritten `TournamentDetail.test.tsx` covering: empty Current
+    state; Randomize populates Next only; Start match promotes Next→
+    Current and resets Current's inputs; Save result opens the confirm
+    dialog and only calls `recordMatchResult` on Confirm, not on the
+    initial click; End tournament opens its confirm dialog and only
+    calls `endTournament`/`onEnded` on Confirm. New
+    `TournamentDetailRoute.test.tsx` for the redirect-when-completed
+    case.
+20. [ ] **History page.** New `src/pages/HistoryPage.tsx` — two always-
+    visible sections. **By match**: new
+    `listRecentCompletedMatches()` query (cross-tournament, joins
+    `match_participants`/`matches`/`tournaments` for the same "round
+    label / vs / winner bold / score" row format as Rounds played,
+    newest first). **By tournament**: all tournaments regardless of
+    status, each row → `<Link to={`/tournaments/${id}/scoreboard`}>`
+    (unconditionally the scoreboard, even for an active tournament — a
+    live partial ranking). _Test:_ `HistoryPage.test.tsx` — both
+    sections render, by-tournament links target `/scoreboard` regardless
+    of status.
+21. [ ] **Full route wiring + `vercel.json`.** Final `App.tsx` routes:
+    `/` → redirect to `/create` (or make Create the index route
+    directly — pick one), `/create`, `/active`, `/tournaments/:id`,
+    `/tournaments/:id/scoreboard`, `/scoreboard`, `/history`, `/member`,
+    all under `AppLayout`. Add `vercel.json` SPA catch-all rewrite to
+    `/index.html` (no local migrations dir precedent for this file —
+    it's new, needed so hard refresh/direct links to any nested route
+    don't 404 on the existing Vercel deployment). _Test:_ full
+    `App.test.tsx` routing smoke test across all 5 tabs; `npm run build`.
+22. [ ] **CSS overhaul: bottom-tab mobile-first layout.** Replace
+    `src/index.css`'s fixed `1126px` desktop container with a
+    mobile-first, always-bottom-tab-bar layout (per the confirmed
+    decision — no responsive switch to a top-nav on wide viewports);
+    scope down the unscoped 56px `h1` rule; card/list/dialog styling for
+    the redesigned Manage Tournament and Scoreboard views; `IconChoice`
+    and `Avatar` visual states. Consult the `frontend-design` skill here
+    — no exact values prescribed by this phase. _Test:_ Playwright MCP
+    check in light/dark `prefers-color-scheme`, at a mobile viewport
+    width and a wide one (bottom tab bar present at both); full RTL
+    suite green.
+23. [ ] **Full regression + walkthrough.** `npm run lint`, `npm run
+    build`, `npm test`. Playwright MCP click-through: add a member →
+    Create tab, select 2+ from the checklist, submit → confirm popup →
+    land on Manage → Randomize + Start match + Save result (confirm
+    dialog) for a couple of rounds → End tournament (confirm dialog) →
+    land on that tournament's Scoreboard with correct win-rate ranking
+    and medal icons → Active tab shows/doesn't show it correctly →
+    Scoreboard tab: toggle period/type filters independently and confirm
+    the numbers change → History: both sections render, by-tournament
+    link reaches the same scoreboard. Both languages, both themes, no
+    console errors.
+24. [ ] **Deploy + live smoke test.** Push, confirm the Vercel build
+    succeeds (watch for the `CLAUDE.md`-documented git-author-email
+    deploy-block gotcha from Phase 12), repeat step 23's walkthrough
+    against the live URL, including a hard refresh on a nested route to
+    confirm the `vercel.json` rewrite works in production.
+
+**Known risks:** the 7 icons are full-color flat illustrations, not a
+monochrome set — render as-is in both themes (step 22 judgment call).
+`TournamentType`/`MatchType` duplication also exists in
+`tournamentsApi.ts` and `src/features/matchmaking/types.ts` — out of
+scope here, same as before. A mid-loop participant-add failure in step
+17's orchestration leaves a partially enrolled tournament (mitigated,
+not eliminated, by the `PartialTournamentCreationError` recovery path).
+Step 19 is the single largest, riskiest step in this phase (a full
+rework of the current/next/queue model) — consider splitting it further
+during implementation if it proves too large for one sitting.
+
 ---
 
 ## Critical Files
