@@ -5,11 +5,21 @@ export function LanguageToggle() {
   const { t, i18n } = useTranslation()
 
   return (
-    <div>
-      <button type="button" onClick={() => setLocale('en')} disabled={i18n.language === 'en'}>
+    <div className="language-toggle">
+      <button
+        type="button"
+        className="language-toggle-button"
+        onClick={() => setLocale('en')}
+        disabled={i18n.language === 'en'}
+      >
         {t('language.english')}
       </button>
-      <button type="button" onClick={() => setLocale('th')} disabled={i18n.language === 'th'}>
+      <button
+        type="button"
+        className="language-toggle-button"
+        onClick={() => setLocale('th')}
+        disabled={i18n.language === 'th'}
+      >
         {t('language.thai')}
       </button>
     </div>

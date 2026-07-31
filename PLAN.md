@@ -352,7 +352,7 @@ list the player pool.
   so the previous draft's cross-page `DraftParticipantsContext` is **not
   needed** — a nice simplification versus the prior plan.
 
-1. [ ] **Dependencies + asset groundwork.** `npm install react-router-dom`
+1. [x] **Dependencies + asset groundwork.** `npm install react-router-dom`
    (`^7.18.2`, compatible with installed `react@^18.3.1`). `git mv Material
    src/assets/icons` (Vite can't import from outside `src/`) — **12
    files**: gender/type pickers `male.png`, `female.png`,
@@ -367,7 +367,7 @@ list the player pool.
    reconcile or accept, not leave as an oversight. Delete dead
    `src/App.css`. _Test:_ `npm run build` succeeds; `git status` shows
    only the rename + deletion + package files.
-2. [ ] **Remove the late-join feature.** Delete
+2. [x] **Remove the late-join feature.** Delete
    `src/features/tournaments/ParticipantsSection.tsx` and
    `useCreatePlayerAndAddParticipant.ts`; remove `ParticipantsSection`
    from `TournamentDetail.tsx`'s render (the participants list itself
@@ -376,40 +376,40 @@ list the player pool.
    the creation-time orchestration (step 17). _Test:_ `npm run build &&
    npm run lint` clean; existing `TournamentDetail.test.tsx` cases that
    asserted add-participant behavior are removed/updated accordingly.
-3. [ ] **Delete the old in-progress Standings.** Remove
+3. [x] **Delete the old in-progress Standings.** Remove
    `src/features/matches/StandingsTable.tsx` (+ its test),
    `useStandings.ts`, `sortStandings.ts` (+ its test), and `getStandings`
    from `matchesApi.ts` — superseded by the win-rate Scoreboard built in
    steps 11-14. _Test:_ `npm run build` clean (no dangling imports).
-4. [ ] **Avatar placeholder utility.** New `src/lib/avatarColor.ts` — a
+4. [x] **Avatar placeholder utility.** New `src/lib/avatarColor.ts` — a
    pure function deriving a stable color from a name (e.g. hash → hue).
    New `src/components/Avatar.tsx` — renders initials (first letters of
    up to two name words) on that color, fixed size prop. _Test:_
    `avatarColor.test.ts` (same name → same color, reasonable spread
    across names); `Avatar.test.tsx` (renders correct initials).
-5. [ ] **Centralize `TournamentType`.** New
+5. [x] **Centralize `TournamentType`.** New
    `src/features/tournaments/tournamentType.ts` mirroring
    `src/features/players/playerLevels.ts`. Update `CreateTournamentForm.tsx`
    to import from it. _Test:_ `CreateTournamentForm.test.tsx` passes
    unmodified.
-6. [ ] **Reusable `IconChoice` component.** New `src/components/IconChoice.tsx`
+6. [x] **Reusable `IconChoice` component.** New `src/components/IconChoice.tsx`
    — `<fieldset>`/`<legend>` + visually-hidden native radios, each
    `<label>` wrapping an `<img alt="">` + caption. `.visually-hidden` +
    `.icon-choice*` styles in `src/index.css` using existing theme
    variables. _Test:_ `IconChoice.test.tsx` — group/radio roles, click
    calls `onChange`, `checked`/`disabled` reflect props.
-7. [ ] **Wire `IconChoice` for Gender and Tournament Type.** Gender in
+7. [x] **Wire `IconChoice` for Gender and Tournament Type.** Gender in
    `CreatePlayerForm.tsx` only now (its one remaining call site, since
    step 2 deleted the other). Type in `CreateTournamentForm.tsx`. Update
    both components' tests to click radios instead of `selectOptions`.
    _Test:_ updated tests pass; `npm run lint && npm run build` clean.
-8. [ ] **`Modal` component.** New `src/components/Modal.tsx` wrapping
+8. [x] **`Modal` component.** New `src/components/Modal.tsx` wrapping
    native `<dialog>` — `open`/`onClose` props, `showModal()`/`close()`
    via `useEffect`, `cancel`/`close` listeners for Esc/backdrop. No
    external dependency. _Test:_ `Modal.test.tsx` — content presence,
    `onClose` fires from a close button (assert behavior, not native
    `dialog.open` state — jsdom support is inconsistent).
-9. [ ] **Router shell + bottom tab bar.** Wrap `<App/>` in
+9. [x] **Router shell + bottom tab bar.** Wrap `<App/>` in
    `<BrowserRouter>` (`src/main.tsx`). New `src/components/AppLayout.tsx`
    — a bottom-fixed tab bar (Create/Active/Scoreboard/History/Member,
    `NavLink`s) + `<Outlet/>` above it; existing `LanguageToggle` moves
@@ -421,7 +421,7 @@ list the player pool.
    under `AppLayout`) rendering a placeholder, to isolate this step's
    diff to routing plumbing. _Test:_ `App.test.tsx` under
    `<MemoryRouter>` — all 5 tab links present with correct text/`href`s.
-10. [ ] **Member page.** New `src/pages/MemberPage.tsx` (or
+10. [x] **Member page.** New `src/pages/MemberPage.tsx` (or
     `src/features/players/MemberPage.tsx`) — heading relabeled to
     "Member"/"Add member" (new i18n keys, `players.form.submit` copy
     updated), `CreatePlayerForm` (now using `IconChoice` for gender, per
@@ -429,7 +429,7 @@ list the player pool.
     level per row (no selection checkboxes — selection now lives only in
     Create, step 12). _Test:_ `PlayerList.test.tsx` updated for the
     avatar column; `MemberPage.test.tsx` new, basic render check.
-11. [ ] **Win-rate migration.** Extend `tournament_standings` (via
+11. [x] **Win-rate migration.** Extend `tournament_standings` (via
     `apply_migration`) adding `matches_won` and `win_rate` (`NULL` when
     `matches_played = 0`, else `ROUND(matches_won::numeric /
     matches_played::numeric, 4)`) — exact `CREATE OR REPLACE VIEW` SQL
@@ -438,7 +438,7 @@ list the player pool.
     Follow with `generate_typescript_types`. _Test:_ `execute_sql` seed
     fixture, hand-verify arithmetic incl. the `NULL` case;
     `get_advisors` spot-check.
-12. [ ] **Overall-scoreboard data layer.** New view `player_match_history`
+12. [x] **Overall-scoreboard data layer.** New view `player_match_history`
     (one row per player per completed match: `player_id`, `match_id`,
     `tournament_id`, `tournament_type`, `completed_at`, `won boolean`,
     `points_for`) built from the same `team_games_won`-style CTE as
@@ -455,7 +455,7 @@ list the player pool.
     `aggregateScoreboard.test.ts` — grouping/summing correctness, a
     player with 0 matches in the filtered set is excluded or zeroed
     (decide and assert one behavior), win_rate math.
-13. [ ] **Shared `ScoreboardTable` component + medal icons.** New
+13. [x] **Shared `ScoreboardTable` component + medal icons.** New
     `src/features/scoreboard/ScoreboardTable.tsx` — generic ranked table
     (rank incl. medal icons for 0/1/2 via `scoreboard_winner1/2/3.png`,
     `Avatar`, name, matches played/won, a configurable "points" column
@@ -464,14 +464,14 @@ list the player pool.
     column config), win rate %). _Test:_ component test — row order,
     medal icons on top 3, correct column values for both a
     "total points" and a "point diff" config.
-14. [ ] **Overall Scoreboard page (tab 3).** New
+14. [x] **Overall Scoreboard page (tab 3).** New
     `src/pages/OverallScoreboardPage.tsx` — two independent filter
     button-groups (Period: All time/This month; Type: All/Singles/
     Doubles, freely combinable), wired to `useOverallScoreboard`,
     rendering `ScoreboardTable` with the "total points" column config.
     _Test:_ selecting a filter combination calls the hook with the right
     args; empty-state when no matches match the filter.
-15. [ ] **Per-tournament Scoreboard route.** New
+15. [x] **Per-tournament Scoreboard route.** New
     `src/features/tournaments/TournamentScoreboardRoute.tsx`
     (`/tournaments/:id/scoreboard`) — fetches `tournament_standings` for
     the id (new `getTournamentStandingsRanked` or reuse a trimmed query),
@@ -481,13 +481,13 @@ list the player pool.
     shape but for win_rate). No filter bar (tournament itself is the
     scope). _Test:_ `sortScoreboard.test.ts`; route component test
     mocking the query.
-16. [ ] **Active tab.** New `src/pages/ActivePage.tsx` — list of
+16. [x] **Active tab.** New `src/pages/ActivePage.tsx` — list of
     `status === 'active'` tournaments only, each card: name, type,
     "Round N" (`matches.length` for that tournament, no total/no
     progress bar), tap → `/tournaments/:id`. Empty state: plain "No
     active tournaments" (no apology copy, per `IMPROVEMENT.md`). _Test:_
     card click navigates; empty state renders the exact copy.
-17. [ ] **Orchestration mutation + first-match popup.** New
+17. [x] **Orchestration mutation + first-match popup.** New
     `src/features/tournaments/useCreateTournamentWithFirstDraw.ts` — same
     design as the previous plan iteration: `createTournament` →
     sequential `addParticipant` per selected id (a mid-loop failure
@@ -504,7 +504,7 @@ list the player pool.
     `splitIntoTeams.ts` for an exactly-sized, all-zero pool) but still
     handled defensively. _Test:_ hook test — happy path, partial-failure
     path; popup component test — both content branches, button callback.
-18. [ ] **Create Tournament page (tab 1).** New
+18. [x] **Create Tournament page (tab 1).** New
     `src/pages/CreateTournamentPage.tsx` — settings fields (name, type
     via `IconChoice`, games/match, points/game, computed deuce cap) +
     a participant checklist of all members (`Avatar` + name + level per
@@ -516,7 +516,7 @@ list the player pool.
     `FirstMatchDrawnPopup`. _Test:_ 2 selected + Doubles → error; 4
     selected + Doubles → succeeds, popup shows correct matchup and
     navigates to the tournament's Manage screen on confirm.
-19. [ ] **Manage Tournament redesign.** Rewrite
+19. [x] **Manage Tournament redesign.** Rewrite
     `src/features/tournaments/TournamentDetail.tsx` (still prop-driven,
     `tournamentId` + optional `onEnded`, no router coupling added
     directly — new `TournamentDetailRoute.tsx` wraps it with
@@ -560,7 +560,7 @@ list the player pool.
     calls `endTournament`/`onEnded` on Confirm. New
     `TournamentDetailRoute.test.tsx` for the redirect-when-completed
     case.
-20. [ ] **History page.** New `src/pages/HistoryPage.tsx` — two always-
+20. [x] **History page.** New `src/pages/HistoryPage.tsx` — two always-
     visible sections. **By match**: new
     `listRecentCompletedMatches()` query (cross-tournament, joins
     `match_participants`/`matches`/`tournaments` for the same "round
@@ -571,7 +571,7 @@ list the player pool.
     live partial ranking). _Test:_ `HistoryPage.test.tsx` — both
     sections render, by-tournament links target `/scoreboard` regardless
     of status.
-21. [ ] **Full route wiring + `vercel.json`.** Final `App.tsx` routes:
+21. [x] **Full route wiring + `vercel.json`.** Final `App.tsx` routes:
     `/` → redirect to `/create` (or make Create the index route
     directly — pick one), `/create`, `/active`, `/tournaments/:id`,
     `/tournaments/:id/scoreboard`, `/scoreboard`, `/history`, `/member`,
@@ -580,7 +580,7 @@ list the player pool.
     it's new, needed so hard refresh/direct links to any nested route
     don't 404 on the existing Vercel deployment). _Test:_ full
     `App.test.tsx` routing smoke test across all 5 tabs; `npm run build`.
-22. [ ] **CSS overhaul: bottom-tab mobile-first layout.** Replace
+22. [x] **CSS overhaul: bottom-tab mobile-first layout.** Replace
     `src/index.css`'s fixed `1126px` desktop container with a
     mobile-first, always-bottom-tab-bar layout (per the confirmed
     decision — no responsive switch to a top-nav on wide viewports);
@@ -591,7 +591,7 @@ list the player pool.
     check in light/dark `prefers-color-scheme`, at a mobile viewport
     width and a wide one (bottom tab bar present at both); full RTL
     suite green.
-23. [ ] **Full regression + walkthrough.** `npm run lint`, `npm run
+23. [x] **Full regression + walkthrough.** `npm run lint`, `npm run
     build`, `npm test`. Playwright MCP click-through: add a member →
     Create tab, select 2+ from the checklist, submit → confirm popup →
     land on Manage → Randomize + Start match + Save result (confirm

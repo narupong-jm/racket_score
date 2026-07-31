@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabaseClient'
 import type { Tables } from '../../lib/database.types'
+import type { TournamentStanding } from '../matches/matchesApi'
 
 export type Tournament = Tables<'tournaments'>
 export type TournamentParticipant = Tables<'tournament_participants'>
@@ -43,6 +44,17 @@ export async function addParticipant(
 export async function listParticipants(tournamentId: string): Promise<TournamentParticipant[]> {
   const { data, error } = await supabase
     .from('tournament_participants')
+    .select('*')
+    .eq('tournament_id', tournamentId)
+  if (error) throw error
+  return data
+}
+
+export async function getTournamentStandingsRanked(
+  tournamentId: string,
+): Promise<TournamentStanding[]> {
+  const { data, error } = await supabase
+    .from('tournament_standings')
     .select('*')
     .eq('tournament_id', tournamentId)
   if (error) throw error

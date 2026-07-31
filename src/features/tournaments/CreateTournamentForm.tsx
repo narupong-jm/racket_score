@@ -2,9 +2,15 @@ import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useCreateTournament } from './useCreateTournament'
 import { computePointCap } from './computePointCap'
+import { TOURNAMENT_TYPES, type TournamentType } from './tournamentType'
+import { IconChoice } from '../../components/IconChoice'
+import singlesIcon from '../../assets/icons/single_badminton.png'
+import doublesIcon from '../../assets/icons/double_badminton.png'
 
-const TOURNAMENT_TYPES = ['singles', 'doubles'] as const
-type TournamentType = (typeof TOURNAMENT_TYPES)[number]
+const TOURNAMENT_TYPE_ICONS: Record<TournamentType, string> = {
+  singles: singlesIcon,
+  doubles: doublesIcon,
+}
 
 export function CreateTournamentForm() {
   const { t } = useTranslation()
@@ -46,19 +52,17 @@ export function CreateTournamentForm() {
         {t('tournaments.form.nameLabel')}
         <input type="text" value={name} onChange={(event) => setName(event.target.value)} />
       </label>
-      <label>
-        {t('tournaments.form.typeLabel')}
-        <select
-          value={type}
-          onChange={(event) => setType(event.target.value as TournamentType)}
-        >
-          {TOURNAMENT_TYPES.map((ty) => (
-            <option key={ty} value={ty}>
-              {t(`tournamentType.${ty}`)}
-            </option>
-          ))}
-        </select>
-      </label>
+      <IconChoice<TournamentType>
+        legend={t('tournaments.form.typeLabel')}
+        name="type"
+        options={TOURNAMENT_TYPES.map((ty) => ({
+          value: ty,
+          label: t(`tournamentType.${ty}`),
+          icon: TOURNAMENT_TYPE_ICONS[ty],
+        }))}
+        value={type}
+        onChange={setType}
+      />
       <label>
         {t('tournaments.form.gamesPerMatchLabel')}
         <input

@@ -1,29 +1,27 @@
-import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { CreatePlayerForm } from './features/players/CreatePlayerForm'
-import { PlayerList } from './features/players/PlayerList'
-import { CreateTournamentForm } from './features/tournaments/CreateTournamentForm'
-import { TournamentList } from './features/tournaments/TournamentList'
-import { TournamentDetail } from './features/tournaments/TournamentDetail'
-import { LanguageToggle } from './components/LanguageToggle'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { AppLayout } from './components/AppLayout'
+import { CreateTournamentPage } from './pages/CreateTournamentPage'
+import { ActivePage } from './pages/ActivePage'
+import { OverallScoreboardPage } from './pages/OverallScoreboardPage'
+import { HistoryPage } from './pages/HistoryPage'
+import { MemberPage } from './pages/MemberPage'
+import { TournamentDetailRoute } from './features/tournaments/TournamentDetailRoute'
+import { TournamentScoreboardRoute } from './features/tournaments/TournamentScoreboardRoute'
 
 function App() {
-  const { t } = useTranslation()
-  const [selectedTournamentId, setSelectedTournamentId] = useState<string | null>(null)
-
   return (
-    <main>
-      <LanguageToggle />
-
-      <h1>{t('app.playersHeading')}</h1>
-      <CreatePlayerForm />
-      <PlayerList />
-
-      <h1>{t('app.tournamentsHeading')}</h1>
-      <CreateTournamentForm />
-      <TournamentList selectedId={selectedTournamentId} onSelect={setSelectedTournamentId} />
-      {selectedTournamentId && <TournamentDetail tournamentId={selectedTournamentId} />}
-    </main>
+    <Routes>
+      <Route element={<AppLayout />}>
+        <Route index element={<Navigate to="/create" replace />} />
+        <Route path="/create" element={<CreateTournamentPage />} />
+        <Route path="/active" element={<ActivePage />} />
+        <Route path="/tournaments/:id" element={<TournamentDetailRoute />} />
+        <Route path="/tournaments/:id/scoreboard" element={<TournamentScoreboardRoute />} />
+        <Route path="/scoreboard" element={<OverallScoreboardPage />} />
+        <Route path="/history" element={<HistoryPage />} />
+        <Route path="/member" element={<MemberPage />} />
+      </Route>
+    </Routes>
   )
 }
 

@@ -2,6 +2,14 @@ import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useCreatePlayer } from './useCreatePlayer'
 import { GENDERS, PLAYER_LEVELS, type Gender, type PlayerLevel } from './playerLevels'
+import { IconChoice } from '../../components/IconChoice'
+import maleIcon from '../../assets/icons/male.png'
+import femaleIcon from '../../assets/icons/female.png'
+
+const GENDER_ICONS: Record<Gender, string> = {
+  male: maleIcon,
+  female: femaleIcon,
+}
 
 export function CreatePlayerForm() {
   const { t } = useTranslation()
@@ -31,33 +39,20 @@ export function CreatePlayerForm() {
 
   return (
     <form onSubmit={handleSubmit}>
-      <label>
-        {t('players.form.nameLabel')}
-        <input
-          type="text"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
+      <label className="field">
+        <span className="field-label">{t('players.form.nameLabel')}</span>
+        <input type="text" value={name} onChange={(event) => setName(event.target.value)} />
       </label>
-      <label>
-        {t('players.form.genderLabel')}
-        <select
-          value={gender}
-          onChange={(event) => setGender(event.target.value as Gender)}
-        >
-          {GENDERS.map((g) => (
-            <option key={g} value={g}>
-              {t(`gender.${g}`)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        {t('players.form.levelLabel')}
-        <select
-          value={level}
-          onChange={(event) => setLevel(event.target.value as PlayerLevel)}
-        >
+      <IconChoice<Gender>
+        legend={t('players.form.genderLabel')}
+        name="gender"
+        options={GENDERS.map((g) => ({ value: g, label: t(`gender.${g}`), icon: GENDER_ICONS[g] }))}
+        value={gender}
+        onChange={setGender}
+      />
+      <label className="field">
+        <span className="field-label">{t('players.form.levelLabel')}</span>
+        <select value={level} onChange={(event) => setLevel(event.target.value as PlayerLevel)}>
           {PLAYER_LEVELS.map((l) => (
             <option key={l} value={l}>
               {t(`level.${l}`)}

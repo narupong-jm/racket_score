@@ -223,6 +223,47 @@ export type Database = {
       }
     }
     Views: {
+      player_match_history: {
+        Row: {
+          completed_at: string | null
+          match_id: string | null
+          player_id: string | null
+          points_for: number | null
+          tournament_id: string | null
+          tournament_type: string | null
+          won: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "match_participants_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "match_participants_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "player_stats"
+            referencedColumns: ["player_id"]
+          },
+          {
+            foreignKeyName: "match_participants_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matches_tournament_id_fkey"
+            columns: ["tournament_id"]
+            isOneToOne: false
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       player_stats: {
         Row: {
           effective_level: string | null
@@ -241,10 +282,12 @@ export type Database = {
           games_played: number | null
           games_won: number | null
           matches_played: number | null
+          matches_won: number | null
           name: string | null
           player_id: string | null
           point_diff: number | null
           tournament_id: string | null
+          win_rate: number | null
         }
         Relationships: [
           {

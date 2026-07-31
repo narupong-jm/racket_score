@@ -65,6 +65,7 @@ describe('PlayerList level editability', () => {
       await screen.findByRole('combobox', { name: /level for editable player/i }),
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Editable Player' })).toBeInTheDocument()
   })
 
   it('shows a read-only computed level for a player with 3 or more matches', async () => {
@@ -76,6 +77,7 @@ describe('PlayerList level editability', () => {
     expect(await screen.findByText('Pro')).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: /level for locked player/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /save/i })).toBeNull()
+    expect(screen.getByRole('img', { name: 'Locked Player' })).toBeInTheDocument()
   })
 
   it('saves a level change for an editable player', async () => {

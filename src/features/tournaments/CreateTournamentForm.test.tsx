@@ -53,7 +53,7 @@ describe('CreateTournamentForm', () => {
     renderWithClient(<CreateTournamentForm />)
 
     await user.type(screen.getByLabelText(/name/i), 'Friday Battle')
-    await user.selectOptions(screen.getByLabelText(/type/i), 'doubles')
+    await user.click(screen.getByRole('radio', { name: 'Doubles' }))
 
     const pointsInput = screen.getByLabelText(/points per game/i)
     await user.clear(pointsInput)

@@ -19,7 +19,7 @@ describe('CreatePlayerForm', () => {
   it('blocks submit when name is empty', () => {
     renderWithClient(<CreatePlayerForm />)
 
-    const submitButton = screen.getByRole('button', { name: /add player/i })
+    const submitButton = screen.getByRole('button', { name: /add member/i })
     expect(submitButton).toBeDisabled()
     expect(playersApi.createPlayer).not.toHaveBeenCalled()
   })
@@ -36,10 +36,10 @@ describe('CreatePlayerForm', () => {
     renderWithClient(<CreatePlayerForm />)
 
     await user.type(screen.getByLabelText(/name/i), 'New Player')
-    await user.selectOptions(screen.getByLabelText(/gender/i), 'female')
+    await user.click(screen.getByRole('radio', { name: 'Female' }))
     await user.selectOptions(screen.getByLabelText(/level/i), 'advanced')
 
-    const submitButton = screen.getByRole('button', { name: /add player/i })
+    const submitButton = screen.getByRole('button', { name: /add member/i })
     expect(submitButton).toBeEnabled()
     await user.click(submitButton)
 

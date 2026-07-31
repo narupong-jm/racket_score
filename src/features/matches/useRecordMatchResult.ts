@@ -10,7 +10,7 @@ export function useRecordMatchResult(tournamentId: string) {
       queryClient.invalidateQueries({ queryKey: ['matches', tournamentId] })
       queryClient.invalidateQueries({ queryKey: ['drawInputs', tournamentId] })
       queryClient.invalidateQueries({ queryKey: ['playerStats'] })
-      queryClient.invalidateQueries({ queryKey: ['standings', tournamentId] })
+      queryClient.invalidateQueries({ queryKey: ['tournamentStandingsRanked', tournamentId] })
     },
   })
 }

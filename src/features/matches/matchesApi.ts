@@ -3,6 +3,7 @@ import type { Json, Tables } from '../../lib/database.types'
 
 export type Match = Tables<'matches'>
 export type TournamentStanding = Tables<'tournament_standings'>
+export type MatchGame = Tables<'match_games'>
 
 export interface MatchParticipantInput {
   player_id: string
@@ -81,14 +82,43 @@ export async function listMatches(tournamentId: string): Promise<Match[]> {
   return data
 }
 
-export async function getStandings(tournamentId: string): Promise<TournamentStanding[]> {
+export async function listGamesForMatches(matchIds: string[]): Promise<MatchGame[]> {
+  if (matchIds.length === 0) return []
   const { data, error } = await supabase
-    .from('tournament_standings')
+    .from('match_games')
     .select('*')
-    .eq('tournament_id', tournamentId)
-    .order('games_won', { ascending: false })
-    .order('point_diff', { ascending: false })
-    .order('player_id', { ascending: true }) // stable tiebreak for fully-tied players
+    .in('match_id', matchIds)
+    .order('game_number', { ascending: true })
   if (error) throw error
   return data
+}
+
+export interface RecentCompletedMatch {
+  match: Match
+  tournamentName: string
+  participants: MatchHistoryEntry[]
+  games: MatchGame[]
+}
+
+export async function listRecentCompletedMatches(): Promise<RecentCompletedMatch[]> {
+  const { data, error } = await supabase
+    .from('matches')
+    .select('*, tournaments(name)')
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+  if (error) throw error
+
+  const matches = data ?? []
+  const matchIds = matches.map((m) => m.id)
+  const [participants, games] = await Promise.all([
+    getParticipantsForMatches(matchIds),
+    listGamesForMatches(matchIds),
+  ])
+
+  return matches.map(({ tournaments, ...match }) => ({
+    match,
+    tournamentName: tournaments?.name ?? '',
+    participants: participants.filter((p) => p.match_id === match.id),
+    games: games.filter((g) => g.match_id === match.id),
+  }))
 }

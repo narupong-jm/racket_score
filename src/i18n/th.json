@@ -3,6 +3,36 @@
     "english": "อังกฤษ",
     "thai": "ไทย"
   },
+  "common": {
+    "close": "ปิด"
+  },
+  "nav": {
+    "create": "สร้าง",
+    "active": "กำลังแข่ง",
+    "scoreboard": "ตารางคะแนน",
+    "history": "ประวัติ",
+    "member": "สมาชิก"
+  },
+  "member": {
+    "heading": "สมาชิก",
+    "addHeading": "เพิ่มสมาชิก"
+  },
+  "active": {
+    "loading": "กำลังโหลดทัวร์นาเมนต์...",
+    "loadError": "โหลดทัวร์นาเมนต์ไม่สำเร็จ",
+    "empty": "ยังไม่มีทัวร์นาเมนต์ที่กำลังแข่ง",
+    "roundLabel": "รอบที่ {{n}}"
+  },
+  "history": {
+    "byMatchHeading": "ตามแมตช์",
+    "loadingMatches": "กำลังโหลดแมตช์...",
+    "loadMatchesError": "โหลดแมตช์ไม่สำเร็จ",
+    "noRecentMatches": "ยังไม่มีแมตช์",
+    "byTournamentHeading": "ตามทัวร์นาเมนต์",
+    "loadingTournaments": "กำลังโหลดทัวร์นาเมนต์...",
+    "loadTournamentsError": "โหลดทัวร์นาเมนต์ไม่สำเร็จ",
+    "noTournaments": "ยังไม่มีทัวร์นาเมนต์"
+  },
   "app": {
     "playersHeading": "ผู้เล่น",
     "tournamentsHeading": "ทัวร์นาเมนต์"
@@ -29,6 +59,7 @@
     "loading": "กำลังโหลดรายชื่อผู้เล่น...",
     "loadError": "โหลดรายชื่อผู้เล่นไม่สำเร็จ",
     "empty": "ยังไม่มีผู้เล่น",
+    "columnAvatar": "รูป",
     "columnName": "ชื่อ",
     "columnGender": "เพศ",
     "columnLevel": "ระดับ",
@@ -36,7 +67,7 @@
       "nameLabel": "ชื่อ",
       "genderLabel": "เพศ",
       "levelLabel": "ระดับ",
-      "submit": "เพิ่มผู้เล่น"
+      "submit": "เพิ่มสมาชิก"
     },
     "editableLevel": {
       "ariaLabel": "ระดับของ {{name}}",
@@ -50,6 +81,8 @@
       "gamesPerMatchLabel": "จำนวนเกมต่อแมตช์",
       "pointsPerGameLabel": "คะแนนต่อเกม",
       "deuceCap": "เพดานดิวซ์: {{cap}}",
+      "participantsLegend": "ผู้เข้าร่วม",
+      "notEnoughSelected": "เลือกผู้เล่นอย่างน้อย {{needed}} คน (เลือกแล้ว {{selected}} คน)",
       "submit": "สร้างทัวร์นาเมนต์"
     },
     "list": {
@@ -82,7 +115,58 @@
       "newGenderLabel": "เพศผู้เล่นใหม่",
       "newLevelLabel": "ระดับผู้เล่นใหม่",
       "createAndAdd": "สร้างและเพิ่ม"
+    },
+    "firstMatchPopup": {
+      "heading": "สร้างทัวร์นาเมนต์แล้ว",
+      "body": "แมตช์แรก:",
+      "notDrawn": "จับคู่แมตช์แรกอัตโนมัติไม่สำเร็จ -- ไปจับคู่ที่หน้าจัดการทัวร์นาเมนต์",
+      "confirm": "ไปที่หน้าจัดการทัวร์นาเมนต์"
     }
+  },
+  "scoreboard": {
+    "columnRank": "อันดับ",
+    "columnAvatar": "รูป",
+    "columnName": "ชื่อ",
+    "columnMatchesPlayed": "แข่งแล้ว",
+    "columnMatchesWon": "ชนะ",
+    "columnWinRate": "อัตราชนะ",
+    "columnTotalPoints": "คะแนนรวม",
+    "rankLabel": "อันดับ {{rank}}",
+    "noWinRate": "–",
+    "winRateValue": "{{percent}}%",
+    "periodGroupLabel": "ช่วงเวลา",
+    "periodAllTime": "ทั้งหมด",
+    "periodThisMonth": "เดือนนี้",
+    "typeGroupLabel": "ประเภท",
+    "typeAll": "ทั้งหมด",
+    "loading": "กำลังโหลดตารางคะแนน...",
+    "loadError": "โหลดตารางคะแนนไม่สำเร็จ",
+    "empty": "ยังไม่มีการแข่งขัน"
+  },
+  "manage": {
+    "currentMatchHeading": "แมตช์ปัจจุบัน",
+    "noCurrentMatch": "ยังไม่มีแมตช์ที่กำลังเล่น -- เริ่มแมตช์ถัดไปด้านล่าง",
+    "nextMatchHeading": "แมตช์ถัดไป",
+    "notPickedYet": "ยังไม่ได้จับคู่",
+    "randomize": "สุ่มจับคู่",
+    "startMatch": "เริ่มแมตช์",
+    "drawFailed": "จับคู่แมตช์ไม่สำเร็จ",
+    "notEnoughPlayersWithCount": "ผู้เล่นไม่พอสำหรับจับคู่แมตช์ ต้องการอย่างน้อย {{needed}} คน มีอยู่ {{have}} คน",
+    "gameTeamLabel": "{{team}} -- เกมที่ {{n}}",
+    "saveResult": "บันทึกผล",
+    "confirmResultTitle": "ยืนยันผลนี้หรือไม่?",
+    "confirmResultBody": "แก้ไขไม่ได้หลังจากบันทึกแล้ว",
+    "gameScoreLine": "เกมที่ {{n}}: {{team1}} {{team1Score}} - {{team2}} {{team2Score}}",
+    "cancel": "ยกเลิก",
+    "confirmResultButton": "ยืนยันผล",
+    "roundsPlayedHeading": "รอบที่เล่นแล้ว",
+    "noRoundsPlayed": "ยังไม่มีรอบที่เล่นเสร็จ",
+    "roundLabel": "รอบที่ {{n}}",
+    "finalScore": "{{team1Games}}-{{team2Games}}",
+    "endTournament": "จบทัวร์นาเมนต์",
+    "confirmEndTitle": "จบทัวร์นาเมนต์นี้หรือไม่?",
+    "confirmEndBody": "คุณจะถูกพาไปที่ตารางคะแนนสุดท้าย",
+    "confirmEndButton": "ใช่ จบทัวร์นาเมนต์"
   },
   "matches": {
     "draw": {

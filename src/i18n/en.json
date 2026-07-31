@@ -3,6 +3,36 @@
     "english": "English",
     "thai": "Thai"
   },
+  "common": {
+    "close": "Close"
+  },
+  "nav": {
+    "create": "Create",
+    "active": "Active",
+    "scoreboard": "Scoreboard",
+    "history": "History",
+    "member": "Member"
+  },
+  "member": {
+    "heading": "Member",
+    "addHeading": "Add member"
+  },
+  "active": {
+    "loading": "Loading tournaments...",
+    "loadError": "Failed to load tournaments.",
+    "empty": "No active tournaments",
+    "roundLabel": "Round {{n}}"
+  },
+  "history": {
+    "byMatchHeading": "By match",
+    "loadingMatches": "Loading matches...",
+    "loadMatchesError": "Failed to load matches.",
+    "noRecentMatches": "No matches yet.",
+    "byTournamentHeading": "By tournament",
+    "loadingTournaments": "Loading tournaments...",
+    "loadTournamentsError": "Failed to load tournaments.",
+    "noTournaments": "No tournaments yet."
+  },
   "app": {
     "playersHeading": "Players",
     "tournamentsHeading": "Tournaments"
@@ -29,6 +59,7 @@
     "loading": "Loading players...",
     "loadError": "Failed to load players.",
     "empty": "No players yet.",
+    "columnAvatar": "Photo",
     "columnName": "Name",
     "columnGender": "Gender",
     "columnLevel": "Level",
@@ -36,7 +67,7 @@
       "nameLabel": "Name",
       "genderLabel": "Gender",
       "levelLabel": "Level",
-      "submit": "Add player"
+      "submit": "Add member"
     },
     "editableLevel": {
       "ariaLabel": "Level for {{name}}",
@@ -50,6 +81,8 @@
       "gamesPerMatchLabel": "Games per match",
       "pointsPerGameLabel": "Points per game",
       "deuceCap": "Deuce cap: {{cap}}",
+      "participantsLegend": "Participants",
+      "notEnoughSelected": "Select at least {{needed}} players ({{selected}} selected).",
       "submit": "Create tournament"
     },
     "list": {
@@ -82,7 +115,58 @@
       "newGenderLabel": "New player gender",
       "newLevelLabel": "New player level",
       "createAndAdd": "Create & add"
+    },
+    "firstMatchPopup": {
+      "heading": "Tournament created",
+      "body": "First match:",
+      "notDrawn": "The first match couldn't be drawn automatically -- draw it from Manage Tournament.",
+      "confirm": "Go to Manage Tournament"
     }
+  },
+  "scoreboard": {
+    "columnRank": "Rank",
+    "columnAvatar": "Photo",
+    "columnName": "Name",
+    "columnMatchesPlayed": "Played",
+    "columnMatchesWon": "Won",
+    "columnWinRate": "Win Rate",
+    "columnTotalPoints": "Total Points",
+    "rankLabel": "Rank {{rank}}",
+    "noWinRate": "–",
+    "winRateValue": "{{percent}}%",
+    "periodGroupLabel": "Period",
+    "periodAllTime": "All time",
+    "periodThisMonth": "This month",
+    "typeGroupLabel": "Type",
+    "typeAll": "All",
+    "loading": "Loading scoreboard...",
+    "loadError": "Failed to load scoreboard.",
+    "empty": "No matches yet."
+  },
+  "manage": {
+    "currentMatchHeading": "Current match",
+    "noCurrentMatch": "No match in progress -- start the next match below",
+    "nextMatchHeading": "Next match",
+    "notPickedYet": "Not picked yet",
+    "randomize": "Randomize",
+    "startMatch": "Start match",
+    "drawFailed": "Failed to draw a match.",
+    "notEnoughPlayersWithCount": "Not enough players to draw a match. Need at least {{needed}}, have {{have}}.",
+    "gameTeamLabel": "{{team}} -- Game {{n}}",
+    "saveResult": "Save result",
+    "confirmResultTitle": "Confirm this result?",
+    "confirmResultBody": "It can't be edited after.",
+    "gameScoreLine": "Game {{n}}: {{team1}} {{team1Score}} - {{team2}} {{team2Score}}",
+    "cancel": "Cancel",
+    "confirmResultButton": "Confirm result",
+    "roundsPlayedHeading": "Rounds played",
+    "noRoundsPlayed": "No rounds played yet.",
+    "roundLabel": "Round {{n}}",
+    "finalScore": "{{team1Games}}-{{team2Games}}",
+    "endTournament": "End tournament",
+    "confirmEndTitle": "End this tournament?",
+    "confirmEndBody": "You'll be taken to its final scoreboard.",
+    "confirmEndButton": "Yes, end tournament"
   },
   "matches": {
     "draw": {

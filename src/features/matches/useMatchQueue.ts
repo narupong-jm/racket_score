@@ -1,35 +1,55 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  createMatch,
   getParticipantsForMatches,
+  listGamesForMatches,
   listMatches,
   type Match,
+  type MatchGame,
   type MatchHistoryEntry,
+  type MatchParticipantInput,
 } from './matchesApi'
 
-export interface QueuedMatch {
-  match: Match
+export interface TournamentMatches {
+  matches: Match[]
   participants: MatchHistoryEntry[]
+  games: MatchGame[]
 }
 
 /**
- * The single-court queue for a tournament: at most 2 non-completed matches at
- * once (index 0 = current match being played, index 1 = the pre-queued next one).
+ * All of a tournament's matches plus their participants/game scores, in one
+ * query -- the current match (at most one 'queued' row, per the single-court
+ * model) and the completed "rounds played" history are both derived from
+ * this by the caller, since "next match" is ephemeral client-side state
+ * (not persisted) until "Start match" promotes it via useStartNextMatch.
  */
-export function useMatchQueue(tournamentId: string) {
-  return useQuery<QueuedMatch[]>({
+export function useTournamentMatches(tournamentId: string) {
+  return useQuery<TournamentMatches>({
     queryKey: ['matches', tournamentId],
     queryFn: async () => {
       const matches = await listMatches(tournamentId)
-      const queued = matches
-        .filter((m) => m.status === 'queued')
-        .sort((a, b) => a.sequence_number - b.sequence_number)
+      const matchIds = matches.map((m) => m.id)
+      const [participants, games] = await Promise.all([
+        getParticipantsForMatches(matchIds),
+        listGamesForMatches(matchIds),
+      ])
+      return { matches, participants, games }
+    },
+  })
+}
 
-      const participants = await getParticipantsForMatches(queued.map((m) => m.id))
+export function useStartNextMatch(tournamentId: string) {
+  const queryClient = useQueryClient()
 
-      return queued.map((match) => ({
-        match,
-        participants: participants.filter((p) => p.match_id === match.id),
-      }))
+  return useMutation({
+    mutationFn: async (participants: MatchParticipantInput[]) => {
+      const matches = await listMatches(tournamentId)
+      const nextSequenceNumber =
+        matches.reduce((max, m) => Math.max(max, m.sequence_number), 0) + 1
+      return createMatch(tournamentId, nextSequenceNumber, participants)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['matches', tournamentId] })
     },
   })
 }

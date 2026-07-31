@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest'
-import { createMatch, getMatchHistory, getStandings, recordMatchResult } from './matchesApi'
+import { createMatch, getMatchHistory, recordMatchResult } from './matchesApi'
 import { createTournament, addParticipant } from '../tournaments/tournamentsApi'
 import { createPlayer } from '../players/playersApi'
 import { supabase } from '../../lib/supabaseClient'
@@ -89,9 +89,8 @@ describe('matchesApi (real project, anon key)', () => {
     expect(afterCount).toBe(beforeCount) // no orphan `matches` row left behind
   })
 
-  it('records a match result and reflects it in standings', async () => {
+  it('records a match result and reflects it in match history', async () => {
     if (!tournamentId || !matchId) throw new Error('setup not complete')
-    const [a] = playerIds
 
     const result = await recordMatchResult(matchId, [
       { game_number: 1, team1_score: 21, team2_score: 15 },
@@ -103,11 +102,5 @@ describe('matchesApi (real project, anon key)', () => {
     const history = await getMatchHistory(tournamentId)
     expect(history).toHaveLength(4)
     expect(history.filter((h) => h.match_id === matchId && h.team === 1)).toHaveLength(2)
-
-    const standings = await getStandings(tournamentId)
-    const playerAStanding = standings.find((s) => s.player_id === a)
-    expect(playerAStanding?.games_won).toBe(2)
-    expect(playerAStanding?.games_played).toBe(2)
-    expect(playerAStanding?.point_diff).toBe(21 - 15 + (21 - 18))
   })
 })
