@@ -291,7 +291,7 @@ teammatePairs: Set<canonical-id-pair>}`. _Test:_ `tsc --noEmit` only.
    add a participant without reloading and confirm the Draw section
    picks it up immediately; record a match result without reloading and
    confirm Standings updates immediately.
-5. **Final security check** — `get_advisors` + `get_logs` spot-check for
+5. [x] **Final security check** — `get_advisors` + `get_logs` spot-check for
    regressions/errors from the smoke-test traffic.
 
 ---
