@@ -354,10 +354,17 @@ list the player pool.
 
 1. [ ] **Dependencies + asset groundwork.** `npm install react-router-dom`
    (`^7.18.2`, compatible with installed `react@^18.3.1`). `git mv Material
-   src/assets/icons` (Vite can't import from outside `src/`) — **7
-   files**: `male.png`, `female.png`, `single_badminton.png`,
-   `double_badminton.png`, `scoreboard_winner1.png`,
-   `scoreboard_winner2.png`, `scoreboard_winner3.png`. Delete dead
+   src/assets/icons` (Vite can't import from outside `src/`) — **12
+   files**: gender/type pickers `male.png`, `female.png`,
+   `single_badminton.png`, `double_badminton.png`; scoreboard medals
+   `scoreboard_winner1.png`, `scoreboard_winner2.png`,
+   `scoreboard_winner3.png`; bottom-tab nav icons `create_tournament.png`
+   (Create), `active.png` (Active), `overall_scoreboard.png`
+   (Scoreboard), `history_by_person.png` (History), `member.png`
+   (Member) — note the nav icons split across two visual styles (3
+   single-tone blue-gradient: create/active/history; 2 full-color flat:
+   scoreboard/member) that step 22's CSS pass should deliberately
+   reconcile or accept, not leave as an oversight. Delete dead
    `src/App.css`. _Test:_ `npm run build` succeeds; `git status` shows
    only the rename + deletion + package files.
 2. [ ] **Remove the late-join feature.** Delete
