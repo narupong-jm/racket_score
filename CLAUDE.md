@@ -67,10 +67,16 @@ Read these files first, in this order, before doing any implementation work:
 - Supabase (project `racket-score`, separate from the unrelated inactive project in the account),
   RLS enabled on every table using permissive `anon` policies (no-auth app by design) — **created
   and live** (Phase 2); see `src/lib/supabaseClient.ts`/`database.types.ts`.
-- Deployment: Vercel, via GitHub + Vercel dashboard (no Vercel CLI/MCP available in this
-  environment — confirm this hasn't changed before assuming otherwise). **Live** at the URL the
-  user provided during Phase 12 — ask them for it again if you don't have it in context, don't
-  guess/construct a Vercel URL.
+- Deployment: Vercel, via GitHub + Vercel dashboard. A Vercel MCP connector (`claude.ai Vercel`) is
+  now available too (confirmed working during the Phase 14 patch, 2026-07-31) — it needs an
+  interactive OAuth step the first time in a session (calling its `authenticate` tool returns
+  instructions to ask the user to run `/mcp` and select "claude.ai Vercel"; this cannot be
+  completed non-interactively). Once connected: team `nrup-mm`
+  (`team_5rCNsosyamIm9vbTbgMLg5s5`), project `racket-score` (`prj_dSp3IzBqxjv9hntdiXaQUL4ZPtrO`) —
+  use `list_deployments`/`get_deployment`/`get_deployment_build_logs` to check build/deploy status
+  directly instead of asking the user to check the dashboard manually. Still don't
+  guess/construct a Vercel deployment URL from scratch — read it from `list_deployments`/
+  `get_project` (or ask the user) instead.
 
 **Git author email / Vercel deploy note:** the local git identity was auto-configured to
 `j.nrup@Js-MacBook-Air.local` (a machine-generated placeholder, not a real address), which is not
