@@ -276,7 +276,7 @@ teammatePairs: Set<canonical-id-pair>}`. _Test:_ `tsc --noEmit` only.
    participants → draw match → record result → standings update →
    language toggle. Cross-check final DB state via `execute_sql` against
    the production project.
-4. **Fix stale query-cache bug found in smoke test.** `useAddParticipant`
+4. [x] **Fix stale query-cache bug found in smoke test.** `useAddParticipant`
    (`src/features/tournaments/useAddParticipant.ts`) only invalidates
    `['tournamentParticipants', tournamentId]`, not `['drawInputs',
    tournamentId]` — so the Draw section keeps showing the pre-add

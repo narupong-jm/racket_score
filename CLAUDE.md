@@ -41,6 +41,19 @@ Read these three files first, in this order, before doing any implementation wor
 - Deployment: Vercel, via GitHub + Vercel dashboard (no Vercel CLI/MCP available in this
   environment — confirm this hasn't changed before assuming otherwise)
 
+**Git author email / Vercel deploy note:** the local git identity was auto-configured to
+`j.nrup@Js-MacBook-Air.local` (a machine-generated placeholder, not a real address), which is not
+one of the GitHub account's verified emails. Vercel's GitHub integration checks the pushed commit's
+author email against the connected GitHub account and **silently blocks the deploy** ("Deployment
+Blocked: The commit author email ... is not a valid email") if they don't match — the push to
+`origin/main` still succeeds, so this is easy to miss; you have to check the Vercel dashboard to see
+it. Before pushing a commit that needs to actually deploy, confirm `git config user.email` is set to
+the GitHub account's verified email (e.g. via `gh api user` — note the public `email` field is often
+`null` if private, so ask the user to confirm rather than guessing). If a bad-author commit already
+reached `origin/main`, the fix is `git config user.email <verified-email>` then `git commit --amend
+--reset-author --no-edit` and `git push --force-with-lease` — confirm with the user first since it
+rewrites already-pushed history on the shared branch.
+
 Commands: `npm run dev`, `npm run build` (runs `tsc -b && vite build`), `npm run lint` (ESLint
 flat config), `npm run format` (Prettier — `.prettierignore` excludes the root planning docs so it
 never reformats them), `npm run test` (Vitest). Single test file: `npx vitest run
