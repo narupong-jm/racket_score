@@ -712,21 +712,36 @@ ever violated, but this should be called out if a future bug report suggests oth
 
 ## Critical Files
 
-- `SPEC.md`, `RESEARCH.md` — source of truth for requirements/environment
-- `src/features/matchmaking/generateNextMatch.ts` (+ helpers) — the core
-  algorithm; highest-risk, most heavily tested piece
-- `src/lib/database.types.ts` — generated Supabase types underpinning the
-  data-access layer
-- Supabase migrations / `player_stats` & `tournament_standings` views —
-  source of truth for win-rate, skill level, and standings
+- `docs/SPEC.md`, `docs/RESEARCH.md` — source of truth for requirements/environment
+- `src/features/matchmaking/generateNextMatch.ts` (+ helpers, including the `mandatoryIds`
+  equal-match-count invariant in `selectCandidatePool.ts` and the mixed-doubles hard filter
+  in `pickDoublesQuartet.ts`/`splitIntoTeams.ts`, per Phase 14) — the core algorithm;
+  highest-risk, most heavily tested piece
+- `src/features/matchmaking/isMixedDoublesRuleViolated.ts` — shared gender-violation check
+  used by both manual-edit surfaces (Phase 14)
+- `src/components/DrawSlotSelect.tsx` — shared inline-edit control for a drawn-but-not-yet-
+  started match, used by both `TournamentDetail.tsx`'s Next match card and
+  `FirstMatchDrawnPopup.tsx` (Phase 14)
+- `src/features/tournaments/useCreateTournamentWithFirstDraw.ts` — computes the first-match
+  draw but no longer persists it directly as of Phase 14; persistence is deferred to the
+  popup's Confirm action (`useStartNextMatch`, reused from the Next-match flow)
+- `src/lib/database.types.ts` — generated Supabase types underpinning the data-access layer
+  (includes `matches.manually_adjusted`, added in Phase 14)
+- Supabase migrations / `player_stats`, `tournament_standings`, and `player_match_history`
+  views — source of truth for win-rate, effective skill level, and both scoreboards
 
 ## End-to-End Verification
 
-After Phase 12, the full critical path (create player → create tournament
-→ add participants → draw matches → record results with valid/invalid
-scores → watch standings and skill levels update → toggle language) will
-have been exercised at three levels: pure-logic unit tests (Vitest, no
-I/O), integration tests against the real Supabase project (via the JS
-client and cross-checked with the Supabase MCP tools), and full
-browser-driven runs via Playwright MCP against both the local dev server
-and the deployed Vercel URL.
+As of Phase 14, the full critical path has been exercised at three levels: pure-logic unit
+tests (Vitest, no I/O — 181 tests across the suite as of this note), integration tests
+against the real Supabase project (via the JS client and cross-checked with the Supabase MCP
+tools), and full browser-driven runs via Playwright MCP against both the local dev server and
+the deployed Vercel URL. The path covered: create a player → create a tournament (singles or
+doubles) → select participants from the pool → auto-drawn first match, optionally edited
+(with a non-blocking gender-balance warning) before confirming → Randomize / Edit / Start the
+Next match in Manage Tournament, including Current-match exclusion from the draw pool and its
+reuse-fallback warning → record a result with valid/invalid scores (confirm-before-save,
+permanently locked after) → win-rate scoreboards (per-tournament and cross-tournament Overall,
+with period/type filters) and skill levels update live → History tab (both sections
+collapsible, default-collapsed, manually-adjusted badges) → toggle language and theme. All 5
+tabs, both languages, both light/dark themes, no console errors.
