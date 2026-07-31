@@ -602,7 +602,7 @@ list the player pool.
     the numbers change → History: both sections render, by-tournament
     link reaches the same scoreboard. Both languages, both themes, no
     console errors.
-24. [ ] **Deploy + live smoke test.** Push, confirm the Vercel build
+24. [x] **Deploy + live smoke test.** Push, confirm the Vercel build
     succeeds (watch for the `CLAUDE.md`-documented git-author-email
     deploy-block gotcha from Phase 12), repeat step 23's walkthrough
     against the live URL, including a hard refresh on a nested route to
