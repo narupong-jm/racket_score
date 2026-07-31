@@ -15,6 +15,7 @@ export function useCreatePlayerAndAddParticipant(tournamentId: string) {
       queryClient.invalidateQueries({ queryKey: ['players'] })
       queryClient.invalidateQueries({ queryKey: ['playerStats'] })
       queryClient.invalidateQueries({ queryKey: ['tournamentParticipants', tournamentId] })
+      queryClient.invalidateQueries({ queryKey: ['drawInputs', tournamentId] })
     },
   })
 }

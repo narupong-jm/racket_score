@@ -7,6 +7,7 @@ export function useAddParticipant(tournamentId: string) {
     mutationFn: (playerId: string) => addParticipant(tournamentId, playerId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tournamentParticipants', tournamentId] })
+      queryClient.invalidateQueries({ queryKey: ['drawInputs', tournamentId] })
     },
   })
 }

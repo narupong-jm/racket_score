@@ -266,17 +266,32 @@ teammatePairs: Set<canonical-id-pair>}`. _Test:_ `tsc --noEmit` only.
 1. [x] **Push to GitHub** (no Vercel CLI/MCP available per `RESEARCH.md`, so
    this is the viable path). _Test:_ `git remote -v`, repo visible on
    GitHub with expected files.
-2. **User connects the repo in the Vercel dashboard** (their own auth —
+2. [x] **User connects the repo in the Vercel dashboard** (their own auth —
    not something this session can perform), sets `VITE_SUPABASE_URL` /
    `VITE_SUPABASE_ANON_KEY` from the MCP `get_project_url`/
    `get_publishable_keys` output. _Test:_ Vercel build log succeeds; app
    shell loads at the generated URL.
-3. **Post-deploy smoke test** — Playwright MCP (or claude-in-chrome MCP)
+3. [x] **Post-deploy smoke test** — Playwright MCP (or claude-in-chrome MCP)
    against the live URL: create player → create tournament → add
    participants → draw match → record result → standings update →
    language toggle. Cross-check final DB state via `execute_sql` against
    the production project.
-4. **Final security check** — `get_advisors` + `get_logs` spot-check for
+4. **Fix stale query-cache bug found in smoke test.** `useAddParticipant`
+   (`src/features/tournaments/useAddParticipant.ts`) only invalidates
+   `['tournamentParticipants', tournamentId]`, not `['drawInputs',
+   tournamentId]` — so the Draw section keeps showing the pre-add
+   participant count (and a wrongly-disabled "Draw next match" button)
+   until a manual page reload. `useRecordMatchResult`
+   (`src/features/matches/useRecordMatchResult.ts`) invalidates
+   `['matches', ...]`, `['drawInputs', ...]`, `['playerStats']` but not
+   `['standings', tournamentId]` — so the Standings table keeps showing
+   stale 0/0/0 rows after a result is recorded until reload. DB state is
+   correct in both cases; this is UI-only. Add the missing
+   `invalidateQueries` calls in both hooks. _Test:_ Playwright MCP —
+   add a participant without reloading and confirm the Draw section
+   picks it up immediately; record a match result without reloading and
+   confirm Standings updates immediately.
+5. **Final security check** — `get_advisors` + `get_logs` spot-check for
    regressions/errors from the smoke-test traffic.
 
 ---
