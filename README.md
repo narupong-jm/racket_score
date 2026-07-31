@@ -6,7 +6,13 @@ tournaments.
 
 ## Screenshots
 
-<!-- TODO: add screenshots -->
+| Active | Create Tournament |
+|:---:|:---:|
+| <img src="docs/screenshots/active.png" width="220" /> | <img src="docs/screenshots/create-tournament.png" width="220" /> |
+
+| Overall Scoreboard | Member |
+|:---:|:---:|
+| <img src="docs/screenshots/overall-scoreboard.png" width="220" /> | <img src="docs/screenshots/member.png" width="220" /> |
 
 ## Features
 
