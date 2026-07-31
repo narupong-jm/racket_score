@@ -36,6 +36,7 @@ vi.mock('../features/matches/matchesApi', async (importOriginal) => {
   return {
     ...actual,
     createMatch: vi.fn(),
+    listMatches: vi.fn(),
   }
 })
 
@@ -105,6 +106,7 @@ const firstMatch: Match = {
   status: 'queued',
   created_at: '2026-01-01T00:00:00Z',
   completed_at: null,
+  manually_adjusted: false,
 }
 
 afterEach(() => {
@@ -131,7 +133,7 @@ describe('CreateTournamentPage', () => {
     expect(tournamentsApi.createTournament).not.toHaveBeenCalled()
   })
 
-  it('succeeds with 4 selected for Doubles: shows the popup with the correct matchup and navigates on confirm', async () => {
+  it('succeeds with 4 selected for Doubles: shows the popup with the correct matchup, defers persistence until Confirm, and navigates after', async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
     vi.mocked(playersApi.listPlayerStats).mockResolvedValue(players.map((p) => makeStats(p.id)))
     vi.mocked(tournamentsApi.createTournament).mockResolvedValue(tournament)
@@ -153,6 +155,7 @@ describe('CreateTournamentPage', () => {
         { playerId: 'p4', team: 2 },
       ],
     })
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
     vi.mocked(matchesApi.createMatch).mockResolvedValue(firstMatch)
 
     const user = userEvent.setup()
@@ -177,23 +180,94 @@ describe('CreateTournamentPage', () => {
         points_per_game: 21,
       })
     })
-    await waitFor(() => {
-      expect(matchesApi.createMatch).toHaveBeenCalledWith('t1', 1, [
-        { player_id: 'p1', team: 1 },
-        { player_id: 'p2', team: 1 },
-        { player_id: 'p3', team: 2 },
-        { player_id: 'p4', team: 2 },
-      ])
-    })
 
     expect(
       await screen.findByText(
         (_, element) => element?.textContent === 'First match: Alice & Bob vs Carol & Dave',
       ),
     ).toBeInTheDocument()
+    // Not persisted yet -- the popup shows a computed draft until Confirm is clicked.
+    expect(matchesApi.createMatch).not.toHaveBeenCalled()
 
     await user.click(screen.getByRole('button', { name: 'Go to Manage Tournament' }))
 
+    await waitFor(() => {
+      expect(matchesApi.createMatch).toHaveBeenCalledWith(
+        't1',
+        1,
+        [
+          { player_id: 'p1', team: 1 },
+          { player_id: 'p2', team: 1 },
+          { player_id: 'p3', team: 2 },
+          { player_id: 'p4', team: 2 },
+        ],
+        false,
+      )
+    })
+
     expect(await screen.findByText('Manage tournament t1')).toBeInTheDocument()
+  })
+
+  it('allows editing the first-match popup before confirming, marking it manually adjusted', async () => {
+    const playersWithBench = [...players, makePlayer('p5', 'Eve')]
+    vi.mocked(playersApi.listPlayers).mockResolvedValue(playersWithBench)
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue(
+      playersWithBench.map((p) => makeStats(p.id)),
+    )
+    vi.mocked(tournamentsApi.createTournament).mockResolvedValue(tournament)
+    vi.mocked(tournamentsApi.addParticipant).mockResolvedValue({
+      tournament_id: 't1',
+      player_id: 'p1',
+      joined_at: '2026-01-01T00:00:00Z',
+    })
+    vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
+      candidates: [],
+      pairingHistory: { opponentPairs: new Set(), teammatePairs: new Set() },
+    })
+    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
+      ok: true,
+      participants: [
+        { playerId: 'p1', team: 1 },
+        { playerId: 'p2', team: 1 },
+        { playerId: 'p3', team: 2 },
+        { playerId: 'p4', team: 2 },
+      ],
+    })
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.createMatch).mockResolvedValue(firstMatch)
+
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.type(await screen.findByLabelText(/name/i), 'Sunday Smash')
+    await user.click(screen.getByRole('radio', { name: 'Doubles' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Alice' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Bob' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Carol' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Dave' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Eve' })) // bench player, not drawn
+    await user.click(screen.getByRole('button', { name: /create tournament/i }))
+
+    await screen.findByText(
+      (_, element) => element?.textContent === 'First match: Alice & Bob vs Carol & Dave',
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Team 1 player 1' }), 'p5')
+    await user.click(screen.getByRole('button', { name: 'Go to Manage Tournament' }))
+
+    await waitFor(() => {
+      expect(matchesApi.createMatch).toHaveBeenCalledWith(
+        't1',
+        1,
+        [
+          { player_id: 'p5', team: 1 },
+          { player_id: 'p2', team: 1 },
+          { player_id: 'p3', team: 2 },
+          { player_id: 'p4', team: 2 },
+        ],
+        true,
+      )
+    })
   })
 })

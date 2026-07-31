@@ -7,9 +7,11 @@ import { useCreateTournamentWithFirstDraw } from '../features/tournaments/useCre
 import { FirstMatchDrawnPopup } from '../features/tournaments/FirstMatchDrawnPopup'
 import { computePointCap } from '../features/tournaments/computePointCap'
 import { TOURNAMENT_TYPES, type TournamentType } from '../features/tournaments/tournamentType'
-import { getNeededPlayerCount } from '../features/matchmaking/generateNextMatch'
+import { getNeededPlayerCount, type GeneratedMatchParticipant } from '../features/matchmaking/generateNextMatch'
+import { useStartNextMatch } from '../features/matches/useMatchQueue'
 import { IconChoice } from '../components/IconChoice'
 import { Avatar } from '../components/Avatar'
+import type { RosterPlayer } from '../components/DrawSlotSelect'
 import singlesIcon from '../assets/icons/single_badminton.png'
 import doublesIcon from '../assets/icons/double_badminton.png'
 
@@ -27,13 +29,20 @@ export function CreateTournamentPage() {
   const [gamesPerMatch, setGamesPerMatch] = useState(3)
   const [pointsPerGame, setPointsPerGame] = useState(21)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [submittedType, setSubmittedType] = useState<TournamentType>('singles')
+  const [submittedParticipantIds, setSubmittedParticipantIds] = useState<string[]>([])
 
   const { data: players } = usePlayers()
   const { data: statsList } = usePlayerStatsList()
   const { mutate, isPending, data: result } = useCreateTournamentWithFirstDraw()
+  const startFirstMatch = useStartNextMatch(result?.tournament.id ?? '')
 
   const statsByPlayerId = new Map((statsList ?? []).map((s) => [s.player_id, s]))
-  const playerNameById = new Map((players ?? []).map((p) => [p.id, p.name]))
+  const rosterPlayers: RosterPlayer[] = submittedParticipantIds.flatMap((id) => {
+    const player = players?.find((p) => p.id === id)
+    if (!player || (player.gender !== 'male' && player.gender !== 'female')) return []
+    return [{ id: player.id, name: player.name, gender: player.gender }]
+  })
 
   const trimmedName = name.trim()
   const cap = computePointCap(pointsPerGame)
@@ -55,6 +64,8 @@ export function CreateTournamentPage() {
     event.preventDefault()
     if (!isValid) return
 
+    setSubmittedType(type)
+    setSubmittedParticipantIds([...selectedIds])
     mutate({
       tournament: {
         name: trimmedName,
@@ -64,6 +75,22 @@ export function CreateTournamentPage() {
       },
       participantIds: [...selectedIds],
     })
+  }
+
+  function handleConfirmFirstMatch(participants: GeneratedMatchParticipant[], manuallyAdjusted: boolean) {
+    if (!result) return
+    startFirstMatch.mutate(
+      {
+        participants: participants.map((p) => ({ player_id: p.playerId, team: p.team })),
+        manuallyAdjusted,
+      },
+      { onSuccess: () => navigate(`/tournaments/${result.tournament.id}`) },
+    )
+  }
+
+  function handleDismissPopup() {
+    if (!result) return
+    navigate(`/tournaments/${result.tournament.id}`)
   }
 
   return (
@@ -154,8 +181,12 @@ export function CreateTournamentPage() {
         <FirstMatchDrawnPopup
           open
           drawParticipants={result.drawParticipants}
-          playerNameById={playerNameById}
-          onGoToManageTournament={() => navigate(`/tournaments/${result.tournament.id}`)}
+          matchType={submittedType}
+          rosterPlayers={rosterPlayers}
+          onConfirm={handleConfirmFirstMatch}
+          onDismiss={handleDismissPopup}
+          isConfirming={startFirstMatch.isPending}
+          confirmError={startFirstMatch.isError}
         />
       )}
     </section>

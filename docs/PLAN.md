@@ -619,6 +619,95 @@ Step 19 is the single largest, riskiest step in this phase (a full
 rework of the current/next/queue model) — consider splitting it further
 during implementation if it proves too large for one sitting.
 
+## Phase 14 — IMPROVEMENT2 Patch (Matchmaking Corrections, Manual Draw Edit, History Collapse)
+
+A narrower patch on the shipped Phase 13 app, based on post-launch hands-on testing
+feedback (`docs/IMPROVEMENT2.md`), not another nav/flow overhaul. `docs/SPEC.md` §5/§6/§9
+and this file's domain-model notes were already revised to describe the corrected target
+behavior before this phase's implementation.
+
+**Confirmed decisions (this session):**
+- Doubles quartet selection and team-split both promote gender balance to a **hard
+  filter above skill balance** (previously a tiebreak).
+- Equal-match-count fairness becomes a **hard invariant** (max − min ≤ 1 after every
+  match), enforced via a new `mandatoryIds` concept in `selectCandidatePool`.
+- Manual draw editing **warns but does not block** on a gender-balance violation, and is
+  flagged in the DB (`matches.manually_adjusted`) and shown in History.
+- The first-match popup's `createMatch()` persistence is **deferred until Confirm**,
+  matching the Next-match card's model, rather than persisting immediately and adding a
+  separate update-on-edit path.
+- History's collapsed state shows heading + toggle only (no item peek), default
+  collapsed, each section independent.
+
+1. [x] **Equal-match-count hard invariant.** `selectCandidatePool.ts` returns a new
+   `mandatoryIds: Set<string>` alongside `pool`; `pickSinglesPair.ts`/
+   `pickDoublesQuartet.ts` take an optional `mandatoryIds` param and filter candidate
+   combinations to those containing every mandatory id before applying skill/gender
+   criteria; `generateNextMatch.ts` threads it through. _Test:_ updated
+   `selectCandidatePool.test.ts` cases plus a new tier-expansion-shortfall case; new
+   mandatory-filtering cases in `pickDoublesQuartet.test.ts`/`pickSinglesPair.test.ts`;
+   a new multi-round invariant-simulation test asserting max−min ≤ 1 after every match.
+2. [x] **Mixed-doubles hard filter.** Reorder `pickDoublesQuartet.ts` (gender-imbalance
+   filter before skill-spread filter) and `splitIntoTeams.ts` (non-mixed-team-count
+   filter before skill-sum-diff filter). _Test:_ replace each file's "skill wins over
+   gender" test with a "gender wins over skill" test; confirm existing tiebreak tests
+   still pass.
+3. [x] **Current-match draw exclusion.** Thread `currentMatchParticipantIds` into
+   `NextMatchCard` (`TournamentDetail.tsx`); `handleRandomize` filters them out of
+   `drawInputs.candidates` before calling `generateNextMatch`, falling back to the
+   unfiltered pool (with a UI warning) only if too few players remain. _Test:_ extend
+   `TournamentDetail.test.tsx` for both the exclusion and fallback-with-warning cases.
+4. [x] **History collapsible sections.** `ByMatchSection`/`ByTournamentSection` in
+   `HistoryPage.tsx` each get independent `useState` collapse state (default collapsed,
+   heading-only when collapsed), a new `.section-heading-row`/toggle-button CSS pattern,
+   and `history.showMore`/`showLess` i18n keys. _Test:_ default-collapsed, toggle
+   expand/collapse, and independence-of-the-two-sections cases in
+   `HistoryPage.test.tsx`.
+5. [x] **`manually_adjusted` migration.** Via Supabase MCP: add
+   `matches.manually_adjusted boolean not null default false`; extend the `create_match`
+   function with `p_manually_adjusted`; regenerate `database.types.ts`; `get_advisors`
+   check. `matchesApi.ts`'s `createMatch` gains a `manuallyAdjusted` param. _Test:_ real
+   anon-key integration test exercises the new param/column.
+6. [x] **Shared gender-violation helper.** New pure function (e.g.
+   `isMixedDoublesRuleViolated`) in `src/features/matchmaking/`, reusing
+   `splitIntoTeams.ts`'s gender-imbalance logic, for both edit surfaces below to call.
+   _Test:_ unit tests mirroring `splitIntoTeams.test.ts`'s gender fixtures.
+7. [x] **Next-match card inline edit.** Add an Edit action to `NextMatchCard`: tap a
+   drawn player, pick a replacement from the roster; tracks `manuallyAdjusted`, shows the
+   non-blocking warning via step 6's helper (doubles only), and passes the flag through
+   `handleStartMatch` → `startNextMatch` → `createMatch`. _Test:_ extend
+   `TournamentDetail.test.tsx` for swap, warning show/hide, and flag propagation.
+8. [x] **First-match popup: deferred persistence + inline edit.** Restructure
+   `useCreateTournamentWithFirstDraw.ts` to stop calling `createMatch` during
+   tournament/participant creation; it now returns the draft draw + roster candidates.
+   `FirstMatchDrawnPopup.tsx` gets the same inline-edit/warning affordance as step 7. A
+   new confirm mutation calls `createMatch` (with `manuallyAdjusted`) on the popup's
+   Confirm click; only then does the app navigate to Manage Tournament. _Test:_ update
+   the orchestration hook's existing tests (persistence moves out), add tests for the new
+   confirm mutation and the popup's edit/warning behavior.
+9. [x] **History: manually-adjusted badge.** `listRecentCompletedMatches` selects
+   `manually_adjusted`; `ByMatchSection` renders a badge for flagged rows via a new
+   `history.manuallyAdjustedBadge` key. _Test:_ extend `HistoryPage.test.tsx` for the
+   badge's presence/absence.
+10. [x] **Full regression + walkthrough.** `npm run lint`, `npm run build`, `npm test`.
+    Playwright MCP click-through covering all of §1-§3 in one pass (create a tournament →
+    edit the first-match popup's lineup, see the warning if made non-mixed → Confirm →
+    land on Manage → Randomize Next match with someone currently on court playing, verify
+    exclusion or the fallback warning if the pool is tight → Edit the Next match → Start
+    → Save result → History tab: both sections collapsed by default, toggle
+    independently, manually-adjusted rows show their badge), both languages, both
+    themes, no console errors.
+
+**Known risks:** step 8 is the riskiest step in this phase — it restructures an
+already-shipped, already-tested orchestration mutation (`useCreateTournamentWithFirstDraw`,
+flagged as a "known risk" area back in Phase 13 too) to defer persistence; regression-test
+it thoroughly against the existing partial-creation-failure path
+(`PartialTournamentCreationError`) before moving on. The hard equal-match-count invariant
+(step 1) assumes at most two distinct match-count tiers can coexist when the invariant is
+maintained continuously from tournament start — the `mandatoryIds` implementation is
+written to degrade safely (never excludes a lower-count player) even if that assumption is
+ever violated, but this should be called out if a future bug report suggests otherwise.
+
 ---
 
 ## Critical Files

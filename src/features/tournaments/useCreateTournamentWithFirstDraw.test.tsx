@@ -11,7 +11,6 @@ import * as useDrawInputsModule from '../matches/useDrawInputs'
 import * as matchesApi from '../matches/matchesApi'
 import * as generateNextMatchModule from '../matchmaking/generateNextMatch'
 import type { Tournament } from './tournamentsApi'
-import type { Match } from '../matches/matchesApi'
 
 vi.mock('./tournamentsApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./tournamentsApi')>()
@@ -62,21 +61,12 @@ const tournament: Tournament = {
   ended_at: null,
 }
 
-const firstMatch: Match = {
-  id: 'm1',
-  tournament_id: 't1',
-  sequence_number: 1,
-  status: 'queued',
-  created_at: '2026-01-01T00:00:00Z',
-  completed_at: null,
-}
-
 afterEach(() => {
   vi.clearAllMocks()
 })
 
 describe('useCreateTournamentWithFirstDraw', () => {
-  it('happy path: creates the tournament, adds every participant, and draws the first match', async () => {
+  it('happy path: creates the tournament, adds every participant, and computes the first-match draw without persisting it', async () => {
     vi.mocked(tournamentsApi.createTournament).mockResolvedValue(tournament)
     vi.mocked(tournamentsApi.addParticipant).mockResolvedValue({
       tournament_id: 't1',
@@ -94,7 +84,6 @@ describe('useCreateTournamentWithFirstDraw', () => {
         { playerId: 'p2', team: 2 },
       ],
     })
-    vi.mocked(matchesApi.createMatch).mockResolvedValue(firstMatch)
 
     const { result } = renderHook(() => useCreateTournamentWithFirstDraw(), {
       wrapper: createWrapper(),
@@ -114,18 +103,52 @@ describe('useCreateTournamentWithFirstDraw', () => {
 
     expect(tournamentsApi.addParticipant).toHaveBeenNthCalledWith(1, 't1', 'p1')
     expect(tournamentsApi.addParticipant).toHaveBeenNthCalledWith(2, 't1', 'p2')
-    expect(matchesApi.createMatch).toHaveBeenCalledWith('t1', 1, [
-      { player_id: 'p1', team: 1 },
-      { player_id: 'p2', team: 2 },
-    ])
+    // The draw is computed, but persistence is deferred to the popup's Confirm
+    // action (useStartNextMatch) -- this hook must never call createMatch itself.
+    expect(matchesApi.createMatch).not.toHaveBeenCalled()
     expect(result.current.data).toEqual({
       tournament,
-      firstMatch,
       drawParticipants: [
         { playerId: 'p1', team: 1 },
         { playerId: 'p2', team: 2 },
       ],
     })
+  })
+
+  it('reports a null draw when the pool is too small, without persisting anything', async () => {
+    vi.mocked(tournamentsApi.createTournament).mockResolvedValue(tournament)
+    vi.mocked(tournamentsApi.addParticipant).mockResolvedValue({
+      tournament_id: 't1',
+      player_id: 'p1',
+      joined_at: '2026-01-01T00:00:00Z',
+    })
+    vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
+      candidates: [],
+      pairingHistory: { opponentPairs: new Set(), teammatePairs: new Set() },
+    })
+    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
+      ok: false,
+      error: 'not_enough_players',
+    })
+
+    const { result } = renderHook(() => useCreateTournamentWithFirstDraw(), {
+      wrapper: createWrapper(),
+    })
+
+    result.current.mutate({
+      tournament: {
+        name: 'Sunday Smash',
+        type: 'singles',
+        games_per_match: 3,
+        points_per_game: 21,
+      },
+      participantIds: ['p1'],
+    })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    expect(matchesApi.createMatch).not.toHaveBeenCalled()
+    expect(result.current.data).toEqual({ tournament, drawParticipants: null })
   })
 
   it('partial-failure path: a mid-loop addParticipant failure throws a PartialTournamentCreationError carrying the created tournament', async () => {

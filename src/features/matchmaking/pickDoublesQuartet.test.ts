@@ -44,7 +44,7 @@ describe('pickDoublesQuartet', () => {
     expect(maleCount).toBe(2)
   })
 
-  it('picks the skill-best quartet even when it has worse gender balance (skill wins)', () => {
+  it('picks the most gender-balanced quartet even when it has a much larger skill spread (gender wins)', () => {
     const pool = [
       player('a', 50, 'male'),
       player('b', 51, 'male'),
@@ -56,9 +56,11 @@ describe('pickDoublesQuartet', () => {
 
     const quartet = pickDoublesQuartet(pool)
 
-    // The only way to get a 2-2 split is {e,f,+2 of a-d}, which has a much larger
-    // skill spread (>= 85) than the all-male {a,b,c,d} (spread 3). Skill outranks gender.
-    expect(quartet?.map((p) => p.id).sort()).toEqual(['a', 'b', 'c', 'd'])
+    // Gender balance is a hard filter now: any 2-2 quartet (which must include both
+    // e and f, the only two females) is preferred over the tighter-skill all-male
+    // {a,b,c,d}, even though it has a much larger skill spread (85 vs 3).
+    expect(quartet?.some((p) => p.id === 'e')).toBe(true)
+    expect(quartet?.some((p) => p.id === 'f')).toBe(true)
   })
 
   it('picks randomly among fully tied quartets, honoring the whole tied set', () => {
@@ -86,5 +88,21 @@ describe('pickDoublesQuartet', () => {
     const pool = [player('a', 50, 'male'), player('b', 50, 'female')]
 
     expect(pickDoublesQuartet(pool)).toBeNull()
+  })
+
+  it('only considers quartets containing every mandatory player', () => {
+    const pool = [
+      player('a', 50, 'male'),
+      player('b', 51, 'male'),
+      player('c', 52, 'female'),
+      player('d', 53, 'female'),
+      player('e', 10, 'male'), // mandatory, despite being a skill outlier
+    ]
+    // Without a mandatory constraint, {a,b,c,d} (spread 3) beats any quartet with e.
+
+    const quartet = pickDoublesQuartet(pool, new Set(['e']))
+
+    expect(quartet).not.toBeNull()
+    expect(quartet?.some((p) => p.id === 'e')).toBe(true)
   })
 })

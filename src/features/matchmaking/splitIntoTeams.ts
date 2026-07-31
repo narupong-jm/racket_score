@@ -25,7 +25,7 @@ function skillSumDiff([team1, team2]: DoublesTeams): number {
   return Math.abs(sum(team1) - sum(team2))
 }
 
-function nonMixedTeamCount([team1, team2]: DoublesTeams): number {
+export function nonMixedTeamCount([team1, team2]: DoublesTeams): number {
   const isMixed = (team: CandidatePlayer[]) => team[0].gender !== team[1].gender
   return (isMixed(team1) ? 0 : 1) + (isMixed(team2) ? 0 : 1)
 }
@@ -47,8 +47,10 @@ function repeatCount([team1, team2]: DoublesTeams, history: PairingHistory): num
 /**
  * Splits a doubles quartet into two teams, evaluating all 3 possible 2v2
  * splits in strict priority order:
- * 1. Smallest skill-sum difference between the teams.
- * 2. Among those, the most teams that are gender-mixed (1 male + 1 female).
+ * 1. The most teams that are gender-mixed (1 male + 1 female) — a hard
+ *    filter, not a tiebreak: a fully-mixed split is always preferred over
+ *    one with a same-gender team, regardless of skill-sum difference.
+ * 2. Among those, the smallest skill-sum difference between the teams.
  * 3. Among those, the fewest repeat teammate/opponent pairings.
  * 4. Random choice among whatever is still tied.
  */
@@ -60,11 +62,11 @@ export function splitIntoTeams(
 
   let candidates = makeSplits(quartet)
 
-  const minSkillDiff = Math.min(...candidates.map(skillSumDiff))
-  candidates = candidates.filter((split) => skillSumDiff(split) === minSkillDiff)
-
   const minNonMixed = Math.min(...candidates.map(nonMixedTeamCount))
   candidates = candidates.filter((split) => nonMixedTeamCount(split) === minNonMixed)
+
+  const minSkillDiff = Math.min(...candidates.map(skillSumDiff))
+  candidates = candidates.filter((split) => skillSumDiff(split) === minSkillDiff)
 
   const minRepeats = Math.min(...candidates.map((split) => repeatCount(split, pairingHistory)))
   candidates = candidates.filter((split) => repeatCount(split, pairingHistory) === minRepeats)

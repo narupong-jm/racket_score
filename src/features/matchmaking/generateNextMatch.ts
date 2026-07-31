@@ -37,7 +37,7 @@ export function generateNextMatch(
   if (!poolResult.ok) return NOT_ENOUGH_PLAYERS
 
   if (type === 'singles') {
-    const pair = pickSinglesPair(poolResult.pool, pairingHistory)
+    const pair = pickSinglesPair(poolResult.pool, pairingHistory, poolResult.mandatoryIds)
     if (!pair) return NOT_ENOUGH_PLAYERS
 
     const [a, b] = pair
@@ -50,7 +50,7 @@ export function generateNextMatch(
     }
   }
 
-  const quartet = pickDoublesQuartet(poolResult.pool)
+  const quartet = pickDoublesQuartet(poolResult.pool, poolResult.mandatoryIds)
   if (!quartet) return NOT_ENOUGH_PLAYERS
 
   const teams = splitIntoTeams(quartet, pairingHistory)

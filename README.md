@@ -29,6 +29,9 @@ tournaments.
 - Two win-rate-based scoreboards: per-tournament and an overall
   cross-tournament view with period/match-type filters
 - 5-tab bottom navigation: Create / Active / Scoreboard / History / Member
+- Manual override for a drawn-but-not-yet-started match — swap a player
+  before the match starts, with a non-blocking warning if the edit breaks
+  doubles' gender-balance rule; edited matches are flagged in History
 - Thai/English language toggle, light/dark theme support
 
 ## Design decisions & intentional limitations
@@ -38,7 +41,9 @@ These are deliberate design choices, not missing features:
 - **No authentication.** Anyone with the link can create or edit data — this
   is meant for private, trusted club use.
 - **Confirmed match results are permanently locked.** There is no edit UI
-  and no admin override anywhere in the app.
+  and no admin override anywhere in the app. A drawn-but-not-yet-started
+  match is different — the organizer can edit its lineup before it starts;
+  it's the *result*, once confirmed, that can never be changed.
 - **Participants are chosen once, at tournament creation, from the player
   pool.** There is no way to add a player to an in-progress tournament.
 - **No fixed round count.** The UI always shows "Round N", never "Round N of
@@ -55,11 +60,23 @@ no React or Supabase dependency, so it can be unit-tested in isolation. It
 picks the next match by applying these criteria in strict priority order
 (highest first):
 
-1. Equal match count across players
+1. **Equal match count** — a hard invariant, not just a preference: the gap
+   between the most- and least-played participant can never exceed 1. If the
+   lowest-match-count group is smaller than the match needs, every player in
+   it is drawn, and only the remaining seats are filled from the next group.
 2. Skill balance
 3. Gender balance
 4. Avoid repeat pairings from earlier matches
 5. Random choice among whatever remains tied after 1–4
+
+**Doubles is a special case:** gender balance is promoted to a hard filter
+above skill balance — a 2-male/2-female quartet split into two mixed-gender
+teams is always preferred over an unbalanced alternative, not just used to
+break a tie. Singles is unaffected.
+
+While a match is in progress, its participants are excluded from the next
+draw's candidate pool (falling back to reusing one, with a UI warning, only
+if too few other players remain).
 
 Random tie-breaking in step 5 never overrides a higher-priority criterion —
 it only chooses among players/pairings that are already equivalent on every
@@ -197,6 +214,7 @@ client-side routing.
 | -------------------------------------------- | -------------------------------------------------------------------- |
 | [`docs/SPEC.md`](docs/SPEC.md)               | Normative product requirements — source of truth for what to build   |
 | [`docs/IMPROVEMENT.md`](docs/IMPROVEMENT.md) | UX rationale behind the 5-tab navigation rework                      |
+| [`docs/IMPROVEMENT2.md`](docs/IMPROVEMENT2.md) | Post-launch patch: matchmaking corrections, manual draw editing, History collapse |
 | [`docs/PLAN.md`](docs/PLAN.md)               | Phased implementation plan and stack decisions                       |
 | [`docs/RESEARCH.md`](docs/RESEARCH.md)       | Point-in-time snapshot of environment/account state at planning time |
 | [`CLAUDE.md`](CLAUDE.md)                     | Instructions for AI coding agents working in this repo               |

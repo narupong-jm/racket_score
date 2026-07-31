@@ -6,7 +6,6 @@ import {
   type Tournament,
 } from './tournamentsApi'
 import { assembleDrawInputs } from '../matches/useDrawInputs'
-import { createMatch, type Match } from '../matches/matchesApi'
 import { generateNextMatch, type GeneratedMatchParticipant } from '../matchmaking/generateNextMatch'
 
 /**
@@ -33,7 +32,13 @@ export interface CreateTournamentWithFirstDrawInput {
 
 export interface CreateTournamentWithFirstDrawResult {
   tournament: Tournament
-  firstMatch: Match | null
+  /**
+   * The computed first-match draw, not yet persisted -- per the
+   * deferred-persistence design (mirroring the Next-match card), the
+   * organizer confirms (optionally editing it first) via the first-match
+   * popup before it's written as a real `matches` row. `null` means the draw
+   * itself failed (not enough players), so there's nothing to confirm.
+   */
   drawParticipants: GeneratedMatchParticipant[] | null
 }
 
@@ -74,16 +79,10 @@ export function useCreateTournamentWithFirstDraw() {
         // (verified against selectCandidatePool/pickDoublesQuartet/
         // splitIntoTeams), but still handled defensively rather than assumed
         // away -- the caller can show a "not drawn yet" state for this case.
-        return { tournament, firstMatch: null, drawParticipants: null }
+        return { tournament, drawParticipants: null }
       }
 
-      const firstMatch = await createMatch(
-        tournament.id,
-        1,
-        drawResult.participants.map((p) => ({ player_id: p.playerId, team: p.team })),
-      )
-
-      return { tournament, firstMatch, drawParticipants: drawResult.participants }
+      return { tournament, drawParticipants: drawResult.participants }
     },
     onSuccess: (result) => {
       invalidateAll(queryClient, result.tournament.id)

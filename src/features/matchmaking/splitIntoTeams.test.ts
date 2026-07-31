@@ -27,8 +27,10 @@ describe('splitIntoTeams', () => {
   it('chooses the split with the smallest skill-sum difference', () => {
     const p0 = player('p0', 10, 'male')
     const p1 = player('p1', 90, 'male')
-    const p2 = player('p2', 50, 'female')
-    const p3 = player('p3', 50, 'female')
+    const p2 = player('p2', 50, 'male')
+    const p3 = player('p3', 50, 'male')
+    // All-male quartet, so every split has 2 non-mixed teams -> gender doesn't
+    // discriminate here; this isolates the skill-sum-diff criterion.
     // {p0,p1}v{p2,p3}: 100v100 diff 0 (best). Other two splits: 60v140 diff 80.
 
     const result = splitIntoTeams([p0, p1, p2, p3], emptyHistory())
@@ -94,22 +96,21 @@ describe('splitIntoTeams', () => {
     expect(result).not.toBeNull()
   })
 
-  it('picks the skill-best split even when it has worse gender balance (skill wins)', () => {
+  it('picks the gender-mixed split even when it has a much worse skill-sum difference (gender wins)', () => {
     const p0 = player('p0', 0, 'male')
     const p1 = player('p1', 100, 'male')
     const p2 = player('p2', 50, 'female')
     const p3 = player('p3', 50, 'female')
     // {p0,p1}v{p2,p3}: diff 0, but both teams same-gender (worst gender score).
     // {p0,p2}v{p1,p3} and {p0,p3}v{p1,p2}: diff 100, but both teams mixed (best gender score).
+    // Gender balance is a hard filter now, so a mixed split wins despite the huge diff.
 
     const result = splitIntoTeams([p0, p1, p2, p3], emptyHistory())
 
-    expect(normalizePartition(result)).toEqual(
-      normalizePartition([
-        [p0, p1],
-        [p2, p3],
-      ]),
-    )
+    expect(result).not.toBeNull()
+    const [team1, team2] = result!
+    expect(team1[0].gender).not.toBe(team1[1].gender)
+    expect(team2[0].gender).not.toBe(team2[1].gender)
   })
 
   it('picks randomly among fully tied splits, honoring the whole tied set', () => {

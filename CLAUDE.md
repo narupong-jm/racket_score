@@ -17,6 +17,17 @@ that matters. Before assuming any Phase-13-era tooling exists (`react-router-dom
 component, the scoreboard views), check `package.json`/`src/` rather than assuming from `docs/PLAN.md`
 alone — none of it exists yet as of this note.
 
+**Post-Phase-13 patch in flight:** as of 2026-07-31, Phase 13 has shipped (the 5-tab
+bottom-nav app described below is live). `docs/IMPROVEMENT2.md` is the next unit of work — a
+narrower patch based on post-launch hands-on testing, **not** another nav/flow overhaul. It
+covers three matchmaking corrections (equal match count as a hard invariant, mixed-doubles
+gender balance as a hard filter instead of a tiebreak, and excluding in-progress Current-match
+players from the Next-match draw), a new inline manual-edit capability for a drawn-but-not-yet-
+started match, and collapsible (default-collapsed) sections on the History tab. `docs/SPEC.md`
+§5/§6/§9 have already been revised to describe the corrected target behavior, but **none of it
+is implemented yet** as of this note — check `src/features/matchmaking/`, `src/features/matches/`,
+and `src/pages/HistoryPage.tsx` rather than assuming the SPEC's description is live.
+
 **Node version note:** the local Node is v20.13.1, below what several current package majors
 require (`vite@8`+/rolldown, `eslint@10`'s dependency chain declares `^20.19`, `jsdom@30`+). Where
 this caused real breakage we pinned to the last compatible major instead of the newest: `vite@^6`,
@@ -38,6 +49,9 @@ Read these files first, in this order, before doing any implementation work:
 4. **`docs/PLAN.md`** — the phased implementation plan, including stack decisions and clarifications
    that refine `docs/SPEC.md`. This is the primary execution guide — work phase by phase, in order,
    verifying each step's stated test before moving to the next.
+5. **`docs/IMPROVEMENT2.md`** — a narrower, later patch on top of the shipped Phase 13 app (see
+   "Post-Phase-13 patch in flight" above): matchmaking corrections, manual draw editing, and History
+   collapse. Read this in addition to the above four when working on this specific patch.
 
 ## Stack
 
@@ -122,9 +136,15 @@ surfaced real pre-existing errors once actually run.
   ends it; UI showing round progress must say "Round N", never "Round N of M".
 - Best-of-N match results that include more games than needed to decide the match (e.g. a 3rd game
   after a 2-0 sweep in best-of-3) must be **rejected** at validation, not silently accepted.
-- Once a match result is confirmed (via the confirm-before-save dialog), it is **permanently
+- Once a match **result** is confirmed (via the confirm-before-save dialog), it is **permanently
   locked** — no edit UI, no admin override, anywhere in the app. This is deliberate, not a
-  to-do.
+  to-do. **Separately** (per `docs/IMPROVEMENT2.md` §2, not yet implemented), a match that's been
+  drawn but **not yet started** — the auto-drawn first match's creation-time confirmation popup, or
+  the Manage screen's Next match card before Start match is tapped — can have its players edited
+  inline, swapping a drawn player for someone else in the tournament's roster. This only touches the
+  *draw*, never a confirmed *result*; the UI warns but does not block if the edited lineup violates
+  the gender-balance rule below, and the edited match is flagged as manually-adjusted (visible later
+  in History).
 - Single-court model: matches are drawn one at a time. As of Phase 13, drawing is split into two
   explicit, independently-managed slots in the Manage Tournament screen — **Next match** (filled
   only by an explicit "Randomize" tap, one match type's needed-player-count via
@@ -132,10 +152,20 @@ surfaced real pre-existing errors once actually run.
   that promotes whatever's in Next; never auto-promoted when a result is confirmed). The
   tournament's very first match is the one exception — it's auto-drawn immediately at creation
   time, with a confirmation popup, before the organizer ever sees the Manage screen.
-- Matchmaking priority order (highest to lowest): equal match count → skill balance → gender
-  balance → avoid repeat pairings → random choice among remaining ties. Tie-break randomness must
-  never override a higher-priority criterion (e.g. it can't cross tiers of the equal-match-count
-  grouping).
+- Matchmaking priority order (highest to lowest): **equal match count** (per `docs/IMPROVEMENT2.md`
+  §1.1, not yet implemented, this is a **hard invariant** — the gap between the most- and
+  least-played participant must never exceed 1; when the lowest-count tier is short of the needed
+  player count, every player in that tier is drawn and only the remaining seats are filled from the
+  next tier) → skill balance → gender balance → avoid repeat pairings → random choice among
+  remaining ties. Tie-break randomness must never override a higher-priority criterion (e.g. it
+  can't cross tiers of the equal-match-count grouping). **Doubles is a special case** (per
+  `docs/IMPROVEMENT2.md` §1.2, not yet implemented): gender balance (2-male-2-female quartets/team
+  splits over any unbalanced alternative) is promoted to a **hard filter above skill balance**, not
+  a tiebreak — so for doubles the effective order is equal match count → gender balance (hard) →
+  skill balance → avoid repeat pairings; singles is unaffected. **Current-match exclusion** (per
+  `docs/IMPROVEMENT2.md` §1.3, not yet implemented): while a Current match is in progress, its
+  participants are excluded from the Next-match candidate pool, with a reuse fallback + UI warning
+  if too few other players remain.
 - **Two distinct scoreboards, both win-rate-based** (as of Phase 13 — the earlier games-won/
   point-diff "Standings" screen was deleted): a **per-tournament Scoreboard** (match win rate within
   one tournament, tiebreak by point differential) that works identically whether the tournament is

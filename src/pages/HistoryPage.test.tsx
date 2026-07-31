@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
@@ -54,6 +55,7 @@ const recentMatch: RecentCompletedMatch = {
     status: 'completed',
     created_at: '2026-01-01T00:00:00Z',
     completed_at: '2026-01-01T00:00:00Z',
+    manually_adjusted: false,
   },
   tournamentName: 'Sunday Smash',
   participants: [
@@ -86,21 +88,30 @@ const completedTournament: Tournament = {
 }
 
 describe('HistoryPage', () => {
-  it('renders both the By match and By tournament sections', async () => {
+  it('renders both the By match and By tournament sections, each collapsed by default', async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
     vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([recentMatch])
     vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament, completedTournament])
 
+    const user = userEvent.setup()
     renderPage()
 
     expect(screen.getByRole('heading', { name: 'By match' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'By tournament' })).toBeInTheDocument()
 
+    // Collapsed by default: heading + toggle only, no item content yet.
+    expect(screen.queryByText('Round 2')).toBeNull()
+    expect(screen.queryByText('Winter Cup')).toBeNull()
+    const toggles = screen.getAllByRole('button', { name: 'Show more' })
+    expect(toggles).toHaveLength(2)
+
+    await user.click(toggles[0])
     expect(await screen.findByText('Round 2')).toBeInTheDocument()
     expect(screen.getByText('Alice')).toBeInTheDocument()
     expect(screen.getByText('Bob')).toBeInTheDocument()
     expect(screen.getByText('1-0')).toBeInTheDocument()
 
+    await user.click(screen.getByRole('button', { name: 'Show more' }))
     expect(await screen.findByText('Winter Cup')).toBeInTheDocument()
     expect(screen.getAllByText('Sunday Smash').length).toBeGreaterThan(0)
   })
@@ -110,12 +121,123 @@ describe('HistoryPage', () => {
     vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([])
     vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament, completedTournament])
 
+    const user = userEvent.setup()
     renderPage()
+
+    const byTournamentHeading = await screen.findByRole('heading', { name: 'By tournament' })
+    const byTournamentToggle = byTournamentHeading.parentElement!.querySelector('button')!
+    await user.click(byTournamentToggle)
 
     const activeLink = await screen.findByRole('link', { name: /sunday smash/i })
     const completedLink = screen.getByRole('link', { name: /winter cup/i })
 
     expect(activeLink).toHaveAttribute('href', '/tournaments/t1/scoreboard')
     expect(completedLink).toHaveAttribute('href', '/tournaments/t2/scoreboard')
+  })
+
+  describe('collapsible sections', () => {
+    it('shows only the heading and toggle when collapsed, with no item peek', async () => {
+      vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([recentMatch])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+
+      renderPage()
+
+      await screen.findByRole('heading', { name: 'By match' })
+      expect(screen.queryByText('Round 2')).toBeNull()
+      expect(screen.queryByText('Sunday Smash')).toBeNull()
+      expect(screen.getAllByRole('button', { name: 'Show more' })).toHaveLength(2)
+    })
+
+    it('expands a section on toggle click and flips its label to Show less', async () => {
+      vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([recentMatch])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+
+      const user = userEvent.setup()
+      renderPage()
+
+      const byMatchHeading = screen.getByRole('heading', { name: 'By match' })
+      const byMatchToggle = byMatchHeading.parentElement!.querySelector('button')!
+
+      await user.click(byMatchToggle)
+
+      expect(await screen.findByText('Round 2')).toBeInTheDocument()
+      expect(byMatchToggle).toHaveTextContent('Show less')
+    })
+
+    it('re-collapses a section on a second toggle click', async () => {
+      vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([recentMatch])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+
+      const user = userEvent.setup()
+      renderPage()
+
+      const byMatchHeading = screen.getByRole('heading', { name: 'By match' })
+      const byMatchToggle = byMatchHeading.parentElement!.querySelector('button')!
+
+      await user.click(byMatchToggle)
+      expect(await screen.findByText('Round 2')).toBeInTheDocument()
+
+      await user.click(byMatchToggle)
+      expect(screen.queryByText('Round 2')).toBeNull()
+      expect(byMatchToggle).toHaveTextContent('Show more')
+    })
+
+    it('toggles each section independently', async () => {
+      vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([recentMatch])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+
+      const user = userEvent.setup()
+      renderPage()
+
+      const byMatchHeading = screen.getByRole('heading', { name: 'By match' })
+      const byMatchToggle = byMatchHeading.parentElement!.querySelector('button')!
+
+      await user.click(byMatchToggle)
+      expect(await screen.findByText('Round 2')).toBeInTheDocument()
+
+      // By tournament section is untouched -- still collapsed.
+      const byTournamentHeading = screen.getByRole('heading', { name: 'By tournament' })
+      const byTournamentToggle = byTournamentHeading.parentElement!.querySelector('button')!
+      expect(byTournamentToggle).toHaveTextContent('Show more')
+      expect(screen.queryByRole('link', { name: /sunday smash/i })).toBeNull()
+    })
+  })
+
+  describe('manually-adjusted badge', () => {
+    it('does not show a badge for a match that was not manually adjusted', async () => {
+      vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([recentMatch])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([])
+
+      const user = userEvent.setup()
+      renderPage()
+
+      await user.click(screen.getAllByRole('button', { name: 'Show more' })[0])
+
+      await screen.findByText('Round 2')
+      expect(screen.queryByText('Manually adjusted')).toBeNull()
+    })
+
+    it('shows a badge next to a match that was manually adjusted', async () => {
+      const adjustedMatch: RecentCompletedMatch = {
+        ...recentMatch,
+        match: { ...recentMatch.match, manually_adjusted: true },
+      }
+      vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([adjustedMatch])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([])
+
+      const user = userEvent.setup()
+      renderPage()
+
+      await user.click(screen.getAllByRole('button', { name: 'Show more' })[0])
+
+      expect(await screen.findByText('Round 2')).toBeInTheDocument()
+      expect(screen.getByText('Manually adjusted')).toBeInTheDocument()
+    })
   })
 })

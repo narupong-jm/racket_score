@@ -19,6 +19,8 @@ import {
   getNeededPlayerCount,
   type GeneratedMatchParticipant,
 } from '../matchmaking/generateNextMatch'
+import { isMixedDoublesRuleViolated } from '../matchmaking/isMixedDoublesRuleViolated'
+import { DrawSlotSelect, type RosterPlayer } from '../../components/DrawSlotSelect'
 import type { MatchType } from '../matchmaking/types'
 import type { Match, MatchGame, MatchHistoryEntry } from '../matches/matchesApi'
 
@@ -45,6 +47,11 @@ export function TournamentDetail({ tournamentId, onEnded }: TournamentDetailProp
   const cap = tournament.point_cap ?? computePointCap(tournament.points_per_game)
 
   const playerNameById = new Map((players ?? []).map((p) => [p.id, p.name]))
+  const rosterPlayers: RosterPlayer[] = (participants ?? []).flatMap((participant) => {
+    const player = players?.find((p) => p.id === participant.player_id)
+    if (!player || (player.gender !== 'male' && player.gender !== 'female')) return []
+    return [{ id: player.id, name: player.name, gender: player.gender }]
+  })
   const matches = tournamentMatches?.matches ?? []
   const matchParticipants = tournamentMatches?.participants ?? []
   const games = tournamentMatches?.games ?? []
@@ -113,6 +120,10 @@ export function TournamentDetail({ tournamentId, onEnded }: TournamentDetailProp
         matchType={matchType}
         isActive={isActive}
         hasCurrentMatch={currentMatch !== null}
+        currentMatchParticipantIds={
+          currentMatch ? participantsFor(currentMatch.id).map((p) => p.player_id) : []
+        }
+        rosterPlayers={rosterPlayers}
         playerNameById={playerNameById}
       />
 
@@ -418,6 +429,8 @@ interface NextMatchCardProps {
   matchType: MatchType
   isActive: boolean
   hasCurrentMatch: boolean
+  currentMatchParticipantIds: string[]
+  rosterPlayers: RosterPlayer[]
   playerNameById: Map<string, string>
 }
 
@@ -426,6 +439,8 @@ function NextMatchCard({
   matchType,
   isActive,
   hasCurrentMatch,
+  currentMatchParticipantIds,
+  rosterPlayers,
   playerNameById,
 }: NextMatchCardProps) {
   const { t } = useTranslation()
@@ -433,6 +448,9 @@ function NextMatchCard({
   const startNextMatch = useStartNextMatch(tournamentId)
   const [nextDraw, setNextDraw] = useState<GeneratedMatchParticipant[] | null>(null)
   const [drawFailed, setDrawFailed] = useState(false)
+  const [usedCurrentMatchFallback, setUsedCurrentMatchFallback] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [manuallyAdjusted, setManuallyAdjusted] = useState(false)
 
   const neededCount = getNeededPlayerCount(matchType)
   const participantCount = drawInputs?.candidates.length ?? 0
@@ -440,21 +458,48 @@ function NextMatchCard({
 
   function handleRandomize() {
     if (!drawInputs) return
-    const result = generateNextMatch(matchType, drawInputs.candidates, drawInputs.pairingHistory)
+    const excludingCurrent = drawInputs.candidates.filter(
+      (c) => !currentMatchParticipantIds.includes(c.id),
+    )
+    const usedFallback = excludingCurrent.length < neededCount
+    const candidates = usedFallback ? drawInputs.candidates : excludingCurrent
+
+    const result = generateNextMatch(matchType, candidates, drawInputs.pairingHistory)
     if (result.ok) {
       setNextDraw(result.participants)
       setDrawFailed(false)
+      setUsedCurrentMatchFallback(usedFallback)
     } else {
       setNextDraw(null)
       setDrawFailed(true)
+      setUsedCurrentMatchFallback(false)
     }
+    setEditing(false)
+    setManuallyAdjusted(false)
+  }
+
+  function handleSwap(oldPlayerId: string, newPlayerId: string) {
+    if (!nextDraw || oldPlayerId === newPlayerId) return
+    setNextDraw(
+      nextDraw.map((p) => (p.playerId === oldPlayerId ? { ...p, playerId: newPlayerId } : p)),
+    )
+    setManuallyAdjusted(true)
   }
 
   function handleStartMatch() {
     if (!nextDraw) return
     startNextMatch.mutate(
-      nextDraw.map((p) => ({ player_id: p.playerId, team: p.team })),
-      { onSuccess: () => setNextDraw(null) },
+      {
+        participants: nextDraw.map((p) => ({ player_id: p.playerId, team: p.team })),
+        manuallyAdjusted,
+      },
+      {
+        onSuccess: () => {
+          setNextDraw(null)
+          setEditing(false)
+          setManuallyAdjusted(false)
+        },
+      },
     )
   }
 
@@ -471,19 +516,77 @@ function NextMatchCard({
         .join(' & ')
     : ''
 
+  const mixedDoublesViolation =
+    matchType === 'doubles' && nextDraw
+      ? isMixedDoublesRuleViolated(
+          nextDraw.map((p) => {
+            const roster = rosterPlayers.find((r) => r.id === p.playerId)
+            return {
+              id: p.playerId,
+              gender: roster?.gender ?? 'male',
+              skillValue: 0,
+              matchesPlayedInTournament: 0,
+            }
+          }),
+          nextDraw.filter((p) => p.team === 1).map((p) => p.playerId),
+        )
+      : false
+
   return (
     <section className="card">
       <h3>{t('manage.nextMatchHeading')}</h3>
-      {nextDraw ? (
+      {!nextDraw && <p className="empty-state">{t('manage.notPickedYet')}</p>}
+      {nextDraw && !editing && (
         <p className="matchup-line">{t('matches.draw.matchup', { team1, team2 })}</p>
-      ) : (
-        <p className="empty-state">{t('manage.notPickedYet')}</p>
+      )}
+      {nextDraw && editing && (
+        <div className="draw-edit-teams">
+          <div className="draw-edit-team">
+            {nextDraw
+              .filter((p) => p.team === 1)
+              .map((p, i) => (
+                <DrawSlotSelect
+                  key={p.playerId}
+                  participant={p}
+                  index={i}
+                  draw={nextDraw}
+                  rosterPlayers={rosterPlayers}
+                  onSwap={handleSwap}
+                />
+              ))}
+          </div>
+          <span className="round-vs">vs</span>
+          <div className="draw-edit-team">
+            {nextDraw
+              .filter((p) => p.team === 2)
+              .map((p, i) => (
+                <DrawSlotSelect
+                  key={p.playerId}
+                  participant={p}
+                  index={i}
+                  draw={nextDraw}
+                  rosterPlayers={rosterPlayers}
+                  onSwap={handleSwap}
+                />
+              ))}
+          </div>
+        </div>
       )}
 
       <div className="button-row">
         <button type="button" className="secondary" onClick={handleRandomize} disabled={!isActive || notEnoughPlayers}>
           {t('manage.randomize')}
         </button>
+        {nextDraw && (
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => setEditing((e) => !e)}
+            disabled={!isActive}
+          >
+            {editing ? t('manage.doneEditingDraw') : t('manage.editDraw')}
+          </button>
+        )}
         {nextDraw && (
           <button
             type="button"
@@ -505,6 +608,12 @@ function NextMatchCard({
       )}
       {drawFailed && <p className="field-error">{t('matches.draw.notEnoughPlayers')}</p>}
       {startNextMatch.isError && <p className="field-error">{t('manage.drawFailed')}</p>}
+      {nextDraw && usedCurrentMatchFallback && (
+        <p className="field-warning">{t('manage.currentMatchReusedWarning')}</p>
+      )}
+      {nextDraw && manuallyAdjusted && mixedDoublesViolation && (
+        <p className="field-warning">{t('manage.mixedDoublesWarning')}</p>
+      )}
     </section>
   )
 }

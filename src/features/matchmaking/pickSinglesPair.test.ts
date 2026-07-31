@@ -105,4 +105,14 @@ describe('pickSinglesPair', () => {
     pair?.forEach((p) => expect(poolIds.has(p.id)).toBe(true))
     expect(pair?.some((p) => p.id === 'd')).toBe(false)
   })
+
+  it('only considers pairs containing every mandatory player', () => {
+    const pool = [player('a', 50), player('b', 90), player('c', 52)]
+    // Without a mandatory constraint, a-c (gap 2) beats any pair including b.
+
+    const pair = pickSinglesPair(pool, emptyHistory(), new Set(['b']))
+
+    expect(pair).not.toBeNull()
+    expect(pair?.some((p) => p.id === 'b')).toBe(true)
+  })
 })

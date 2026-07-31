@@ -10,6 +10,9 @@
   --danger: #c0392b;
   --danger-bg: rgba(192, 57, 43, 0.1);
   --danger-border: rgba(192, 57, 43, 0.4);
+  --warning: #b7791f;
+  --warning-bg: rgba(183, 121, 31, 0.1);
+  --warning-border: rgba(183, 121, 31, 0.4);
   --shadow:
     rgba(16, 26, 20, 0.08) 0 8px 24px -8px, rgba(16, 26, 20, 0.06) 0 2px 6px -2px;
 
@@ -46,6 +49,9 @@
     --danger: #e5776b;
     --danger-bg: rgba(229, 119, 107, 0.16);
     --danger-border: rgba(229, 119, 107, 0.45);
+    --warning: #e0b04f;
+    --warning-bg: rgba(224, 176, 79, 0.16);
+    --warning-border: rgba(224, 176, 79, 0.45);
     --shadow:
       rgba(0, 0, 0, 0.5) 0 10px 24px -8px, rgba(0, 0, 0, 0.35) 0 2px 6px -2px;
   }
@@ -246,6 +252,57 @@ p {
   color: var(--danger);
   font-size: 13px;
   margin-top: 4px;
+}
+
+.field-warning {
+  color: var(--warning);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+  margin-left: 6px;
+}
+
+.section-heading-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-heading-row h2 {
+  margin: 0;
+}
+
+.draw-edit-teams {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.draw-edit-team {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.section-toggle-button {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--accent);
+  border-color: transparent;
 }
 
 .card {

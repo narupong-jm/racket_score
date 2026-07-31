@@ -88,6 +88,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           id: string
+          manually_adjusted: boolean
           sequence_number: number
           status: string
           tournament_id: string
@@ -96,6 +97,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           id?: string
+          manually_adjusted?: boolean
           sequence_number: number
           status?: string
           tournament_id: string
@@ -104,6 +106,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           id?: string
+          manually_adjusted?: boolean
           sequence_number?: number
           status?: string
           tournament_id?: string
@@ -317,6 +320,7 @@ export type Database = {
     Functions: {
       create_match: {
         Args: {
+          p_manually_adjusted?: boolean
           p_participants: Json
           p_sequence_number: number
           p_tournament_id: string
@@ -325,6 +329,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           id: string
+          manually_adjusted: boolean
           sequence_number: number
           status: string
           tournament_id: string
@@ -342,6 +347,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           id: string
+          manually_adjusted: boolean
           sequence_number: number
           status: string
           tournament_id: string

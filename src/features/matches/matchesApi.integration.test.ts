@@ -4,6 +4,62 @@ import { createTournament, addParticipant } from '../tournaments/tournamentsApi'
 import { createPlayer } from '../players/playersApi'
 import { supabase } from '../../lib/supabaseClient'
 
+describe('matchesApi: manually_adjusted flag (real project, anon key)', () => {
+  it('defaults to false and can be set true via the manuallyAdjusted param', async () => {
+    const runId = crypto.randomUUID()
+    const tournament = await createTournament({
+      name: `Manually Adjusted Test ${runId}`,
+      type: 'singles',
+      games_per_match: 1,
+      points_per_game: 21,
+    })
+    const playerA = await createPlayer({
+      name: `Manually Adjusted A ${runId}`,
+      gender: 'male',
+      self_selected_level: 'beginner',
+    })
+    const playerB = await createPlayer({
+      name: `Manually Adjusted B ${runId}`,
+      gender: 'female',
+      self_selected_level: 'beginner',
+    })
+    await addParticipant(tournament.id, playerA.id)
+    await addParticipant(tournament.id, playerB.id)
+
+    try {
+      const defaultMatch = await createMatch(tournament.id, 1, [
+        { player_id: playerA.id, team: 1 },
+        { player_id: playerB.id, team: 2 },
+      ])
+      expect(defaultMatch.manually_adjusted).toBe(false)
+
+      const adjustedMatch = await createMatch(
+        tournament.id,
+        2,
+        [
+          { player_id: playerA.id, team: 1 },
+          { player_id: playerB.id, team: 2 },
+        ],
+        true,
+      )
+      expect(adjustedMatch.manually_adjusted).toBe(true)
+    } finally {
+      const { data: matches } = await supabase
+        .from('matches')
+        .select('id')
+        .eq('tournament_id', tournament.id)
+      const matchIds = (matches ?? []).map((m) => m.id)
+      if (matchIds.length > 0) {
+        await supabase.from('match_participants').delete().in('match_id', matchIds)
+        await supabase.from('matches').delete().in('id', matchIds)
+      }
+      await supabase.from('tournament_participants').delete().eq('tournament_id', tournament.id)
+      await supabase.from('tournaments').delete().eq('id', tournament.id)
+      await supabase.from('players').delete().in('id', [playerA.id, playerB.id])
+    }
+  })
+})
+
 describe('matchesApi (real project, anon key)', () => {
   const runId = crypto.randomUUID()
   let tournamentId: string | undefined

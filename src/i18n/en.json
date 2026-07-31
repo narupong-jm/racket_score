@@ -31,7 +31,10 @@
     "byTournamentHeading": "By tournament",
     "loadingTournaments": "Loading tournaments...",
     "loadTournamentsError": "Failed to load tournaments.",
-    "noTournaments": "No tournaments yet."
+    "noTournaments": "No tournaments yet.",
+    "showMore": "Show more",
+    "showLess": "Show less",
+    "manuallyAdjustedBadge": "Manually adjusted"
   },
   "app": {
     "playersHeading": "Players",
@@ -152,6 +155,11 @@
     "startMatch": "Start match",
     "drawFailed": "Failed to draw a match.",
     "notEnoughPlayersWithCount": "Not enough players to draw a match. Need at least {{needed}}, have {{have}}.",
+    "currentMatchReusedWarning": "Not enough other players available -- this draw reuses someone currently playing in the Current match.",
+    "editDraw": "Edit",
+    "doneEditingDraw": "Done editing",
+    "editDrawSlotLabel": "Team {{team}} player {{n}}",
+    "mixedDoublesWarning": "This lineup isn't gender-mixed, though a mixed pairing was possible.",
     "gameTeamLabel": "{{team}} -- Game {{n}}",
     "saveResult": "Save result",
     "confirmResultTitle": "Confirm this result?",

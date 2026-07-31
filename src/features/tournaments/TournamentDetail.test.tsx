@@ -106,6 +106,7 @@ function makeMatch(id: string, sequenceNumber: number, status: 'queued' | 'compl
     status,
     created_at: '2026-01-01T00:00:00Z',
     completed_at: status === 'completed' ? '2026-01-01T00:00:00Z' : null,
+    manually_adjusted: false,
   }
 }
 
@@ -201,10 +202,15 @@ describe('TournamentDetail: Next match card (Randomize / Start match)', () => {
     await user.click(screen.getByRole('button', { name: 'Start match' }))
 
     await waitFor(() => {
-      expect(matchesApi.createMatch).toHaveBeenCalledWith('t1', 1, [
-        { player_id: 'p1', team: 1 },
-        { player_id: 'p2', team: 2 },
-      ])
+      expect(matchesApi.createMatch).toHaveBeenCalledWith(
+        't1',
+        1,
+        [
+          { player_id: 'p1', team: 1 },
+          { player_id: 'p2', team: 2 },
+        ],
+        false,
+      )
     })
 
     // Current is now populated with the promoted pairing...
@@ -221,6 +227,211 @@ describe('TournamentDetail: Next match card (Randomize / Start match)', () => {
 
     // ...and Next is cleared back to empty.
     expect(screen.getByText('Not picked yet')).toBeInTheDocument()
+  })
+
+  it('excludes the Current match participants from the Next-match candidate pool', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([
+      ...players,
+      { id: 'p3', name: 'Carol', gender: 'male', self_selected_level: 'beginner', created_at: '' },
+      { id: 'p4', name: 'Dave', gender: 'female', self_selected_level: 'beginner', created_at: '' },
+    ])
+    vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
+      candidates: [
+        { id: 'p1', gender: 'female', skillValue: 50, matchesPlayedInTournament: 1 },
+        { id: 'p2', gender: 'male', skillValue: 50, matchesPlayedInTournament: 1 },
+        { id: 'p3', gender: 'male', skillValue: 50, matchesPlayedInTournament: 0 },
+        { id: 'p4', gender: 'female', skillValue: 50, matchesPlayedInTournament: 0 },
+      ],
+      pairingHistory: { opponentPairs: new Set(), teammatePairs: new Set() },
+    })
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([makeMatch('m1', 1, 'queued')])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([
+      { match_id: 'm1', player_id: 'p1', team: 1 },
+      { match_id: 'm1', player_id: 'p2', team: 2 },
+    ])
+    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
+      ok: true,
+      participants: [
+        { playerId: 'p3', team: 1 },
+        { playerId: 'p4', team: 2 },
+      ],
+    })
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(await screen.findByRole('button', { name: 'Randomize' }))
+
+    await waitFor(() => {
+      expect(generateNextMatchModule.generateNextMatch).toHaveBeenCalled()
+    })
+    const [, calledCandidates] = vi.mocked(generateNextMatchModule.generateNextMatch).mock.calls[0]
+    expect(calledCandidates.map((c) => c.id).sort()).toEqual(['p3', 'p4'])
+
+    expect(
+      screen.queryByText(
+        'Not enough other players available -- this draw reuses someone currently playing in the Current match.',
+      ),
+    ).toBeNull()
+  })
+
+  it('falls back to reusing a Current match participant, with a warning, when too few other players remain', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([makeMatch('m1', 1, 'queued')])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([
+      { match_id: 'm1', player_id: 'p1', team: 1 },
+      { match_id: 'm1', player_id: 'p2', team: 2 },
+    ])
+    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
+      ok: true,
+      participants: [
+        { playerId: 'p1', team: 1 },
+        { playerId: 'p2', team: 2 },
+      ],
+    })
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(await screen.findByRole('button', { name: 'Randomize' }))
+
+    await waitFor(() => {
+      expect(generateNextMatchModule.generateNextMatch).toHaveBeenCalled()
+    })
+    const [, calledCandidates] = vi.mocked(generateNextMatchModule.generateNextMatch).mock.calls[0]
+    expect(calledCandidates.map((c) => c.id).sort()).toEqual(['p1', 'p2'])
+
+    expect(
+      await screen.findByText(
+        'Not enough other players available -- this draw reuses someone currently playing in the Current match.',
+      ),
+    ).toBeInTheDocument()
+  })
+})
+
+describe('TournamentDetail: Next match inline edit', () => {
+  it('allows editing the Next match draw before starting it, marking it as manually adjusted', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      { tournament_id: 't1', player_id: 'p1', joined_at: '2026-01-01T00:00:00Z' },
+      { tournament_id: 't1', player_id: 'p2', joined_at: '2026-01-01T00:00:00Z' },
+      { tournament_id: 't1', player_id: 'p3', joined_at: '2026-01-01T00:00:00Z' },
+    ])
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([
+      ...players,
+      { id: 'p3', name: 'Carol', gender: 'female', self_selected_level: 'beginner', created_at: '' },
+    ])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
+      ok: true,
+      participants: [
+        { playerId: 'p1', team: 1 },
+        { playerId: 'p2', team: 2 },
+      ],
+    })
+    vi.mocked(matchesApi.createMatch).mockResolvedValue(makeMatch('m-new', 1, 'queued'))
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(await screen.findByRole('button', { name: 'Randomize' }))
+    await screen.findByText('Alice vs Bob')
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const team1Slot = screen.getByRole('combobox', { name: 'Team 1 player 1' })
+    await user.selectOptions(team1Slot, 'p3')
+
+    await user.click(screen.getByRole('button', { name: 'Start match' }))
+
+    await waitFor(() => {
+      expect(matchesApi.createMatch).toHaveBeenCalledWith(
+        't1',
+        1,
+        [
+          { player_id: 'p3', team: 1 },
+          { player_id: 'p2', team: 2 },
+        ],
+        true,
+      )
+    })
+  })
+
+  it('shows a non-blocking warning when an edit leaves a 2-2 doubles quartet split into same-gender teams', async () => {
+    const doublesTournament: Tournament = { ...activeTournament, type: 'doubles' }
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([doublesTournament])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      { tournament_id: 't1', player_id: 'p1', joined_at: '2026-01-01T00:00:00Z' },
+      { tournament_id: 't1', player_id: 'p2', joined_at: '2026-01-01T00:00:00Z' },
+      { tournament_id: 't1', player_id: 'p3', joined_at: '2026-01-01T00:00:00Z' },
+      { tournament_id: 't1', player_id: 'p4', joined_at: '2026-01-01T00:00:00Z' },
+      { tournament_id: 't1', player_id: 'p5', joined_at: '2026-01-01T00:00:00Z' },
+    ])
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([
+      { id: 'p1', name: 'Ann', gender: 'male', self_selected_level: 'beginner', created_at: '' },
+      { id: 'p2', name: 'Ben', gender: 'male', self_selected_level: 'beginner', created_at: '' },
+      { id: 'p3', name: 'Cid', gender: 'female', self_selected_level: 'beginner', created_at: '' },
+      { id: 'p4', name: 'Dee', gender: 'female', self_selected_level: 'beginner', created_at: '' },
+      { id: 'p5', name: 'Eve', gender: 'male', self_selected_level: 'beginner', created_at: '' },
+    ])
+    vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
+      candidates: [
+        { id: 'p1', gender: 'male', skillValue: 50, matchesPlayedInTournament: 0 },
+        { id: 'p2', gender: 'male', skillValue: 50, matchesPlayedInTournament: 0 },
+        { id: 'p3', gender: 'female', skillValue: 50, matchesPlayedInTournament: 0 },
+        { id: 'p4', gender: 'female', skillValue: 50, matchesPlayedInTournament: 0 },
+      ],
+      pairingHistory: { opponentPairs: new Set(), teammatePairs: new Set() },
+    })
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
+      ok: true,
+      participants: [
+        { playerId: 'p1', team: 1 },
+        { playerId: 'p2', team: 1 },
+        { playerId: 'p3', team: 2 },
+        { playerId: 'p4', team: 2 },
+      ],
+    })
+    vi.mocked(matchesApi.createMatch).mockResolvedValue(makeMatch('m-new', 1, 'queued'))
+
+    const warningText =
+      "This lineup isn't gender-mixed, though a mixed pairing was possible."
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(await screen.findByRole('button', { name: 'Randomize' }))
+    await screen.findByText('Ann & Ben vs Cid & Dee')
+    expect(screen.queryByText(warningText)).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    const team1SecondSlot = screen.getByRole('combobox', { name: 'Team 1 player 2' })
+    await user.selectOptions(team1SecondSlot, 'p5')
+
+    expect(await screen.findByText(warningText)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Start match' }))
+
+    await waitFor(() => {
+      expect(matchesApi.createMatch).toHaveBeenCalledWith(
+        't1',
+        1,
+        [
+          { player_id: 'p1', team: 1 },
+          { player_id: 'p5', team: 1 },
+          { player_id: 'p3', team: 2 },
+          { player_id: 'p4', team: 2 },
+        ],
+        true,
+      )
+    })
   })
 })
 

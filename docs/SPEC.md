@@ -9,6 +9,12 @@ participant selection, unified win-rate scoreboard, new cross-tournament
 Overall Scoreboard, placeholder avatars). §3, §4, §6-§9 revised below;
 this replaces the single-scroll / 4-page flow from the previous update,
 which was never implemented.
+Updated: 2026-07-31 (later still) — incorporates `IMPROVEMENT2.md`'s
+post-launch corrections on top of the shipped Phase 13 app: hard-invariant
+equal match counts, hard-filter mixed-gender doubles, Current-match draw
+exclusion, manual editing of a drawn-but-not-yet-started match, and
+collapsible (default-collapsed) History sections. §5, §6, and §9 revised
+below. Not yet implemented as of this note — see `docs/IMPROVEMENT2.md`.
 
 ## 1. Overview
 
@@ -78,8 +84,14 @@ history/stats and standings within each tournament.
 Organizer clicks a button to draw one match at a time (can queue the next
 match in advance). Selection priority, in order:
 
-1. **Equal match count** — prefer players who have played the fewest
-   matches so far in this tournament.
+1. **Equal match count** — a **hard invariant**, not just a preference: the
+   gap between the most-played and least-played participant must never
+   exceed 1, at every point in the tournament. Players with the fewest
+   matches played so far are always drawn first; if that lowest-count
+   group has fewer players than the match needs, **every** player in it is
+   included in the draw, and only the remaining seats are filled from the
+   next-lowest group — the algorithm may never skip a lowest-count player
+   in favor of a better skill/gender fit elsewhere in the pool.
 2. **Skill balance** — pair opponents (or, for doubles, split the 4 drawn
    players into 2 teams) to be as evenly matched as possible. Uses the
    player's real win-rate percentage once they have ≥3 matches; for players
@@ -92,6 +104,32 @@ match in advance). Selection priority, in order:
 4. **Avoid repeat pairings** — prefer opponents/teams who have not yet
    played each other in this tournament. Only allow a repeat when no
    other combination satisfies the constraints above.
+
+**Doubles-specific correction (gender balance is a hard filter, not a
+tiebreak):** the priority order above (skill balance before gender
+balance) is the **singles** order. For **doubles**, gender balance is
+promoted above skill balance at both steps of the draw:
+
+- **Quartet selection**: among the candidate players from step 1, any
+  quartet with exactly 2 males and 2 females is preferred over any 3-1 or
+  4-0 quartet **regardless of skill spread**. Skill spread is only used to
+  break ties among quartets that are equally gender-balanced.
+- **Team split**: given a chosen quartet, a split where both teams are
+  gender-mixed (1 male + 1 female each) is preferred over any split with a
+  same-gender team, **regardless of skill-sum difference**. Skill-sum
+  difference and repeat-pairing avoidance are only used to break ties
+  among splits that are equally (best-available) mixed.
+
+So the effective doubles order is: equal match count → gender balance
+(hard) → skill balance → avoid repeat pairings. The singles order is
+unchanged: equal match count → skill balance → gender balance → avoid
+repeat pairings.
+
+**Excluding in-progress players:** while a Current match is in progress
+(§9), its participants are excluded from the candidate pool used to draw
+Next match — a player can't be drawn again while still on court. If
+excluding them would leave too few players to fill Next match, they may be
+reused as a fallback, with a visible warning in the UI that this happened.
 
 ## 6. Match Result Recording
 
@@ -106,6 +144,17 @@ match in advance). Selection priority, in order:
   match anywhere in the app, and no admin-override path. Getting a score
   wrong means it stays wrong; this is a deliberate simplification, not an
   oversight.
+- This lock applies only to a **result** once confirmed. A match that has
+  been drawn but **not yet started** — the tournament's auto-drawn first
+  match (still showing its creation-time confirmation popup) or a Next
+  match not yet promoted via Start match (§9) — can still be edited: the
+  organizer swaps out one or more drawn players for someone else from the
+  tournament's participant pool, inline in the same popup/card. Editing a
+  draw is unrelated to editing a result — there's no "result" yet to
+  protect. The app **warns, but does not block**, if the edited lineup
+  violates §5's gender-balance rule; the organizer can still confirm the
+  override. An edited draw is flagged as manually adjusted, and that flag
+  is visible later in History (§9).
 
 ## 7. Tournament Scoreboard (per tournament)
 
@@ -170,7 +219,8 @@ every screen size (not a responsive top-nav on wider viewports):
    immediately per the Match Generator (§5) and shown in a confirmation
    popup, and the organizer is taken directly into that tournament's
    Manage screen (tab 2's drill-down, below) — the new tournament also
-   appears in tab 2's list automatically.
+   appears in tab 2's list automatically. The popup has an **Edit** action
+   (§6) to swap out a drawn player before confirming, alongside Confirm.
 2. **Active** — list of tournaments currently in progress. Each card:
    name, type, current round number (e.g. "Round 7" — there is no fixed
    total round count and therefore no round-progress fraction/bar).
@@ -183,7 +233,10 @@ every screen size (not a responsive top-nav on wider viewports):
      **Randomize** button draws the next pairing (§5) into this card —
      manually, on demand, for every match including the tournament's
      first one is drawn automatically at creation time per tab 1, but
-     every match after that requires an explicit Randomize tap. Once a
+     every match after that requires an explicit Randomize tap. The card
+     also has an **Edit** action (§6) to swap out one or more drawn
+     players inline before starting the match; an edited pairing is
+     flagged as manually adjusted (visible later in History). Once a
      pairing exists here, a **Start match** button appears and moves it
      into Current match (replacing whatever was there, resetting score
      inputs), clearing Next match back to empty.
@@ -197,11 +250,15 @@ every screen size (not a responsive top-nav on wider viewports):
      confirm the tournament's status flips to ended and the organizer
      lands on that tournament's Scoreboard (§7).
 3. **Scoreboard** — the Overall Scoreboard (§8).
-4. **History** — two always-visible sections: **by match** (every
-   completed match across all tournaments, active or ended, newest
-   first, same row format as Rounds played) and **by tournament** (every
-   tournament, active and ended; tapping one opens its per-tournament
-   Scoreboard, §7).
+4. **History** — two sections, **by match** (every completed match
+   across all tournaments, active or ended, newest first, same row
+   format as Rounds played) and **by tournament** (every tournament,
+   active and ended; tapping one opens its per-tournament Scoreboard,
+   §7). Each section has its own show more / show less toggle in its
+   heading (top-right), independent of the other; both default to
+   **collapsed** (heading only — no peek of items) so the organizer
+   opts in to scrolling through history rather than it being forced on
+   page load.
 5. **Member** — the central player pool: an "add member" form (name,
    gender as an icon-toggle, level as a dropdown, no photo upload per
    §3) above a list of all current members (photo/avatar, name, level).

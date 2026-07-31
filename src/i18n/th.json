@@ -31,7 +31,10 @@
     "byTournamentHeading": "ตามทัวร์นาเมนต์",
     "loadingTournaments": "กำลังโหลดทัวร์นาเมนต์...",
     "loadTournamentsError": "โหลดทัวร์นาเมนต์ไม่สำเร็จ",
-    "noTournaments": "ยังไม่มีทัวร์นาเมนต์"
+    "noTournaments": "ยังไม่มีทัวร์นาเมนต์",
+    "showMore": "แสดงเพิ่มเติม",
+    "showLess": "แสดงน้อยลง",
+    "manuallyAdjustedBadge": "ปรับด้วยมือ"
   },
   "app": {
     "playersHeading": "ผู้เล่น",
@@ -152,6 +155,11 @@
     "startMatch": "เริ่มแมตช์",
     "drawFailed": "จับคู่แมตช์ไม่สำเร็จ",
     "notEnoughPlayersWithCount": "ผู้เล่นไม่พอสำหรับจับคู่แมตช์ ต้องการอย่างน้อย {{needed}} คน มีอยู่ {{have}} คน",
+    "currentMatchReusedWarning": "ผู้เล่นคนอื่นไม่พอ -- การจับคู่นี้ใช้ผู้เล่นที่กำลังแข่งอยู่ในแมตช์ปัจจุบันซ้ำ",
+    "editDraw": "แก้ไข",
+    "doneEditingDraw": "เสร็จสิ้นการแก้ไข",
+    "editDrawSlotLabel": "ทีม {{team}} ผู้เล่นคนที่ {{n}}",
+    "mixedDoublesWarning": "คู่นี้ไม่ได้ผสมชาย-หญิง ทั้งที่สามารถจับคู่แบบผสมได้",
     "gameTeamLabel": "{{team}} -- เกมที่ {{n}}",
     "saveResult": "บันทึกผล",
     "confirmResultTitle": "ยืนยันผลนี้หรือไม่?",

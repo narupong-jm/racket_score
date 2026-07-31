@@ -38,15 +38,20 @@ export function useTournamentMatches(tournamentId: string) {
   })
 }
 
+export interface StartNextMatchInput {
+  participants: MatchParticipantInput[]
+  manuallyAdjusted?: boolean
+}
+
 export function useStartNextMatch(tournamentId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (participants: MatchParticipantInput[]) => {
+    mutationFn: async ({ participants, manuallyAdjusted = false }: StartNextMatchInput) => {
       const matches = await listMatches(tournamentId)
       const nextSequenceNumber =
         matches.reduce((max, m) => Math.max(max, m.sequence_number), 0) + 1
-      return createMatch(tournamentId, nextSequenceNumber, participants)
+      return createMatch(tournamentId, nextSequenceNumber, participants, manuallyAdjusted)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['matches', tournamentId] })

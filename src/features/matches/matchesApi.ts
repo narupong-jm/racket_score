@@ -14,11 +14,13 @@ export async function createMatch(
   tournamentId: string,
   sequenceNumber: number,
   participants: MatchParticipantInput[],
+  manuallyAdjusted = false,
 ): Promise<Match> {
   const { data, error } = await supabase.rpc('create_match', {
     p_tournament_id: tournamentId,
     p_sequence_number: sequenceNumber,
     p_participants: participants as unknown as Json,
+    p_manually_adjusted: manuallyAdjusted,
   })
   if (error) throw error
   return data

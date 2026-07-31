@@ -25,6 +25,7 @@ describe('selectCandidatePool', () => {
     expect(result.ok).toBe(true)
     if (result.ok) {
       expect(result.pool.map((p) => p.id).sort()).toEqual(['a', 'b'])
+      expect(result.mandatoryIds).toEqual(new Set())
     }
   })
 
@@ -36,6 +37,7 @@ describe('selectCandidatePool', () => {
     expect(result.ok).toBe(true)
     if (result.ok) {
       expect(result.pool.map((p) => p.id).sort()).toEqual(['a', 'b', 'c'])
+      expect(result.mandatoryIds).toEqual(new Set())
     }
   })
 
@@ -54,6 +56,29 @@ describe('selectCandidatePool', () => {
     if (result.ok) {
       // whole tier 0 (a) + whole tier 1 (b, c, d) = 4, even though only 3 were needed
       expect(result.pool.map((p) => p.id).sort()).toEqual(['a', 'b', 'c', 'd'])
+      // tier 0 (a) was short on its own, so it's mandatory; tier 1 (b, c, d) is the
+      // tier that completed the requirement, so it's optional/selectable
+      expect(result.mandatoryIds).toEqual(new Set(['a']))
+    }
+  })
+
+  it('mandatory tier smaller than neededCount by more than one seat', () => {
+    const players = [
+      player('a', 0), // tier 0: 2 players, short by 2 seats for a 4-needed doubles draw
+      player('b', 0),
+      player('c', 1),
+      player('d', 1),
+      player('e', 1),
+      player('f', 1),
+      player('g', 1), // tier 1: 5 players
+    ]
+
+    const result = selectCandidatePool(players, 4)
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.pool.map((p) => p.id).sort()).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g'])
+      expect(result.mandatoryIds).toEqual(new Set(['a', 'b']))
     }
   })
 

@@ -63,6 +63,7 @@ function match(id: string, sequenceNumber: number): Match {
     status: 'completed',
     created_at: '2026-01-01T00:00:00Z',
     completed_at: '2026-01-01T00:00:00Z',
+    manually_adjusted: false,
   }
 }
 
