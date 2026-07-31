@@ -4,10 +4,6 @@ A badminton club-night app for organizing pickup tournaments with _balanced
 random matchmaking_, built around a persistent player pool shared across
 tournaments.
 
-## Live demo
-
-https://racket-score-ten.vercel.app/
-
 ## Screenshots
 
 <!-- TODO: add screenshots -->
@@ -126,7 +122,7 @@ current rather than relying on batch recomputation:
 This repository does not include a `migrations/` or `supabase/` folder —
 schema and views were applied directly to the live Supabase project. To
 reproduce the schema, provision a new Supabase project and recreate the
-tables/views described in `SPEC.md`.
+tables/views described in [`docs/SPEC.md`](docs/SPEC.md).
 
 ## Scripts
 
@@ -191,13 +187,13 @@ client-side routing.
 
 ## Documentation map
 
-| File             | Purpose                                                              |
-| ---------------- | -------------------------------------------------------------------- |
-| `SPEC.md`        | Normative product requirements — source of truth for what to build   |
-| `IMPROVEMENT.md` | UX rationale behind the 5-tab navigation rework                      |
-| `PLAN.md`        | Phased implementation plan and stack decisions                       |
-| `RESEARCH.md`    | Point-in-time snapshot of environment/account state at planning time |
-| `CLAUDE.md`      | Instructions for AI coding agents working in this repo               |
+| File                                         | Purpose                                                              |
+| -------------------------------------------- | -------------------------------------------------------------------- |
+| [`docs/SPEC.md`](docs/SPEC.md)               | Normative product requirements — source of truth for what to build   |
+| [`docs/IMPROVEMENT.md`](docs/IMPROVEMENT.md) | UX rationale behind the 5-tab navigation rework                      |
+| [`docs/PLAN.md`](docs/PLAN.md)               | Phased implementation plan and stack decisions                       |
+| [`docs/RESEARCH.md`](docs/RESEARCH.md)       | Point-in-time snapshot of environment/account state at planning time |
+| [`CLAUDE.md`](CLAUDE.md)                     | Instructions for AI coding agents working in this repo               |
 
 ## License
 

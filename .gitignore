@@ -3,5 +3,6 @@ dist
 .env
 .env.*
 !.env.example
+README_GUIDELINE.md
 .DS_Store
 .playwright-mcp

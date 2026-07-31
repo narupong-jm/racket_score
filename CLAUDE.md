@@ -4,17 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Phases 1-12 of `PLAN.md` are complete: the app is built, deployed to Vercel, and was functioning
+Phases 1-12 of `docs/PLAN.md` are complete: the app is built, deployed to Vercel, and was functioning
 as a single-scroll page (all Players/Tournaments content on one screen, no router). Phase 13 is a
 **navigation and flow overhaul** — currently unimplemented (all steps unchecked) — replacing that
 single page with a 5-tab bottom-navigation structure (Create / Active / Scoreboard / History /
-Member), per `IMPROVEMENT.md` (a user-authored concept doc; read it for the full rationale/mockup
-references behind Phase 13's design — `SPEC.md` §3-§9 were rewritten to match it and are the
-normative version, but `IMPROVEMENT.md` explains *why*). Phase 13 went through two earlier,
+Member), per `docs/IMPROVEMENT.md` (a user-authored concept doc; read it for the full rationale/mockup
+references behind Phase 13's design — `docs/SPEC.md` §3-§9 were rewritten to match it and are the
+normative version, but `docs/IMPROVEMENT.md` explains *why*). Phase 13 went through two earlier,
 narrower drafts (3-page, then 4-page) before this one — if you see references to those in old
-conversation history, they're superseded; `PLAN.md`'s current Phase 13 section is the only one
+conversation history, they're superseded; `docs/PLAN.md`'s current Phase 13 section is the only one
 that matters. Before assuming any Phase-13-era tooling exists (`react-router-dom`, the icon-picker
-component, the scoreboard views), check `package.json`/`src/` rather than assuming from `PLAN.md`
+component, the scoreboard views), check `package.json`/`src/` rather than assuming from `docs/PLAN.md`
 alone — none of it exists yet as of this note.
 
 **Node version note:** the local Node is v20.13.1, below what several current package majors
@@ -26,17 +26,17 @@ harmless, but rolldown-style native-binding or ESM/CJS interop failures at runti
 
 Read these files first, in this order, before doing any implementation work:
 
-1. **`SPEC.md`** — confirmed product requirements. Source of truth for _what_ to build. Carries
+1. **`docs/SPEC.md`** — confirmed product requirements. Source of truth for _what_ to build. Carries
    dated "Updated" notes at the top tracking each revision — read those before trusting any single
    section, since some (§3-§9) have been rewritten more than once.
-2. **`IMPROVEMENT.md`** — the concept doc behind `SPEC.md`'s current §3-§9 and `PLAN.md`'s current
-   Phase 13. Not itself normative (SPEC.md is), but explains the UI/UX reasoning and references a
-   mockup that isn't reproduced in `SPEC.md`'s prose.
-3. **`RESEARCH.md`** — environment/account state as of planning time (Supabase org/projects, local
+2. **`docs/IMPROVEMENT.md`** — the concept doc behind `docs/SPEC.md`'s current §3-§9 and `docs/PLAN.md`'s current
+   Phase 13. Not itself normative (docs/SPEC.md is), but explains the UI/UX reasoning and references a
+   mockup that isn't reproduced in `docs/SPEC.md`'s prose.
+3. **`docs/RESEARCH.md`** — environment/account state as of planning time (Supabase org/projects, local
    tooling availability, git status). Useful for knowing what's already provisioned vs. what needs
    to be created, but re-verify rather than trusting it blindly since it's a point-in-time snapshot.
-4. **`PLAN.md`** — the phased implementation plan, including stack decisions and clarifications
-   that refine `SPEC.md`. This is the primary execution guide — work phase by phase, in order,
+4. **`docs/PLAN.md`** — the phased implementation plan, including stack decisions and clarifications
+   that refine `docs/SPEC.md`. This is the primary execution guide — work phase by phase, in order,
    verifying each step's stated test before moving to the next.
 
 ## Stack
@@ -83,7 +83,7 @@ traverses the referenced `tsconfig.app.json`/`tsconfig.node.json` projects. This
 hard way after several steps' "clean type-check" claims turned out to be no-ops; `tsc -b --force`
 surfaced real pre-existing errors once actually run.
 
-## Architecture (target shape, per PLAN.md)
+## Architecture (target shape, per docs/PLAN.md)
 
 - `src/lib/` — Supabase client, generated DB types (`database.types.ts`), shared utilities
 - `src/features/{players,tournaments,matches,matchmaking,scoreboard}/` — feature-oriented modules
@@ -104,17 +104,17 @@ surfaced real pre-existing errors once actually run.
   old in-progress "Standings" screen that read them was deleted) but were left in the view rather
   than removed, since other things may still reference them.
 
-### Domain model essentials (see SPEC.md/PLAN.md for full detail)
+### Domain model essentials (see docs/SPEC.md / docs/PLAN.md for full detail)
 
 - Central, persistent **player pool** shared across tournaments (name, gender [male/female only],
   self-selected level until 3 matches played, then win-rate-derived effective level). Displayed
   everywhere with a **generated placeholder avatar** (initials + name-derived color) — there is no
   photo upload or `players.photo`/`avatar_url` column; don't add one without the user explicitly
-  asking, per `SPEC.md` §3's deferral.
+  asking, per `docs/SPEC.md` §3's deferral.
 - **Doubles pairs/teams are never persisted** — every tournament re-pairs individuals from the pool.
 - **Participants are chosen once, at tournament-creation time, from the member pool — never
   after.** There is deliberately no "add a late player to an in-progress tournament" feature (it
-  existed early on and was explicitly removed — see `SPEC.md` §4 and Phase 13's step 2). Don't
+  existed early on and was explicitly removed — see `docs/SPEC.md` §4 and Phase 13's step 2). Don't
   reintroduce it without being asked.
 - A tournament is singles OR doubles (not both), with its own games-per-match, points-per-game, and
   a deuce cap **auto-computed from the BWF 21→30 ratio**: `cap = round(pointsPerGame * 30 / 21)`.
@@ -144,11 +144,11 @@ surfaced real pre-existing errors once actually run.
   [all/singles/doubles] filters, and a cumulative *total points scored* column instead of point
   differential). Don't conflate the two — they use different views/queries and different "points"
   semantics.
-- No real-time sync — polling/manual refresh only (per SPEC.md's explicit deferral).
+- No real-time sync — polling/manual refresh only (per docs/SPEC.md's explicit deferral).
 
-## Working conventions from PLAN.md
+## Working conventions from docs/PLAN.md
 
-- Build in the phase order defined in `PLAN.md`; each step has an explicit "_Test:_" — treat that
+- Build in the phase order defined in `docs/PLAN.md`; each step has an explicit "_Test:_" — treat that
   as the acceptance check for the step, not just a suggestion.
 - Prefer atomic RPCs over sequential inserts where a partial failure would leave orphan rows (e.g.
   match creation across `matches` + `match_participants`).
