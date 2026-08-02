@@ -109,14 +109,28 @@ function ByTournamentSection() {
           )}
           {!isLoading && !isError && tournaments && tournaments.length > 0 && (
             <ul className="link-list">
-              {tournaments.map((tournament) => (
-                <li key={tournament.id}>
-                  <Link className="link-list-row" to={`/tournaments/${tournament.id}/scoreboard`}>
-                    <span>{tournament.name}</span>
-                    <span className="link-list-meta">{t(`tournamentType.${tournament.type}`)}</span>
-                  </Link>
-                </li>
-              ))}
+              {tournaments.map((tournament) =>
+                tournament.status === 'cancelled' ? (
+                  <li key={tournament.id}>
+                    <span className="link-list-row">
+                      <span>{tournament.name}</span>
+                      <span className="badge">{t('tournamentStatus.cancelled')}</span>
+                    </span>
+                  </li>
+                ) : (
+                  <li key={tournament.id}>
+                    <Link
+                      className="link-list-row"
+                      to={`/tournaments/${tournament.id}/scoreboard`}
+                    >
+                      <span>{tournament.name}</span>
+                      <span className="link-list-meta">
+                        {t(`tournamentType.${tournament.type}`)}
+                      </span>
+                    </Link>
+                  </li>
+                ),
+              )}
             </ul>
           )}
         </>

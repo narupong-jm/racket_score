@@ -87,6 +87,14 @@ const completedTournament: Tournament = {
   ended_at: '2026-01-02T00:00:00Z',
 }
 
+const cancelledTournament: Tournament = {
+  ...activeTournament,
+  id: 't3',
+  name: 'Rained Out Cup',
+  status: 'cancelled',
+  ended_at: null,
+}
+
 describe('HistoryPage', () => {
   it('renders both the By match and By tournament sections, each collapsed by default', async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
@@ -204,6 +212,32 @@ describe('HistoryPage', () => {
       const byTournamentToggle = byTournamentHeading.parentElement!.querySelector('button')!
       expect(byTournamentToggle).toHaveTextContent('Show more')
       expect(screen.queryByRole('link', { name: /sunday smash/i })).toBeNull()
+    })
+  })
+
+  describe('cancelled tournament row', () => {
+    it('renders a cancelled tournament as plain text with a Cancelled badge, not a link', async () => {
+      vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+        activeTournament,
+        cancelledTournament,
+      ])
+
+      const user = userEvent.setup()
+      renderPage()
+
+      const byTournamentHeading = await screen.findByRole('heading', { name: 'By tournament' })
+      const byTournamentToggle = byTournamentHeading.parentElement!.querySelector('button')!
+      await user.click(byTournamentToggle)
+
+      expect(await screen.findByText('Rained Out Cup')).toBeInTheDocument()
+      expect(screen.getByText('Cancelled')).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /rained out cup/i })).toBeNull()
+
+      // Active/completed rows are unaffected -- still plain links, still unbadged.
+      const activeLink = screen.getByRole('link', { name: /sunday smash/i })
+      expect(activeLink).toHaveAttribute('href', '/tournaments/t1/scoreboard')
     })
   })
 

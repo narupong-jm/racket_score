@@ -21,6 +21,7 @@ vi.mock('./tournamentsApi', async (importOriginal) => {
     listTournaments: vi.fn(),
     listParticipants: vi.fn(),
     endTournament: vi.fn(),
+    cancelTournament: vi.fn(),
   }
 })
 
@@ -470,10 +471,10 @@ describe('TournamentDetail: Save result confirm dialog', () => {
 })
 
 describe('TournamentDetail: End tournament confirm dialog', () => {
-  it('shows an enabled End tournament button for an active tournament', async () => {
+  it('shows an enabled End tournament button for an active tournament with a confirmed result', async () => {
     vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
     setupCommonMocks()
-    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([makeMatch('m1', 1, 'completed')])
     vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
 
     renderWithClient(<TournamentDetail tournamentId="t1" />)
@@ -484,7 +485,7 @@ describe('TournamentDetail: End tournament confirm dialog', () => {
   it('hides End tournament for a completed tournament', async () => {
     vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([completedTournament])
     setupCommonMocks()
-    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([makeMatch('m1', 1, 'completed')])
     vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
 
     renderWithClient(<TournamentDetail tournamentId="t2" />)
@@ -493,10 +494,22 @@ describe('TournamentDetail: End tournament confirm dialog', () => {
     expect(screen.queryByRole('button', { name: 'End tournament' })).toBeNull()
   })
 
-  it('opens a confirm dialog on End tournament and only calls endTournament/onEnded on Confirm', async () => {
+  it('hides End tournament for an active tournament with zero confirmed results', async () => {
     vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
     setupCommonMocks()
     vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await screen.findByText('Active T')
+    expect(screen.queryByRole('button', { name: 'End tournament' })).toBeNull()
+  })
+
+  it('opens a confirm dialog on End tournament and only calls endTournament/onEnded on Confirm', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([makeMatch('m1', 1, 'completed')])
     vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
     vi.mocked(tournamentsApi.endTournament).mockResolvedValue({
       ...activeTournament,
@@ -520,6 +533,73 @@ describe('TournamentDetail: End tournament confirm dialog', () => {
     })
     await waitFor(() => {
       expect(onEnded).toHaveBeenCalledTimes(1)
+    })
+  })
+})
+
+describe('TournamentDetail: Cancel tournament confirm dialog', () => {
+  it('shows an enabled Cancel tournament button for an active tournament with zero confirmed results', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    expect(await screen.findByRole('button', { name: 'Cancel tournament' })).toBeEnabled()
+  })
+
+  it('hides Cancel tournament once a confirmed result exists', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([makeMatch('m1', 1, 'completed')])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    expect(await screen.findByRole('button', { name: 'End tournament' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel tournament' })).toBeNull()
+  })
+
+  it('hides Cancel tournament for a non-active tournament', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([completedTournament])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+
+    renderWithClient(<TournamentDetail tournamentId="t2" />)
+
+    await screen.findByText('Completed T')
+    expect(screen.queryByRole('button', { name: 'Cancel tournament' })).toBeNull()
+  })
+
+  it('opens a confirm dialog on Cancel tournament and only calls cancelTournament/onCancelled on Confirm', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    vi.mocked(tournamentsApi.cancelTournament).mockResolvedValue({
+      ...activeTournament,
+      status: 'cancelled',
+    })
+    const onCancelled = vi.fn()
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" onCancelled={onCancelled} />)
+
+    await user.click(await screen.findByRole('button', { name: 'Cancel tournament' }))
+
+    expect(await screen.findByText('Cancel this tournament?')).toBeInTheDocument()
+    expect(tournamentsApi.cancelTournament).not.toHaveBeenCalled()
+    expect(onCancelled).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Yes, cancel tournament' }))
+
+    await waitFor(() => {
+      expect(tournamentsApi.cancelTournament).toHaveBeenCalledWith('t1')
+    })
+    await waitFor(() => {
+      expect(onCancelled).toHaveBeenCalledTimes(1)
     })
   })
 })

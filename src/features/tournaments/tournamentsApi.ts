@@ -71,3 +71,11 @@ export async function endTournament(tournamentId: string): Promise<Tournament> {
   if (error) throw error
   return data
 }
+
+export async function cancelTournament(tournamentId: string): Promise<Tournament> {
+  const { data, error } = await supabase.rpc('cancel_tournament', {
+    p_tournament_id: tournamentId,
+  })
+  if (error) throw error
+  return data
+}

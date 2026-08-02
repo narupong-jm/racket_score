@@ -56,7 +56,8 @@
   },
   "tournamentStatus": {
     "active": "กำลังดำเนินการ",
-    "completed": "จบแล้ว"
+    "completed": "จบแล้ว",
+    "cancelled": "ยกเลิกแล้ว"
   },
   "players": {
     "loading": "กำลังโหลดรายชื่อผู้เล่น...",
@@ -174,7 +175,11 @@
     "endTournament": "จบทัวร์นาเมนต์",
     "confirmEndTitle": "จบทัวร์นาเมนต์นี้หรือไม่?",
     "confirmEndBody": "คุณจะถูกพาไปที่ตารางคะแนนสุดท้าย",
-    "confirmEndButton": "ใช่ จบทัวร์นาเมนต์"
+    "confirmEndButton": "ใช่ จบทัวร์นาเมนต์",
+    "cancelTournament": "ยกเลิกทัวร์นาเมนต์",
+    "confirmCancelTitle": "ยกเลิกทัวร์นาเมนต์นี้หรือไม่?",
+    "confirmCancelBody": "การกระทำนี้ย้อนกลับไม่ได้ แมตช์ที่จับคู่ไว้แต่ยังไม่ได้เล่นจะถูกยกเลิกไปด้วย",
+    "confirmCancelButton": "ใช่ ยกเลิกทัวร์นาเมนต์"
   },
   "matches": {
     "draw": {

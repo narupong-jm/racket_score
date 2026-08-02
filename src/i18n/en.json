@@ -56,7 +56,8 @@
   },
   "tournamentStatus": {
     "active": "Active",
-    "completed": "Completed"
+    "completed": "Completed",
+    "cancelled": "Cancelled"
   },
   "players": {
     "loading": "Loading players...",
@@ -174,7 +175,11 @@
     "endTournament": "End tournament",
     "confirmEndTitle": "End this tournament?",
     "confirmEndBody": "You'll be taken to its final scoreboard.",
-    "confirmEndButton": "Yes, end tournament"
+    "confirmEndButton": "Yes, end tournament",
+    "cancelTournament": "Cancel tournament",
+    "confirmCancelTitle": "Cancel this tournament?",
+    "confirmCancelBody": "This can't be undone. Any drawn-but-unplayed match will be discarded.",
+    "confirmCancelButton": "Yes, cancel tournament"
   },
   "matches": {
     "draw": {

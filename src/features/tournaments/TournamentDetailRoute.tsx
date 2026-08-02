@@ -16,5 +16,11 @@ export function TournamentDetailRoute() {
     return <Navigate to={`/tournaments/${id}/scoreboard`} replace />
   }
 
-  return <TournamentDetail tournamentId={id} onEnded={() => navigate(`/tournaments/${id}/scoreboard`)} />
+  return (
+    <TournamentDetail
+      tournamentId={id}
+      onEnded={() => navigate(`/tournaments/${id}/scoreboard`)}
+      onCancelled={() => navigate('/active')}
+    />
+  )
 }

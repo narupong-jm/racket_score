@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useTournaments } from './useTournaments'
 import { useEndTournament } from './useEndTournament'
+import { useCancelTournament } from './useCancelTournament'
 import { useParticipants } from './useParticipants'
 import { computePointCap } from './computePointCap'
 import { formatDate } from '../../i18n/formatDate'
@@ -27,9 +28,10 @@ import type { Match, MatchGame, MatchHistoryEntry } from '../matches/matchesApi'
 interface TournamentDetailProps {
   tournamentId: string
   onEnded?: () => void
+  onCancelled?: () => void
 }
 
-export function TournamentDetail({ tournamentId, onEnded }: TournamentDetailProps) {
+export function TournamentDetail({ tournamentId, onEnded, onCancelled }: TournamentDetailProps) {
   const { t, i18n } = useTranslation()
   const { data: tournaments } = useTournaments()
   const tournament = tournaments?.find((tour) => tour.id === tournamentId)
@@ -39,6 +41,8 @@ export function TournamentDetail({ tournamentId, onEnded }: TournamentDetailProp
   const { data: participants } = useParticipants(tournamentId)
   const endTournament = useEndTournament()
   const [endModalOpen, setEndModalOpen] = useState(false)
+  const cancelTournament = useCancelTournament()
+  const [cancelModalOpen, setCancelModalOpen] = useState(false)
 
   if (!tournament) return <p>{t('tournaments.detail.notFound')}</p>
 
@@ -60,6 +64,7 @@ export function TournamentDetail({ tournamentId, onEnded }: TournamentDetailProp
   const completedMatches = matches
     .filter((m) => m.status === 'completed')
     .sort((a, b) => b.sequence_number - a.sequence_number)
+  const hasConfirmedResult = completedMatches.length > 0
 
   function participantsFor(matchId: string): MatchHistoryEntry[] {
     return matchParticipants.filter((p) => p.match_id === matchId)
@@ -75,6 +80,16 @@ export function TournamentDetail({ tournamentId, onEnded }: TournamentDetailProp
       onSuccess: () => {
         setEndModalOpen(false)
         onEnded?.()
+      },
+    })
+  }
+
+  function handleConfirmCancel() {
+    if (!tournament) return
+    cancelTournament.mutate(tournament.id, {
+      onSuccess: () => {
+        setCancelModalOpen(false)
+        onCancelled?.()
       },
     })
   }
@@ -153,7 +168,7 @@ export function TournamentDetail({ tournamentId, onEnded }: TournamentDetailProp
         )}
       </section>
 
-      {isActive && (
+      {isActive && hasConfirmedResult && (
         <div className="danger-zone">
           <button
             type="button"
@@ -177,6 +192,40 @@ export function TournamentDetail({ tournamentId, onEnded }: TournamentDetailProp
                 disabled={endTournament.isPending}
               >
                 {t('manage.confirmEndButton')}
+              </button>
+            </div>
+          </Modal>
+        </div>
+      )}
+
+      {isActive && !hasConfirmedResult && (
+        <div className="danger-zone">
+          <button
+            type="button"
+            className="danger"
+            onClick={() => setCancelModalOpen(true)}
+            disabled={cancelTournament.isPending}
+          >
+            {t('manage.cancelTournament')}
+          </button>
+          <Modal open={cancelModalOpen} onClose={() => setCancelModalOpen(false)}>
+            <h3>{t('manage.confirmCancelTitle')}</h3>
+            <p>{t('manage.confirmCancelBody')}</p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setCancelModalOpen(false)}
+              >
+                {t('manage.cancel')}
+              </button>
+              <button
+                type="button"
+                className="danger"
+                onClick={handleConfirmCancel}
+                disabled={cancelTournament.isPending}
+              >
+                {t('manage.confirmCancelButton')}
               </button>
             </div>
           </Modal>

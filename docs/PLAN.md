@@ -708,6 +708,129 @@ maintained continuously from tournament start — the `mandatoryIds` implementat
 written to degrade safely (never excludes a lower-count player) even if that assumption is
 ever violated, but this should be called out if a future bug report suggests otherwise.
 
+## Phase 15 — Cancel Tournament
+
+A narrow, spec-driven addition (`docs/SPEC.md` §4/§9, updated 2026-08-02): a permanent
+"discard a mistaken tournament" action, distinct from End Tournament, available only up
+until a tournament's first match result is confirmed. No schema/type migration is needed
+for the new status value itself (`tournaments.status` is untyped `string`), but a new
+atomic RPC is needed to safely delete a drawn-but-unconfirmed match alongside the status
+flip.
+
+**Confirmed decisions (this session):**
+- Cancel is gated on `completedMatches.length === 0` for the tournament; once any result
+  is confirmed, Cancel disappears forever and End Tournament takes its place — the two
+  actions are mutually exclusive within the same `danger-zone` block.
+- Implemented as a single atomic Postgres RPC, `cancel_tournament(p_tournament_id uuid)
+  returns tournaments`, applied via the Supabase MCP connector (no local migration
+  convention exists in this repo) — mirroring `create_match`/`record_match_result` rather
+  than sequential `.update()`/`.delete()` calls, per `CLAUDE.md`'s atomic-RPC guidance.
+  The RPC re-validates its precondition server-side (raises unless the tournament is
+  `active` **and** has zero completed matches) since RLS is permissive `anon` and the
+  button-visibility gate alone isn't trustworthy.
+- No new `cancelled_at` column — `ended_at` stays `null` for cancelled tournaments;
+  nothing in the spec displays a cancellation timestamp.
+- New i18n keys are distinctly named (`manage.cancelTournament`, `confirmCancelTitle`,
+  `confirmCancelBody`, `confirmCancelButton`, `tournamentStatus.cancelled`) — none of
+  them reuse `manage.cancel`, which stays the generic modal-dismiss label already shared
+  by other confirm dialogs (including the new Cancel dialog's own dismiss button, exactly
+  as End's dialog already does).
+- History's `ByTournamentSection` only changes behavior for `status === 'cancelled'` rows
+  (plain text + `.badge`, no `Link`); active/completed rows are untouched, since no
+  Active/Completed badges exist today despite SPEC.md's "in place of Active/Completed"
+  phrasing.
+
+1. [x] **`cancel_tournament` RPC.** Via the Supabase MCP connector's `apply_migration`:
+   create `cancel_tournament(p_tournament_id uuid) returns tournaments` — raises an
+   exception unless the target tournament's `status = 'active'` and it has zero rows in
+   `matches` with `status = 'completed'`; deletes `match_participants` then `matches` for
+   any row with `status = 'queued'` on that tournament (0 or 1 rows, by the single-court
+   model); updates `tournaments.status = 'cancelled'`; returns the updated row. `grant
+   execute on function cancel_tournament(uuid) to anon`. Follow with
+   `generate_typescript_types` (`src/lib/database.types.ts` — the `Functions` section
+   needs the new signature for `supabase.rpc('cancel_tournament', ...)` to type-check,
+   same as `create_match`/`record_match_result`) and a `get_advisors` spot-check.
+   _Test:_ `execute_sql` seeds a tournament + queued match + its participants, calls the
+   function directly, and asserts the `matches`/`match_participants` rows are gone,
+   `tournaments.status` is `'cancelled'`, and `player_stats`/`tournament_standings` are
+   unaffected (confirming the deliberate never-touches-scoreboard-data invariant);
+   a second `execute_sql` case seeds a *completed* match on another tournament and
+   asserts the function raises.
+2. [x] **`cancelTournament` API wrapper.** New `cancelTournament(tournamentId): Promise<Tournament>`
+   in `src/features/tournaments/tournamentsApi.ts`, wrapping `supabase.rpc('cancel_tournament',
+   { p_tournament_id: tournamentId })`, mirroring `endTournament`'s shape/error-throwing.
+   _Test:_ new case in `tournamentsApi.integration.test.ts` mirroring the existing "ends a
+   tournament" test (`cancelTournament(id)` → `status` is `'cancelled'`, `ended_at` still
+   `null`); a second case creates a match via `createMatch`/`recordMatchResult` first and
+   asserts `cancelTournament(id)` `rejects.toThrow()` — proving the server-side guard
+   holds even when called directly, bypassing the UI's button gating entirely.
+3. [x] **`useCancelTournament` hook.** New `src/features/tournaments/useCancelTournament.ts`,
+   a `useMutation` mirroring `useEndTournament.ts`'s structure, but its `onSuccess`
+   invalidates both `['tournaments']` and `['matches', tournamentId]` — needed because,
+   unlike `endTournament`, cancelling can delete a cached `matches` row via the RPC, and
+   `useTournamentMatches`'s cache for that tournament would otherwise go stale.
+   _Test:_ a small hook test asserting both query keys are invalidated on success.
+4. [x] **Narrow End Tournament's visibility.** In `TournamentDetail.tsx`, derive
+   `hasConfirmedResult = completedMatches.length > 0` and change the existing danger-zone
+   guard from `{isActive && (...)}` to gate the End button+modal on
+   `isActive && hasConfirmedResult`. Update the two now-affected cases in
+   `TournamentDetail.test.tsx`'s "End tournament confirm dialog" describe block — both
+   currently mock `listMatches` to `[]` and expect the End button to render — so each
+   mocks at least one completed match instead. _Test:_ the two updated RTL cases above,
+   plus a new case asserting End tournament is **absent** for an active tournament with
+   zero completed matches.
+5. [x] **Cancel Tournament button + confirm dialog.** In `TournamentDetail.tsx`'s single
+   `danger-zone` block, branch on `hasConfirmedResult`: render the End button+`Modal`
+   (step 4) when true, else a new Cancel button+`Modal` using `manage.cancelTournament`,
+   `manage.confirmCancelTitle`, `manage.confirmCancelBody`, `manage.confirmCancelButton`
+   (new keys in both `en.json`/`th.json`), with the modal's dismiss button reusing
+   `manage.cancel` exactly like End's does. New `cancelModalOpen` state, a
+   `handleConfirmCancel` calling `useCancelTournament()`'s mutate with
+   `onSuccess: () => { setCancelModalOpen(false); onCancelled?.() }`. Extend
+   `TournamentDetailProps` with `onCancelled?: () => void`; wire it in
+   `TournamentDetailRoute.tsx` as `onCancelled={() => navigate('/active')}`. _Test:_ a new
+   "Cancel tournament confirm dialog" describe block in `TournamentDetail.test.tsx`
+   mirroring the End block's 3-test shape: (a) Cancel button visible + enabled when
+   active with zero completed matches, (b) Cancel button absent once a completed match
+   exists (and absent for a non-active tournament), (c) full click-through — dialog opens,
+   `cancelTournament` not yet called, confirm click calls it with the right id and then
+   fires `onCancelled`.
+6. [x] **History: Cancelled badge, non-interactive row.** Add `tournamentStatus.cancelled`
+   (`"Cancelled"` / Thai equivalent) to both i18n files — this also fixes
+   `TournamentDetail.tsx`'s own header (`tournaments.detail.summary`, which already does
+   `t(\`tournamentStatus.${tournament.status}\`)`) for free, no extra wiring needed. In
+   `HistoryPage.tsx`'s `ByTournamentSection`, render rows with
+   `tournament.status === 'cancelled'` as plain text (name + a `.badge` showing
+   `tournamentStatus.cancelled`, no `Link`, no href) instead of the existing
+   `<Link to=".../scoreboard">`; active/completed rows keep their current unbadged `Link`
+   rendering unchanged. _Test:_ new case(s) in `HistoryPage.test.tsx`: a
+   cancelled-tournament fixture renders its name + the Cancelled badge with no accessible
+   `link` role for that row, while the existing row-linking test (which only fixtures
+   active/completed) continues to pass unmodified.
+7. [x] **Full regression + walkthrough.** `npm run lint`, `npm run build`, `npm test`.
+   Playwright MCP click-through: create a tournament → in Manage, confirm Cancel
+   tournament is visible and End tournament is not → open the confirm dialog, dismiss it
+   (nothing happens) → confirm it for real → land on the Active tab with the tournament
+   gone → History tab: it appears in By tournament with a Cancelled badge and is not
+   tappable into a scoreboard → separately, create a second tournament, play and confirm
+   one result, then verify Cancel has disappeared and End has taken its place, and that
+   End still works as before (regression). Both languages, both themes, no console
+   errors.
+
+**Known risks:** RLS is permissive `anon`, so the RPC's server-side re-check (status
+`active` + zero completed matches) is the only real enforcement against a stale or
+directly-called cancel; a race where a result is confirmed in one tab while cancel is
+submitted from another isn't covered by any UI-level test, only the RPC integration test
+in step 2. Step 4's narrowing of End Tournament's visibility silently breaks two existing
+passing `TournamentDetail.test.tsx` cases if their fixtures aren't updated in the same
+step — easy to miss in review since the tests would otherwise look untouched. No app code
+has ever deleted a `matches`/`match_participants` row outside test-cleanup blocks before
+this RPC; double-check FK/delete ordering directly against the live schema (`list_tables`)
+rather than assuming the test-cleanup convention is authoritative. If a future caller of
+`<TournamentDetail>` ever omits `onCancelled`, a stale ephemeral "Next match" draw could
+remain visible after a cancel with no navigation to clear it — low risk today since
+`TournamentDetailRoute` is the only caller and always wires it.
+
 ---
 
 ## Critical Files
@@ -729,19 +852,35 @@ ever violated, but this should be called out if a future bug report suggests oth
   (includes `matches.manually_adjusted`, added in Phase 14)
 - Supabase migrations / `player_stats`, `tournament_standings`, and `player_match_history`
   views — source of truth for win-rate, effective skill level, and both scoreboards
+- `src/features/tournaments/tournamentsApi.ts` (+ `useCancelTournament.ts`) —
+  `cancelTournament` wraps the new `cancel_tournament` RPC; alongside `endTournament`/
+  `useEndTournament`, together the only code paths that ever write `tournaments.status`
+  (Phase 15)
+- `cancel_tournament` Postgres RPC (live Supabase project only — no local migration file,
+  applied/inspected via the Supabase MCP connector) — re-validates zero confirmed results
+  server-side before deleting any queued match and flipping status to `cancelled` (Phase 15)
+- `src/features/tournaments/TournamentDetail.tsx` — the danger zone now branches between
+  Cancel Tournament (`completedMatches.length === 0`) and End Tournament, mutually
+  exclusive per tournament (Phase 15)
 
 ## End-to-End Verification
 
-As of Phase 14, the full critical path has been exercised at three levels: pure-logic unit
-tests (Vitest, no I/O — 181 tests across the suite as of this note), integration tests
+As of Phase 15, the full critical path has been exercised at three levels: pure-logic unit
+tests (Vitest, no I/O — 190 tests across the suite as of this note), integration tests
 against the real Supabase project (via the JS client and cross-checked with the Supabase MCP
-tools), and full browser-driven runs via Playwright MCP against both the local dev server and
-the deployed Vercel URL. The path covered: create a player → create a tournament (singles or
-doubles) → select participants from the pool → auto-drawn first match, optionally edited
-(with a non-blocking gender-balance warning) before confirming → Randomize / Edit / Start the
-Next match in Manage Tournament, including Current-match exclusion from the draw pool and its
-reuse-fallback warning → record a result with valid/invalid scores (confirm-before-save,
-permanently locked after) → win-rate scoreboards (per-tournament and cross-tournament Overall,
-with period/type filters) and skill levels update live → History tab (both sections
-collapsible, default-collapsed, manually-adjusted badges) → toggle language and theme. All 5
-tabs, both languages, both light/dark themes, no console errors.
+tools, including the `cancel_tournament` RPC exercised directly via `execute_sql` before any
+UI wired up to it), and full browser-driven runs via Playwright MCP against the local dev
+server (Phase 15's walkthrough specifically was run against the local dev server only; the
+deployed Vercel URL has not yet been re-verified post-Phase-15). The path covered: create a
+player → create a tournament (singles or doubles) → select participants from the pool →
+auto-drawn first match, optionally edited (with a non-blocking gender-balance warning) before
+confirming → Randomize / Edit / Start the Next match in Manage Tournament, including
+Current-match exclusion from the draw pool and its reuse-fallback warning → record a result
+with valid/invalid scores (confirm-before-save, permanently locked after) → win-rate
+scoreboards (per-tournament and cross-tournament Overall, with period/type filters) and skill
+levels update live → History tab (both sections collapsible, default-collapsed,
+manually-adjusted badges) → before a tournament's first
+result is confirmed, Cancel it instead (confirm dialog, permanent, discards any
+drawn-but-unconfirmed match) and land back on Active with it now absent, appearing in
+History's by-tournament list as a non-interactive Cancelled row → toggle language and
+theme. All 5 tabs, both languages, both light/dark themes, no console errors.

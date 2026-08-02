@@ -318,6 +318,27 @@ export type Database = {
       }
     }
     Functions: {
+      cancel_tournament: {
+        Args: { p_tournament_id: string }
+        Returns: {
+          created_at: string
+          ended_at: string | null
+          games_per_match: number
+          id: string
+          name: string
+          point_cap: number | null
+          points_per_game: number
+          status: string
+          type: string
+          win_by: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tournaments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_match: {
         Args: {
           p_manually_adjusted?: boolean

@@ -15,6 +15,10 @@ equal match counts, hard-filter mixed-gender doubles, Current-match draw
 exclusion, manual editing of a drawn-but-not-yet-started match, and
 collapsible (default-collapsed) History sections. §5, §6, and §9 revised
 below. Not yet implemented as of this note — see `docs/IMPROVEMENT2.md`.
+Updated: 2026-08-02 — adds **Cancel Tournament** (§4, §9): a permanent,
+non-reversible way to discard a tournament created by mistake, available
+only before its first match result is confirmed, in place of End
+Tournament during that window. Not yet implemented as of this note.
 
 ## 1. Overview
 
@@ -78,6 +82,18 @@ history/stats and standings within each tournament.
   the current one is still being played.
 - Tournament ends when the **organizer manually stops it** — there is no
   fixed number of matches or rounds decided in advance.
+- **Cancelling** a tournament is a separate, permanent action available
+  only **before its first match result is confirmed** — intended for a
+  tournament created by mistake or no longer wanted, not for abandoning
+  one that's already underway. During that window the organizer sees a
+  **Cancel** action instead of End Tournament (§9); once a first result
+  is confirmed, Cancel disappears for good and the normal End Tournament
+  flow takes over. Cancelling sets the tournament's status to
+  **cancelled**, discards any drawn-but-unconfirmed match (Next or
+  Current — §9), and cannot be undone; there is no reactivation path back
+  to active. Because it's only available pre-first-result, a cancelled
+  tournament never has any confirmed match data, so it cannot affect
+  `player_stats` or scoreboard views.
 
 ## 5. Match Generator (balanced random draw)
 
@@ -246,15 +262,28 @@ every screen size (not a responsive top-nav on wider viewports):
      final score), the round counter increments, and Current match
      returns to empty (Next match's pairing, if any, is not
      auto-promoted — the organizer must tap Start match).
+   - **Cancel tournament** (danger-styled) — shown in place of End
+     tournament, and only until the tournament's first match result is
+     confirmed (§4). Opens a confirm dialog warning the action is
+     permanent and can't be undone; on confirm, the tournament's status
+     flips to **cancelled**, any drawn-but-unconfirmed match (Next or
+     Current) is discarded, and the organizer returns to the Active tab
+     (the tournament no longer appears there — it moves to History,
+     below). Once a first result is confirmed, this action disappears
+     permanently and End tournament takes its place, as below.
    - **End tournament** (danger-styled) opens a confirm dialog; on
      confirm the tournament's status flips to ended and the organizer
      lands on that tournament's Scoreboard (§7).
 3. **Scoreboard** — the Overall Scoreboard (§8).
 4. **History** — two sections, **by match** (every completed match
    across all tournaments, active or ended, newest first, same row
-   format as Rounds played) and **by tournament** (every tournament,
-   active and ended; tapping one opens its per-tournament Scoreboard,
-   §7). Each section has its own show more / show less toggle in its
+   format as Rounds played) and **by tournament** (every tournament —
+   active, ended, or cancelled; tapping an active or ended one opens its
+   per-tournament Scoreboard, §7 — a cancelled tournament is listed with
+   a **Cancelled** badge in place of Active/Completed but has no
+   Scoreboard to open, since cancelling is only possible before any
+   match result exists). Each section has its own show more / show less
+   toggle in its
    heading (top-right), independent of the other; both default to
    **collapsed** (heading only — no peek of items) so the organizer
    opts in to scrolling through history rather than it being forced on

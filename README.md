@@ -6,12 +6,12 @@ tournaments.
 
 ## Screenshots
 
-| Active | Create Tournament |
-|:---:|:---:|
+|                        Active                         |                        Create Tournament                         |
+| :---------------------------------------------------: | :--------------------------------------------------------------: |
 | <img src="docs/screenshots/active.png" width="220" /> | <img src="docs/screenshots/create-tournament.png" width="220" /> |
 
-| Overall Scoreboard | Member |
-|:---:|:---:|
+|                        Overall Scoreboard                         |                        Member                         |
+| :---------------------------------------------------------------: | :---------------------------------------------------: |
 | <img src="docs/screenshots/overall-scoreboard.png" width="220" /> | <img src="docs/screenshots/member.png" width="220" /> |
 
 ## Features
@@ -32,6 +32,9 @@ tournaments.
 - Manual override for a drawn-but-not-yet-started match — swap a player
   before the match starts, with a non-blocking warning if the edit breaks
   doubles' gender-balance rule; edited matches are flagged in History
+- Cancel a tournament before its first match result is confirmed —
+  replaces the End action during that window, permanent, shown as a
+  "Cancelled" row in History
 - Thai/English language toggle, light/dark theme support
 
 ## Design decisions & intentional limitations
@@ -43,9 +46,12 @@ These are deliberate design choices, not missing features:
 - **Confirmed match results are permanently locked.** There is no edit UI
   and no admin override anywhere in the app. A drawn-but-not-yet-started
   match is different — the organizer can edit its lineup before it starts;
-  it's the *result*, once confirmed, that can never be changed.
+  it's the _result_, once confirmed, that can never be changed.
 - **Participants are chosen once, at tournament creation, from the player
   pool.** There is no way to add a player to an in-progress tournament.
+- **Cancelling a tournament is permanent.** It's only available before the
+  tournament's first match result is confirmed, and there's no path back
+  to active once cancelled.
 - **No fixed round count.** The UI always shows "Round N", never "Round N of
   M" — a tournament runs until the organizer manually ends it.
 - **No real-time sync.** Data updates via polling/manual refresh only.
@@ -210,14 +216,14 @@ client-side routing.
 
 ## Documentation map
 
-| File                                         | Purpose                                                              |
-| -------------------------------------------- | -------------------------------------------------------------------- |
-| [`docs/SPEC.md`](docs/SPEC.md)               | Normative product requirements — source of truth for what to build   |
-| [`docs/IMPROVEMENT.md`](docs/IMPROVEMENT.md) | UX rationale behind the 5-tab navigation rework                      |
+| File                                           | Purpose                                                                           |
+| ---------------------------------------------- | --------------------------------------------------------------------------------- |
+| [`docs/SPEC.md`](docs/SPEC.md)                 | Normative product requirements — source of truth for what to build                |
+| [`docs/IMPROVEMENT.md`](docs/IMPROVEMENT.md)   | UX rationale behind the 5-tab navigation rework                                   |
 | [`docs/IMPROVEMENT2.md`](docs/IMPROVEMENT2.md) | Post-launch patch: matchmaking corrections, manual draw editing, History collapse |
-| [`docs/PLAN.md`](docs/PLAN.md)               | Phased implementation plan and stack decisions                       |
-| [`docs/RESEARCH.md`](docs/RESEARCH.md)       | Point-in-time snapshot of environment/account state at planning time |
-| [`CLAUDE.md`](CLAUDE.md)                     | Instructions for AI coding agents working in this repo               |
+| [`docs/PLAN.md`](docs/PLAN.md)                 | Phased implementation plan and stack decisions                                    |
+| [`docs/RESEARCH.md`](docs/RESEARCH.md)         | Point-in-time snapshot of environment/account state at planning time              |
+| [`CLAUDE.md`](CLAUDE.md)                       | Instructions for AI coding agents working in this repo                            |
 
 ## License
 
