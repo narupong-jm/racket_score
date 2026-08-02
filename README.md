@@ -14,6 +14,10 @@ tournaments.
 | :---------------------------------------------------------------: | :---------------------------------------------------: |
 | <img src="docs/screenshots/overall-scoreboard.png" width="220" /> | <img src="docs/screenshots/member.png" width="220" /> |
 
+|                       History (by match)                        |                       History (by tournament)                        |
+| :-------------------------------------------------------------: | :------------------------------------------------------------------: |
+| <img src="docs/screenshots/history-by-match.png" width="220" /> | <img src="docs/screenshots/history-by-tournament.png" width="220" /> |
+
 ## Features
 
 - Central, persistent player pool with generated placeholder avatars
