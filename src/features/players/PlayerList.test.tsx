@@ -13,6 +13,10 @@ vi.mock('./playersApi', () => ({
   updatePlayer: vi.fn(),
 }))
 
+vi.mock('../passphrase/usePassphraseGate', () => ({
+  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+}))
+
 function renderWithClient(ui: ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
@@ -96,9 +100,11 @@ describe('PlayerList level editability', () => {
     await user.click(screen.getByRole('button', { name: /save/i }))
 
     await waitFor(() => {
-      expect(playersApi.updatePlayer).toHaveBeenCalledWith('p1', {
-        self_selected_level: 'advanced',
-      })
+      expect(playersApi.updatePlayer).toHaveBeenCalledWith(
+        'p1',
+        { self_selected_level: 'advanced' },
+        'test-passphrase',
+      )
     })
   })
 })

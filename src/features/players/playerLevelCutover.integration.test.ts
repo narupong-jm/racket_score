@@ -3,6 +3,7 @@ import { createPlayer, getPlayerStats } from './playersApi'
 import { createTournament, addParticipant } from '../tournaments/tournamentsApi'
 import { createMatch, recordMatchResult } from '../matches/matchesApi'
 import { supabase } from '../../lib/supabaseClient'
+import { testWritePassphrase } from '../../test/testPassphrase'
 
 describe('effective_level cutover at exactly 3 matches (real project, anon key)', () => {
   const runId = crypto.randomUUID()
@@ -30,34 +31,52 @@ describe('effective_level cutover at exactly 3 matches (real project, anon key)'
   })
 
   it('stays self-selected through 2 matches, then switches to the win-rate band on the 3rd', async () => {
-    const player = await createPlayer({
-      name: `Cutover Test Player ${runId}`,
-      gender: 'male',
-      self_selected_level: 'beginner',
-    })
-    const opponent = await createPlayer({
-      name: `Cutover Test Opponent ${runId}`,
-      gender: 'female',
-      self_selected_level: 'beginner',
-    })
+    const player = await createPlayer(
+      {
+        name: `Cutover Test Player ${runId}`,
+        gender: 'male',
+        self_selected_level: 'beginner',
+      },
+      testWritePassphrase,
+    )
+    const opponent = await createPlayer(
+      {
+        name: `Cutover Test Opponent ${runId}`,
+        gender: 'female',
+        self_selected_level: 'beginner',
+      },
+      testWritePassphrase,
+    )
     playerIds.push(player.id, opponent.id)
 
-    const tournament = await createTournament({
-      name: `Cutover Test ${runId}`,
-      type: 'singles',
-      games_per_match: 1,
-      points_per_game: 21,
-    })
+    const tournament = await createTournament(
+      {
+        name: `Cutover Test ${runId}`,
+        type: 'singles',
+        games_per_match: 1,
+        points_per_game: 21,
+      },
+      testWritePassphrase,
+    )
     tournamentId = tournament.id
-    await addParticipant(tournamentId, player.id)
-    await addParticipant(tournamentId, opponent.id)
+    await addParticipant(tournamentId, player.id, testWritePassphrase)
+    await addParticipant(tournamentId, opponent.id, testWritePassphrase)
 
     async function playAndWin(sequenceNumber: number) {
-      const match = await createMatch(tournamentId!, sequenceNumber, [
-        { player_id: player.id, team: 1 },
-        { player_id: opponent.id, team: 2 },
-      ])
-      await recordMatchResult(match.id, [{ game_number: 1, team1_score: 21, team2_score: 10 }])
+      const match = await createMatch(
+        tournamentId!,
+        sequenceNumber,
+        [
+          { player_id: player.id, team: 1 },
+          { player_id: opponent.id, team: 2 },
+        ],
+        testWritePassphrase,
+      )
+      await recordMatchResult(
+        match.id,
+        [{ game_number: 1, team1_score: 21, team2_score: 10 }],
+        testWritePassphrase,
+      )
     }
 
     await playAndWin(1)

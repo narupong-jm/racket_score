@@ -10,8 +10,16 @@ export async function listPlayers(): Promise<Player[]> {
   return data
 }
 
-export async function createPlayer(input: TablesInsert<'players'>): Promise<Player> {
-  const { data, error } = await supabase.from('players').insert(input).select().single()
+export async function createPlayer(
+  input: TablesInsert<'players'>,
+  passphrase: string,
+): Promise<Player> {
+  const { data, error } = await supabase.rpc('create_player', {
+    p_name: input.name,
+    p_gender: input.gender,
+    p_self_selected_level: input.self_selected_level,
+    p_passphrase: passphrase,
+  })
   if (error) throw error
   return data
 }
@@ -19,13 +27,15 @@ export async function createPlayer(input: TablesInsert<'players'>): Promise<Play
 export async function updatePlayer(
   id: string,
   updates: TablesUpdate<'players'>,
+  passphrase: string,
 ): Promise<Player> {
-  const { data, error } = await supabase
-    .from('players')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
+  const { data, error } = await supabase.rpc('update_player', {
+    p_id: id,
+    p_passphrase: passphrase,
+    p_name: updates.name,
+    p_gender: updates.gender,
+    p_self_selected_level: updates.self_selected_level,
+  })
   if (error) throw error
   return data
 }

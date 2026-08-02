@@ -831,6 +831,452 @@ rather than assuming the test-cleanup convention is authoritative. If a future c
 remain visible after a cancel with no navigation to clear it — low risk today since
 `TournamentDetailRoute` is the only caller and always wires it.
 
+## Phase 16 — Write-Access Passphrase
+
+A narrow, spec-driven addition (`docs/SPEC.md` §2, updated 2026-08-02): a single
+shared passphrase, required before any write (create/update/delete anywhere in the
+app), enforced at the database level via RPC — not a UI-only check. Reading/browsing
+stays open to everyone, unchanged. This phase converts every remaining direct-table
+write (`players` insert/update, `tournaments` insert/update, `tournament_participants`
+insert) to go through a passphrase-checked RPC, and adds the same check to the RPCs
+that already exist (`create_match`, `record_match_result`, `cancel_tournament`).
+
+**Confirmed decisions (this session, via user interview):**
+- One passphrase for the whole app — not per-tournament, not per-person.
+- Enforced server-side: every write RPC re-validates the passphrase itself (no
+  "trust the client already checked" shortcut); the underlying tables have
+  `INSERT`/`UPDATE`/`DELETE` revoked from `anon` so a write is impossible except
+  through one of these RPCs.
+- Secret is stored **hashed** (via `pgcrypto`) in a new singleton settings table,
+  seeded once by migration. No in-app Settings UI to change it — changing it later
+  means writing and running a new migration. The actual passphrase text is **not**
+  written into this plan or committed anywhere in the repo in plaintext — it's
+  supplied by the user directly when the seeding migration is applied.
+- No app-entry gate. Browsing every tab works with no prompt. The **first**
+  write-triggering action in a browser session pops a passphrase modal; a correct
+  entry completes that action and is cached in `sessionStorage` (cleared when the
+  tab/browser closes, never longer) so later writes in the same session aren't
+  re-prompted — though each is still independently re-checked server-side, so a
+  stale/invalidated cached value is caught and re-prompted for.
+- Wrong entry: inline error in the modal, unlimited retries, no lockout/rate-limit.
+- Applies uniformly to every write path, present and future — any write added later
+  must go through the same RPC-plus-passphrase pattern, not a direct table call.
+
+1. [x] **Migration: passphrase settings table + verify RPC.** Via the Supabase MCP
+   connector's `apply_migration`: confirmed `pgcrypto` already enabled (schema
+   `extensions`, from an earlier phase — no action needed); created singleton table
+   `app_secrets (id boolean primary key default true check (id), passphrase_hash
+   text not null)`, RLS enabled with **no policies** (so it's reachable only through
+   `SECURITY DEFINER` functions owned by a role that bypasses RLS, never directly);
+   seeded its one row with `extensions.crypt(<passphrase the user supplied directly
+   in chat at this step>, extensions.gen_salt('bf'))` — the raw value was never
+   written to this plan, a commit, or any repo file, only pasted into the migration
+   SQL sent straight to Supabase. Added internal `plpgsql` helper
+   `check_write_passphrase(p_passphrase text)` that raises `EXCEPTION
+   'invalid_passphrase'` (`ERRCODE 'P0001'`) unless `p_passphrase` matches the
+   stored hash, and public wrapper `verify_write_passphrase(p_passphrase text)
+   returns boolean` for the modal's own validation call (step 7).
+   **Gotcha found here:** Supabase auto-grants `EXECUTE` to `anon`/`authenticated`
+   directly (not via the `PUBLIC` pseudo-role) on every new function in the `public`
+   schema at creation time — `revoke all on function ... from public` does **not**
+   touch those explicit grants. Needed a second, explicit `revoke execute ...
+   from anon, authenticated` pass (on `check_write_passphrase`, which should never
+   be callable directly) and `revoke execute ... from authenticated` on
+   `verify_write_passphrase` (this app only ever uses the `anon` key). Confirmed
+   via `pg_proc.proacl` that the final grants are exactly: `check_write_passphrase`
+   → `postgres, service_role` only; `verify_write_passphrase` → `postgres, anon,
+   service_role`. Keep this in mind for steps 2-3's new RPCs — they must be
+   `anon`-executable (that's the whole point), so no extra revoke needed there, but
+   any future *internal-only* helper needs the same explicit anon/authenticated
+   revoke, not just a `from public` one. _Test:_ `execute_sql` — correct passphrase
+   → `verify_write_passphrase` returns `true`; wrong passphrase → raises
+   `invalid_passphrase`, `app_secrets` unchanged; confirmed exactly one row, and its
+   `passphrase_hash` is a proper bcrypt hash (`$2...`, 60 chars — not
+   plaintext-recoverable by inspection); `get_advisors` (security) shows no new
+   `anon_security_definer_function_executable` warning for `check_write_passphrase`
+   (the one for `verify_write_passphrase` is expected/intentional — it's the
+   client-facing validation entry point).
+2. [x] **Migration: passphrase-gate the existing write RPCs.** Dropped and recreated
+   `create_match`, `record_match_result`, `cancel_tournament` with a new `p_passphrase
+   text` parameter (added before `create_match`'s existing `p_manually_adjusted
+   boolean default false` — a defaulted param must be trailing — the other two had no
+   defaults so ordering didn't matter); each calls `check_write_passphrase(p_passphrase)`
+   as its first statement. **Also switched all three from `SECURITY INVOKER` (their
+   prior default) to `SECURITY DEFINER`**, discovered necessary mid-step, not
+   anticipated when this step was originally planned: `check_write_passphrase` is
+   locked to `postgres`/`service_role` only (step 1), so a still-`SECURITY INVOKER`
+   RPC running as `anon` couldn't call it at all. This is also exactly what step 4
+   will need anyway — once anon's direct table grants are revoked, these RPCs must
+   run with the owner's privileges to still write. Added the required `set
+   search_path = public, pg_temp` to all three (mandatory for any `SECURITY DEFINER`
+   function, and a bonus fix: `create_match`/`record_match_result` previously had no
+   pinned search_path at all, a pre-existing `get_advisors` WARN this incidentally
+   resolves). Left anon/authenticated grants at their prior default (unlike step 1's
+   internal helper, these three are meant to be directly callable — no extra revoke
+   needed; `get_advisors` now flags them as anon/authenticated-executable
+   `SECURITY DEFINER` functions, which is expected/intentional here). Regenerating TS
+   types is still deferred to step 5, after step 3's new RPCs also land.
+   _Test:_ `execute_sql` — each RPC called with the wrong passphrase against a
+   nonexistent id raised `invalid_passphrase` before any lookup/mutation ran; full
+   round-trip with the right passphrase and real fixture rows (2 players, a
+   tournament, `create_match` → `record_match_result` completing it; a second
+   tournament, `create_match` → `cancel_tournament` discarding the queued match) via
+   `execute_sql` confirmed identical output/side effects to the pre-change behavior,
+   including `cancel_tournament`'s pre-existing "already has a confirmed result"
+   guard still firing correctly with a *right* passphrase against the first
+   tournament; all fixtures cleaned up afterward. `get_advisors` (security)
+   re-checked — no unexpected new warnings, only the expected/intentional
+   anon-executable-SECURITY-DEFINER ones for these three RPCs (mirroring
+   `verify_write_passphrase`'s from step 1).
+
+   **Heads up — live production impact:** this migration was applied directly to the
+   live `racket-score` Supabase project (no branch/staging). The currently-deployed
+   Vercel app's client code still calls these three RPCs with their *old* argument
+   lists (no `p_passphrase`), so **recording a match result and cancelling a
+   tournament are broken in production right now** (every call will fail with a
+   missing-required-parameter error) until step 8 updates and redeploys the client.
+   `create_match` is called internally by the same flows, so drawing a match is
+   broken too. Browsing/reading is unaffected. This is an accepted, temporary
+   in-between state while working through this phase's steps in order, not a
+   regression to fix separately — but don't leave it sitting mid-phase for long
+   without telling whoever else might be using the live app.
+3. [x] **Migration: new RPCs replacing direct table writes.** Created
+   `create_player(p_name text, p_gender text, p_self_selected_level text,
+   p_passphrase text) returns players`; `update_player(p_id uuid, p_passphrase
+   text, p_name text default null, p_gender text default null,
+   p_self_selected_level text default null) returns players` (each nullable field
+   left `NULL` means "leave unchanged," via `COALESCE` against the existing row —
+   mirrors today's partial-update client call; `p_passphrase` had to be declared
+   before the defaulted fields, not after, since Postgres requires all
+   defaulted params to trail — harmless, since PostgREST/the JS client always
+   calls by name, not position); `create_tournament(p_name text, p_type text,
+   p_games_per_match int, p_points_per_game int, p_passphrase text, p_win_by int
+   default 2) returns tournaments` (confirmed via `list_tables` that `point_cap`
+   is a `GENERATED ALWAYS AS` column, so a plain insert of the other fields
+   reproduces the old direct-insert behavior exactly, no cap logic duplicated in
+   the RPC); `add_participant(p_tournament_id uuid, p_player_id uuid, p_passphrase
+   text) returns tournament_participants`; `end_tournament(p_tournament_id uuid,
+   p_passphrase text) returns tournaments` (status → `completed`, `ended_at` →
+   `now()`). All five: `check_write_passphrase` first, `security definer` + `set
+   search_path = public, pg_temp` (same reasoning as step 2), explicit `grant
+   execute ... to anon`; `update_player`/`end_tournament` explicitly
+   `raise exception` on a missing id (parity with the old `.select().single()`
+   client call, which already errored on 0 rows returned) rather than silently
+   returning nothing. No new business-rule validation was added beyond what the
+   table's own `CHECK` constraints already enforced — this step is a mechanical
+   RPC wrapper around the prior direct-write behavior, not a behavior change.
+   _Test:_ `execute_sql` per RPC — wrong passphrase raised `invalid_passphrase`
+   against a nonexistent id/bogus row with zero data change for all five; full
+   round-trip with the right passphrase and real fixture rows confirmed each
+   RPC's output matches the old direct insert/update exactly (`create_player` →
+   correct row; `update_player` changing only `self_selected_level` left
+   `name`/`gender` untouched, confirming `COALESCE` partial-update parity;
+   `create_tournament` → `win_by` defaulted to 2 and `point_cap` auto-computed to
+   30 for a 21-point game, matching the BWF formula; `add_participant` → correct
+   join row; `end_tournament` → `status`/`ended_at` set correctly); separately
+   confirmed `update_player`/`end_tournament` raise a clear "not found" error
+   with the *right* passphrase against a nonexistent id (proving the passphrase
+   check and the not-found check are independent, not conflated); all fixtures
+   cleaned up afterward. `get_advisors` (security) re-checked — only the
+   expected/intentional anon-executable-`SECURITY DEFINER` warnings for all five
+   new RPCs, no unrelated regressions.
+4. [x] **Migration: revoke direct anon writes.** Audited via
+   `information_schema.role_table_grants`: `anon` held the full default Supabase
+   grant set (`SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER`) on
+   all six tables, layered under the "permissive anon policies" RLS from Phase 2.8
+   (an `anon_full_access` RLS policy per table, `USING (true) WITH CHECK (true)`
+   for `ALL` commands — but RLS is beside the point once the underlying `GRANT` is
+   gone, since Postgres checks table privileges before RLS is ever evaluated).
+   `revoke insert, update, delete, truncate on players, tournaments,
+   tournament_participants, matches, match_participants, match_games from anon`;
+   `SELECT`/`REFERENCES`/`TRIGGER` left untouched. **Scope note:** the plan
+   wording only named `insert, update, delete`, but `TRUNCATE` was added too —
+   RLS policies don't apply to `TRUNCATE` at all in Postgres, so leaving that grant
+   in place would have left one destructive write completely outside this phase's
+   "every write needs the passphrase" goal, even though the Supabase JS client /
+   PostgREST has no path that issues a `TRUNCATE` today. `REFERENCES`/`TRIGGER`
+   were left alone — DDL-only privileges PostgREST never exposes via the REST API
+   regardless of role, so revoking them would be inert except for risking an
+   unrelated side effect. _Test:_ real HTTP round-trip against the live project
+   using the actual anon (legacy JWT) key, not just `execute_sql`/MCP (which run
+   with elevated privileges and would silently mask a grants-only fix): a `POST
+   /rest/v1/players` insert attempt returned **`401`, Postgres code `42501`,
+   "permission denied for table players"** — a genuine grant-level rejection, not
+   an RLS zero-rows response; repeated for all six tables' `INSERT` endpoint, same
+   `42501` result every time. A `GET /rest/v1/players?select=id&limit=1` in the
+   same session returned `200` with data, confirming reads are untouched. A `POST
+   /rest/v1/rpc/create_player` call with the correct passphrase in the same
+   session returned `200` and created a real row — proving anon can still write
+   through the new RPC path even though direct table writes are now blocked (row
+   cleaned up afterward). `get_advisors` (security) re-checked: no new warnings;
+   the six pre-existing `rls_policy_always_true` warnings **persist** as expected
+   — they're a static read of the still-present `anon_full_access` policy text,
+   which the linter has no way to know is now unreachable for
+   INSERT/UPDATE/DELETE/TRUNCATE because of the grant revoke sitting in front of
+   it. Left as-is rather than rewritten to a SELECT-only policy: rewriting six
+   named policies from earlier phases wasn't part of this step's scope, and the
+   revoke alone is a complete, independently-sufficient enforcement layer (proven
+   by the HTTP test above) — but a future reader of `pg_policies` alone, without
+   also checking grants, could be misled into thinking anon can still write to
+   these tables. Worth a follow-up cleanup someday, not urgent since it's
+   cosmetic/documentation-accuracy risk, not a real access-control gap.
+5. [x] **Regenerate TS types.** `generate_typescript_types` → `src/lib/
+   database.types.ts`, picking up all of steps 1-3's new/changed `Functions`
+   signatures (`add_participant`, `cancel_tournament`, `check_write_passphrase`,
+   `create_match`, `create_player`, `create_tournament`, `end_tournament`,
+   `record_match_result`, `update_player`, `verify_write_passphrase` all present
+   with their new `p_passphrase` args; `app_secrets` also now appears as a
+   regular table type, harmless/unused by the app). One transcription slip while
+   pasting the generator's output back in — the `CompositeTypes<>` helper's last
+   branch got written as `DefaultSchema["CompositeTypes"][CompositeTypeName]`
+   instead of the generator's actual `[PublicCompositeTypeNameOrOptions]` —
+   caught and fixed before running the build below; harmless in practice since
+   `CompositeTypes` is `{[_ in never]: never}` (no composite types exist), but
+   worth a mention since it shows manual re-typing of a generated file is a
+   real error source, not just a mechanical copy. _Test:_ `npm run build` (via
+   `tsc -b`) — exactly 3 errors, all "Property 'p_passphrase' is missing," all
+   at the three call sites in `matchesApi.ts`/`tournamentsApi.ts` that already
+   call an RPC (`create_match`, `record_match_result`, `cancel_tournament` — step
+   2's changes). This confirms the expected split precisely: TypeScript catches
+   the RPC call sites because their argument *shape* changed, but it has no way
+   to know about step 4's grant revocation, so `playersApi.ts`'s/
+   `tournamentsApi.ts`'s remaining direct `.insert()`/`.update()` calls
+   (`createPlayer`, `updatePlayer`, `createTournament`, `addParticipant`) still
+   type-check cleanly even though they're now runtime-broken in production
+   (permission-denied, per step 4's note) — a reminder that this step's clean
+   build is necessary but not sufficient evidence of correctness; only step 8's
+   actual rewiring (plus the walkthrough in step 9) closes that gap. All 3
+   errors resolved in step 8, not here.
+6. [x] **Client passphrase cache + gate.** New `src/lib/passphraseStore.ts` —
+   `getCachedPassphrase()`/`setCachedPassphrase()`/`clearCachedPassphrase()` thin
+   wrappers over `sessionStorage`, plus its own small unit test file (mirroring
+   `avatarColor.test.ts`'s convention for a pure `src/lib/` util). New
+   `src/features/passphrase/passphraseApi.ts` — `verifyWritePassphrase(passphrase)`
+   wrapping `supabase.rpc('verify_write_passphrase', ...)`, throwing on error
+   (mirrors every other `*Api.ts` file's `if (error) throw error` convention); since
+   the RPC itself always either returns `true` or raises, this wrapper is
+   `Promise<void>`, not `Promise<boolean>` — success is "didn't throw."
+   Built the provider as **three files, not one**, after `npm run lint` flagged
+   `react-refresh/only-export-components` on an initial single-file version that
+   exported both the component and the `usePassphraseGate` hook together:
+   `PassphraseGateContext.ts` (just the `createContext` call + its value type, no
+   JSX), `usePassphraseGate.ts` (the consuming hook, throws if called outside the
+   provider), `PassphraseGateProvider.tsx` (the actual provider component). The
+   provider's `getPassphrase(): Promise<string>` returns the cached value
+   immediately if present; otherwise it opens a modal (state + a
+   resolve/reject pair held in a ref, keyed to the one in-flight request) and the
+   promise resolves once submission calls `verifyWritePassphrase` successfully
+   (caching the value first) or rejects if the modal is dismissed/cancelled
+   (closing via the `X`/Esc/backdrop, all already wired through `Modal.tsx`'s
+   `onClose` — no separate "cancel" affordance needed). A failed verify shows an
+   inline error and leaves the modal open for another attempt, per the "unlimited
+   retries" decision. **The modal's actual content right now is a bare, un-i18n'd
+   placeholder form** (`PassphrasePrompt`, private to `PassphraseGateProvider.tsx`)
+   wrapped in the existing `Modal.tsx` — deliberately not the polished
+   `PassphraseModal.tsx` component step 7 is scoped to build; the public contract
+   (`getPassphrase()`/`usePassphraseGate()`) won't change when step 7 swaps the
+   rendered content, so nothing here is throwaway except that one inner function.
+   Mounted `<PassphraseGateProvider>` once in `main.tsx`, wrapping `<App />` inside
+   `<BrowserRouter>` — the highest sensible point, so every feature hook added in
+   step 8 can call `usePassphraseGate()`. _Test:_ `PassphraseGateProvider.test.tsx`
+   — a cached value resolves immediately with no modal rendered and
+   `verifyWritePassphrase` never called; no cached value opens the modal, and the
+   promise only resolves after a mocked `verifyWritePassphrase` succeeds (asserting
+   both the resolved value and that `setCachedPassphrase` was called with it); a
+   third case (beyond the plan's original two) — a rejected `verifyWritePassphrase`
+   shows the inline error, leaves the modal open, and never calls
+   `setCachedPassphrase` or resolves the caller's promise. Hit one real test bug
+   while writing these: without `vi.clearAllMocks()` in `beforeEach`, the second
+   test's successful call history leaked into the third test's "not called"
+   assertion (mock call arrays persist across `it()` blocks by default in Vitest)
+   — added the clear, all three pass in isolation and together. Full-suite check:
+   `npm run lint` clean, `npm run build` shows the *same* 3 pre-existing
+   `p_passphrase`-missing errors as step 5 (no new ones), and `npm test` shows the
+   same 16 pre-existing integration-test failures as before this step (all real
+   anon-key round-trips hitting steps 2/4's now-incompatible old call shapes,
+   exactly the already-flagged production breakage — not a step 6 regression); all
+   38 non-integration test files, including the 3 new ones added here, pass.
+7. [x] **`PassphraseModal` component.** New `src/components/PassphraseModal.tsx`
+   built on the existing `Modal.tsx`, following the exact markup convention already
+   used by `TournamentDetail.tsx`'s End/Cancel confirm dialogs (`<h3>` title,
+   `<p>` body, a `.field`/`.field-label` wrapped input matching
+   `CreatePlayerForm.tsx`'s convention, a `.modal-actions` div with a `secondary`
+   Cancel button alongside the primary Submit) rather than inventing new markup
+   patterns. Props: `open`, `invalid`, `submitting`, `onSubmit(passphrase)`,
+   `onCancel()` — a **controlled/presentational component**, not the one holding
+   the async verify logic (that stays in `PassphraseGateProvider`, already built
+   and tested in step 6); this keeps the two concerns independently testable, as
+   planned. No cancel-and-proceed path: both the `X` close button and the new
+   explicit Cancel button route through the same `handleClose` → `onCancel` — there
+   is no way to dismiss the modal that doesn't also reject the caller's pending
+   `getPassphrase()` promise (`PassphraseGateProvider`'s existing `handleCancel`
+   already does the rejection; this step didn't need to touch that). Submit is
+   disabled while `submitting` **or** while the field is empty (a small addition
+   beyond the plan's literal wording, cheap and consistent with every other form
+   in the app disabling submit on invalid/empty input, e.g. `CreatePlayerForm`).
+   Added a top-level `passphrase` block to both `en.json`/`th.json`:
+   `title`/`prompt`/`label`/`submit`/`cancel`/`invalid` (`cancel` wasn't in the
+   plan's original key list — added once the component needed an explicit Cancel
+   button to match the app's existing two-button modal-actions convention).
+   Replaced `PassphraseGateProvider.tsx`'s step-6 placeholder (`PassphrasePrompt`
+   + a raw `Modal` wrapper) with `<PassphraseModal open={isOpen} invalid={invalid}
+   submitting={submitting} onSubmit={handleSubmit} onCancel={handleCancel} />` —
+   confirmed the swap needed **zero changes** to `PassphraseGateProvider.test.tsx`
+   (from step 6), since the label text ("Passphrase") and button text ("Submit")
+   happened to already match between the placeholder and the real i18n strings;
+   all 3 of that file's tests still pass unmodified against the real component.
+   _Test:_ new `PassphraseModal.test.tsx` (7 cases) — submit calls `onSubmit` with
+   the typed value; `invalid` renders the inline error via `role="alert"` while
+   the field stays visible/usable; both the close (`X`) button and the explicit
+   Cancel button call `onCancel` (mirrors `Modal.test.tsx`'s existing
+   close-button-click pattern rather than attempting a real Escape/backdrop event,
+   since `Modal.tsx`'s own comment already notes jsdom's `<dialog>` support is too
+   inconsistent to test those directly); submit disabled while `submitting`; submit
+   disabled with an empty field; renders nothing when `open` is `false`. Full-suite
+   check: `npm run lint` clean; `npm run build` shows the same 3 pre-existing
+   `p_passphrase` errors as steps 5-6 (no new ones); `npm test` shows the same 16
+   pre-existing integration-test failures as before (unrelated, already-flagged
+   production breakage) — 203 total tests now (up from 196), all 7 new ones from
+   this step passing, zero regressions elsewhere.
+8. [x] **Wire the client API layer through the gate.** `playersApi.ts`
+   (`createPlayer`, `updatePlayer`), `tournamentsApi.ts` (`createTournament`,
+   `addParticipant`, `endTournament`, `cancelTournament`), `matchesApi.ts`
+   (`createMatch`, `recordMatchResult`) — every function now takes an explicit
+   `passphrase: string` parameter and threads it through as `p_passphrase` on its
+   RPC call (`createPlayer`/`updatePlayer`/`createTournament`/`addParticipant`/
+   `endTournament` switched from a direct `.insert()`/`.update()` to
+   `supabase.rpc(...)`, since step 4 revoked anon's direct grants; the other three
+   already called an RPC and just gained the parameter). **Design deviation from
+   the original wording:** `getPassphrase()` is a *hook* (`useContext` inside),
+   so it can't be called from these plain `*Api.ts` async functions directly —
+   each mutation hook (`useCreatePlayer`, `useUpdatePlayer`, `useAddParticipant`,
+   `useEndTournament`, `useCancelTournament`, `useStartNextMatch`,
+   `useRecordMatchResult`, `useCreateTournamentWithFirstDraw`) calls
+   `usePassphraseGate()` once at its own top level (a hook calling a hook, valid
+   React) and awaits `getPassphrase()` *inside* its `mutationFn` callback,
+   passing the resolved value down into the plain API function. This is a
+   structural difference from this step's original text (which implied the API
+   functions themselves would call the gate) but preserves every behavioral
+   guarantee from step 6/7 (cache-or-prompt, one modal per logical action).
+   `useCreateTournamentWithFirstDraw` resolves the passphrase **once** and reuses
+   it for `createTournament` plus the whole `addParticipant` loop, not once per
+   RPC call. **The stale-cache clear-and-retry behavior described in this step's
+   original text was not implemented** — deliberately descoped, not missed: it
+   depends on a passphrase-rotation feature (an in-app way to invalidate the
+   cached value mid-session) that doesn't exist per this phase's confirmed
+   decisions (rotation is migration-only, done by editing `app_secrets` directly,
+   which can only happen between sessions, not while a tab is open); revisit only
+   if that assumption changes.
+   **Two pieces of confirmed-dead code found blocking the build, deleted rather
+   than updated:** `useCreateTournament.ts` and `CreateTournamentForm.tsx`
+   (+ its test) — a pre-Phase-13 tournament-creation form/hook pair with no
+   route/page importing it (confirmed via grep: its only importer was its own
+   test file), superseded by `CreateTournamentPage.tsx` +
+   `useCreateTournamentWithFirstDraw` back in Phase 13. Left alone it would have
+   needed passphrase-wiring of its own just to keep compiling, for code nothing
+   in the app can ever render — deleted per `CLAUDE.md`'s "if you are certain
+   something is unused, delete it completely" convention instead.
+   **Real-passphrase test infrastructure:** the real anon-key integration test
+   files (`playersApi.integration.test.ts`, `tournamentsApi.integration.test.ts`,
+   `matchesApi.integration.test.ts`, `useDrawInputs.integration.test.tsx`,
+   `playerLevelCutover.integration.test.ts`, `playerStatsLiveness.integration.test.ts`)
+   need the *actual* write passphrase to exercise real RPC round-trips, not a
+   mock — but that value must never land in committed source. Added
+   `VITE_TEST_WRITE_PASSPHRASE` to the local, gitignored `.env` (alongside the
+   existing `VITE_SUPABASE_ANON_KEY` pattern) and an empty placeholder in the
+   tracked `.env.example`; new `src/test/testPassphrase.ts` reads it via
+   `import.meta.env`, throwing loudly if unset (mirrors
+   `supabaseClient.ts`'s existing fail-loud convention) — every integration test
+   file imports `testWritePassphrase` from there rather than a literal string.
+   For everything else (component/hook unit tests that already mock the
+   `*Api.ts` module directly), added `vi.mock('.../usePassphraseGate', () => ({
+   usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue(
+   'test-passphrase') }) }))` per file and updated each exact-call-args
+   assertion (`toHaveBeenCalledWith(...)`) to include the new parameter —
+   consistent with this codebase's existing convention of mocking the API
+   module rather than rendering a real provider tree.
+   **`supabaseClient.integration.test.ts` rewritten, not just patched:** its one
+   test asserted a direct anon insert *succeeds* ("proving RLS permits anon
+   access") -- exactly the behavior step 4 deliberately removed, so the old
+   assertion is now false by design. Replaced with two tests: a `SELECT` still
+   succeeds, and a direct `INSERT` is rejected with Postgres code `42501` --
+   turning step 4's manual `curl` verification into permanent regression
+   coverage in the suite, instead of just deleting the now-wrong test.
+   _Test:_ `npm run lint` clean; `npm run build` clean (zero errors, first time
+   since step 5); full `npm test` run -- **all 45 test files / 201 tests pass**,
+   including every real anon-key integration test exercising the actual live
+   Supabase project end-to-end through the new RPCs with the real seeded
+   passphrase (proving the whole chain -- migration, grants, client, hooks --
+   works together, not just in isolation).
+9. [x] **Full regression + walkthrough.** `npm run lint` clean, `npm run build`
+   clean, `npm test` — 201/201 passing (re-confirmed fresh, no drift since step 8).
+   Playwright MCP click-through against the local dev server (`localhost:5173`),
+   real anon-key traffic against the live project throughout (no mocks in the
+   browser):
+   - Every tab (Create, Active, Scoreboard, History, Member) browsed freely with
+     no passphrase prompt, in both Thai (the persisted default from prior
+     sessions) and English.
+   - **Create tournament** (Thai): filled the form, selected 2 real members,
+     submitted → passphrase modal appeared with correct Thai copy
+     ("กรอกรหัสผ่าน" / "รหัสผ่าน" / "ยืนยัน"). Wrong value → inline error
+     ("รหัสผ่านไม่ถูกต้อง ลองใหม่อีกครั้ง"), modal stayed open, field retained.
+     Right value → tournament created, first match auto-drawn, popup shown
+     ("แมตช์แรก: Fah พบ Jackie").
+   - **Cache reuse across write types in the same tab**, no re-prompt for any of:
+     confirming the first-match popup (`createMatch`), recording a match result
+     via the confirm-result dialog (`recordMatchResult`), adding a new member
+     from the Member tab (`createPlayer`) — three structurally different write
+     paths, one passphrase entry.
+   - **Tab close/reopen → cache cleared → re-prompts**, confirmed by actually
+     closing the Playwright-controlled page and opening a fresh one (not just a
+     same-tab reload, which does *not* clear `sessionStorage` and correctly did
+     *not* re-prompt when tried first) — the very next write (add member) showed
+     the passphrase modal again, proving the cache is genuinely session-scoped.
+   - **Cancelling the passphrase modal aborts the write**, not just visually:
+     opened End Tournament's confirm dialog, triggered the passphrase modal, hit
+     its own Cancel button, then verified directly against the database that
+     `tournaments.status` was still `active`/`ended_at` still `null` — the
+     mutation never ran. Retried immediately with the right passphrase in the
+     same modal session → succeeded, navigated to the final Scoreboard with
+     correct win-rate/point-diff numbers (Fah 100%/+17, Jackie 0%/-17, matching
+     the 21-15/21-10 result entered).
+   - **English language**: confirm-dialog and passphrase-modal copy all correctly
+     translated ("Enter passphrase" / "This action changes data..." / "Cancel" /
+     "Submit"), same cache/re-prompt behavior confirmed independently of locale.
+   - **Console**: zero JS/React errors at any point during the actual test
+     interactions (checked after every mutating action, not just once at the
+     end). One *expected*, unavoidable browser-level entry did appear during the
+     deliberate wrong-passphrase test — Chrome's own "Failed to load resource:
+     400" network log for the rejected `verify_write_passphrase` call, which
+     Chrome logs automatically for any non-2xx response regardless of whether
+     the app's own `catch` handles it (which it does) — this is not a bug, an
+     unhandled rejection, or something the app can suppress.
+   - **Not separately verified**: dark `prefers-color-scheme` rendering — the
+     Playwright MCP tools available in this session have no color-scheme
+     emulation control, and Phase 16 introduced zero new CSS (the modal reuses
+     `Modal.tsx`'s existing dialog styling plus the pre-existing `.field`/
+     `.modal-actions` classes already exercised under both themes during
+     Phase 13's original CSS pass), so the risk here is low, but it's a real gap
+     in this step's coverage worth naming rather than silently claiming "both
+     themes" were checked.
+   - All test/demo data created during the walkthrough (the tournament, its
+     match/games/participants, and the two players added via the Member form)
+     was deleted afterward via `execute_sql`; `Fah`/`Jackie` (pre-existing real
+     members used as participants) were left untouched.
+
+**Known risks:** the seeded passphrase must never land in a committed file, chat
+transcript stored in the repo, or migration checked into version control in
+plaintext — only its hash, produced from a value the user provides directly when
+step 1 is actually applied. Storing the raw passphrase in `sessionStorage` (not a
+hash) is an accepted, deliberate simplification for this low-stakes shared-club-app
+threat model, not an oversight — don't "fix" it into a hashed client-side value
+without checking with the user first, since the RPC needs the raw value to compare
+against `crypt()`. Step 8's clear-and-retry path is the one piece of real new
+concurrency complexity — if a user has two tabs open and the passphrase is rotated
+between them, the tab with the stale cache should recover via one re-prompt, not an
+infinite loop or a silent failure; test this path explicitly rather than trusting
+it works by inspection.
+
 ---
 
 ## Critical Files
@@ -862,25 +1308,58 @@ remain visible after a cancel with no navigation to clear it — low risk today 
 - `src/features/tournaments/TournamentDetail.tsx` — the danger zone now branches between
   Cancel Tournament (`completedMatches.length === 0`) and End Tournament, mutually
   exclusive per tournament (Phase 15)
+- `app_secrets` table + `check_write_passphrase`/`verify_write_passphrase` Postgres functions
+  (live Supabase project only, applied via the MCP connector — no local migration file) — the
+  hashed-passphrase store and the shared internal check every write RPC below calls first;
+  `check_write_passphrase` is locked to `postgres`/`service_role` only, `verify_write_passphrase`
+  is the one `anon`-callable entry point the client's modal uses to validate a typed value
+  without performing a write (Phase 16)
+- Every write RPC (`create_player`, `update_player`, `create_tournament`, `add_participant`,
+  `end_tournament`, plus the pre-existing `create_match`/`record_match_result`/
+  `cancel_tournament`) — all `SECURITY DEFINER` with a pinned `search_path`, all require
+  `p_passphrase` as their first line of business; `anon`'s direct `INSERT`/`UPDATE`/`DELETE`/
+  `TRUNCATE` grants on `players`/`tournaments`/`tournament_participants`/`matches`/
+  `match_participants`/`match_games` were revoked, so these RPCs are the *only* write path left,
+  not just the recommended one (Phase 16)
+- `src/features/passphrase/` (`PassphraseGateContext.ts`, `usePassphraseGate.ts`,
+  `PassphraseGateProvider.tsx`, `passphraseApi.ts`) + `src/components/PassphraseModal.tsx` +
+  `src/lib/passphraseStore.ts` — the client-side gate: `getPassphrase()` resolves from
+  `sessionStorage` if cached, else opens the modal and resolves only after a successful
+  `verify_write_passphrase` call; mounted once in `main.tsx`, wrapping `<App/>`, so every
+  mutation hook can call `usePassphraseGate()` (Phase 16)
+- Every mutation hook (`useCreatePlayer`, `useUpdatePlayer`, `useCreateTournamentWithFirstDraw`,
+  `useAddParticipant`, `useEndTournament`, `useCancelTournament`, `useStartNextMatch`,
+  `useRecordMatchResult`) — each resolves the passphrase once per logical action via
+  `usePassphraseGate()` and threads it into its underlying `*Api.ts` call (Phase 16)
+- `src/test/testPassphrase.ts` — the real write passphrase for anon-key integration tests, read
+  from the local, gitignored `VITE_TEST_WRITE_PASSPHRASE` env var (never hardcoded in source);
+  every `*.integration.test.ts` file that performs a write imports from here (Phase 16)
 
 ## End-to-End Verification
 
-As of Phase 15, the full critical path has been exercised at three levels: pure-logic unit
-tests (Vitest, no I/O — 190 tests across the suite as of this note), integration tests
-against the real Supabase project (via the JS client and cross-checked with the Supabase MCP
-tools, including the `cancel_tournament` RPC exercised directly via `execute_sql` before any
-UI wired up to it), and full browser-driven runs via Playwright MCP against the local dev
-server (Phase 15's walkthrough specifically was run against the local dev server only; the
-deployed Vercel URL has not yet been re-verified post-Phase-15). The path covered: create a
-player → create a tournament (singles or doubles) → select participants from the pool →
-auto-drawn first match, optionally edited (with a non-blocking gender-balance warning) before
-confirming → Randomize / Edit / Start the Next match in Manage Tournament, including
-Current-match exclusion from the draw pool and its reuse-fallback warning → record a result
-with valid/invalid scores (confirm-before-save, permanently locked after) → win-rate
-scoreboards (per-tournament and cross-tournament Overall, with period/type filters) and skill
-levels update live → History tab (both sections collapsible, default-collapsed,
-manually-adjusted badges) → before a tournament's first
-result is confirmed, Cancel it instead (confirm dialog, permanent, discards any
-drawn-but-unconfirmed match) and land back on Active with it now absent, appearing in
-History's by-tournament list as a non-interactive Cancelled row → toggle language and
-theme. All 5 tabs, both languages, both light/dark themes, no console errors.
+As of Phase 16, the full critical path has been exercised at three levels: pure-logic unit
+tests (Vitest, no I/O), component/hook tests mocking the API layer (including the passphrase
+gate itself), integration tests against the real Supabase project (via the JS client, exercising
+the actual live RPCs with the real seeded passphrase, not a mock — 201 tests across the suite as
+of this note), and full browser-driven runs via Playwright MCP against the local dev server
+(Phase 16's walkthrough, like Phase 15's, was run against the local dev server only; the deployed
+Vercel URL has not yet been re-verified post-Phase-16 — see Phase 16 step 2's note that the live
+Vercel deployment was left in a broken-writes state mid-phase and needs a push + redeploy before
+it matches this local state). The path covered: create a player → create a tournament (singles or
+doubles) → select participants from the pool → auto-drawn first match, optionally edited (with a
+non-blocking gender-balance warning) before confirming → Randomize / Edit / Start the Next match in
+Manage Tournament, including Current-match exclusion from the draw pool and its reuse-fallback
+warning → record a result with valid/invalid scores (confirm-before-save, permanently locked
+after) → win-rate scoreboards (per-tournament and cross-tournament Overall, with period/type
+filters) and skill levels update live → History tab (both sections collapsible,
+default-collapsed, manually-adjusted badges) → before a tournament's first result is confirmed,
+Cancel it instead (confirm dialog, permanent, discards any drawn-but-unconfirmed match) and land
+back on Active with it now absent, appearing in History's by-tournament list as a non-interactive
+Cancelled row → **every one of those write actions now gated by the shared write passphrase**:
+free browsing with no prompt, first write of the session opens the passphrase modal (wrong value
+→ inline error, right value → proceeds and caches for the rest of the tab's session, reused
+silently across every other write type without re-prompting), cancelling the modal aborts the
+write rather than silently completing it, and closing/reopening the tab clears the cache so the
+next write prompts again → toggle language and theme. All 5 tabs, both languages, no console
+errors (dark-theme rendering specifically was not re-verified this phase — see Phase 16 step 9's
+note; no new CSS was introduced, so risk is low but unconfirmed by tooling).

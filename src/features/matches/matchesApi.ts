@@ -14,12 +14,14 @@ export async function createMatch(
   tournamentId: string,
   sequenceNumber: number,
   participants: MatchParticipantInput[],
+  passphrase: string,
   manuallyAdjusted = false,
 ): Promise<Match> {
   const { data, error } = await supabase.rpc('create_match', {
     p_tournament_id: tournamentId,
     p_sequence_number: sequenceNumber,
     p_participants: participants as unknown as Json,
+    p_passphrase: passphrase,
     p_manually_adjusted: manuallyAdjusted,
   })
   if (error) throw error
@@ -35,10 +37,12 @@ export interface GameResultInput {
 export async function recordMatchResult(
   matchId: string,
   games: GameResultInput[],
+  passphrase: string,
 ): Promise<Match> {
   const { data, error } = await supabase.rpc('record_match_result', {
     p_match_id: matchId,
     p_games: games as unknown as Json,
+    p_passphrase: passphrase,
   })
   if (error) throw error
   return data

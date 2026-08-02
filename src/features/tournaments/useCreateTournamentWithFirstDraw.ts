@@ -7,6 +7,7 @@ import {
 } from './tournamentsApi'
 import { assembleDrawInputs } from '../matches/useDrawInputs'
 import { generateNextMatch, type GeneratedMatchParticipant } from '../matchmaking/generateNextMatch'
+import { usePassphraseGate } from '../passphrase/usePassphraseGate'
 
 /**
  * Thrown when the tournament row was created but a participant failed to
@@ -51,17 +52,22 @@ function invalidateAll(queryClient: QueryClient, tournamentId: string) {
 
 export function useCreateTournamentWithFirstDraw() {
   const queryClient = useQueryClient()
+  const { getPassphrase } = usePassphraseGate()
 
   return useMutation({
     mutationFn: async ({
       tournament: tournamentInput,
       participantIds,
     }: CreateTournamentWithFirstDrawInput): Promise<CreateTournamentWithFirstDrawResult> => {
-      const tournament = await createTournament(tournamentInput)
+      // Resolved once and reused for every write below (tournament creation +
+      // the whole participant loop) -- one prompt per logical action, not one
+      // per RPC call, matching the "cached for the rest of the session" gate.
+      const passphrase = await getPassphrase()
+      const tournament = await createTournament(tournamentInput, passphrase)
 
       for (const playerId of participantIds) {
         try {
-          await addParticipant(tournament.id, playerId)
+          await addParticipant(tournament.id, playerId, passphrase)
         } catch (cause) {
           throw new PartialTournamentCreationError(tournament, cause)
         }

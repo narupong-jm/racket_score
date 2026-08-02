@@ -13,8 +13,18 @@ export interface CreateTournamentInput {
   win_by?: number
 }
 
-export async function createTournament(input: CreateTournamentInput): Promise<Tournament> {
-  const { data, error } = await supabase.from('tournaments').insert(input).select().single()
+export async function createTournament(
+  input: CreateTournamentInput,
+  passphrase: string,
+): Promise<Tournament> {
+  const { data, error } = await supabase.rpc('create_tournament', {
+    p_name: input.name,
+    p_type: input.type,
+    p_games_per_match: input.games_per_match,
+    p_points_per_game: input.points_per_game,
+    p_win_by: input.win_by,
+    p_passphrase: passphrase,
+  })
   if (error) throw error
   return data
 }
@@ -31,12 +41,13 @@ export async function listTournaments(): Promise<Tournament[]> {
 export async function addParticipant(
   tournamentId: string,
   playerId: string,
+  passphrase: string,
 ): Promise<TournamentParticipant> {
-  const { data, error } = await supabase
-    .from('tournament_participants')
-    .insert({ tournament_id: tournamentId, player_id: playerId })
-    .select()
-    .single()
+  const { data, error } = await supabase.rpc('add_participant', {
+    p_tournament_id: tournamentId,
+    p_player_id: playerId,
+    p_passphrase: passphrase,
+  })
   if (error) throw error
   return data
 }
@@ -61,20 +72,22 @@ export async function getTournamentStandingsRanked(
   return data
 }
 
-export async function endTournament(tournamentId: string): Promise<Tournament> {
-  const { data, error } = await supabase
-    .from('tournaments')
-    .update({ status: 'completed', ended_at: new Date().toISOString() })
-    .eq('id', tournamentId)
-    .select()
-    .single()
+export async function endTournament(tournamentId: string, passphrase: string): Promise<Tournament> {
+  const { data, error } = await supabase.rpc('end_tournament', {
+    p_tournament_id: tournamentId,
+    p_passphrase: passphrase,
+  })
   if (error) throw error
   return data
 }
 
-export async function cancelTournament(tournamentId: string): Promise<Tournament> {
+export async function cancelTournament(
+  tournamentId: string,
+  passphrase: string,
+): Promise<Tournament> {
   const { data, error } = await supabase.rpc('cancel_tournament', {
     p_tournament_id: tournamentId,
+    p_passphrase: passphrase,
   })
   if (error) throw error
   return data

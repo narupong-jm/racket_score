@@ -32,6 +32,10 @@ vi.mock('../matches/matchesApi', async (importOriginal) => {
   }
 })
 
+vi.mock('../passphrase/usePassphraseGate', () => ({
+  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+}))
+
 function renderAt(path: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(

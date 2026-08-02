@@ -6,6 +6,14 @@
   "common": {
     "close": "Close"
   },
+  "passphrase": {
+    "title": "Enter passphrase",
+    "prompt": "This action changes data. Enter the write passphrase to continue.",
+    "label": "Passphrase",
+    "submit": "Submit",
+    "cancel": "Cancel",
+    "invalid": "Incorrect passphrase. Try again."
+  },
   "nav": {
     "create": "Create",
     "active": "Active",

@@ -8,6 +8,7 @@ import { createTournament, addParticipant } from '../tournaments/tournamentsApi'
 import { createPlayer } from '../players/playersApi'
 import { canonicalPairKey } from '../matchmaking/pairKey'
 import { supabase } from '../../lib/supabaseClient'
+import { testWritePassphrase } from '../../test/testPassphrase'
 
 function createWrapper() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -43,52 +44,81 @@ describe('useDrawInputs (real project, anon key)', () => {
   })
 
   it('assembles candidates and pairing history from a seeded fixture tournament', async () => {
-    const tournament = await createTournament({
-      name: `Draw Inputs Test ${runId}`,
-      type: 'doubles',
-      games_per_match: 1,
-      points_per_game: 21,
-    })
+    const tournament = await createTournament(
+      {
+        name: `Draw Inputs Test ${runId}`,
+        type: 'doubles',
+        games_per_match: 1,
+        points_per_game: 21,
+      },
+      testWritePassphrase,
+    )
     tournamentId = tournament.id
 
     const levels = { A: 'beginner', B: 'intermediate', C: 'advanced', D: 'pro' } as const
     const genders = { A: 'male', B: 'female', C: 'male', D: 'female' } as const
     for (const label of ['A', 'B', 'C', 'D'] as const) {
-      const player = await createPlayer({
-        name: `Draw Inputs Test ${label} ${runId}`,
-        gender: genders[label],
-        self_selected_level: levels[label],
-      })
+      const player = await createPlayer(
+        {
+          name: `Draw Inputs Test ${label} ${runId}`,
+          gender: genders[label],
+          self_selected_level: levels[label],
+        },
+        testWritePassphrase,
+      )
       playerIds[label] = player.id
-      await addParticipant(tournamentId, player.id)
+      await addParticipant(tournamentId, player.id, testWritePassphrase)
     }
     const { A, B, C, D } = playerIds
 
     // match 1 (completed): team1={A,B} vs team2={C,D}
-    const match1 = await createMatch(tournamentId, 1, [
-      { player_id: A, team: 1 },
-      { player_id: B, team: 1 },
-      { player_id: C, team: 2 },
-      { player_id: D, team: 2 },
-    ])
-    await recordMatchResult(match1.id, [{ game_number: 1, team1_score: 21, team2_score: 10 }])
+    const match1 = await createMatch(
+      tournamentId,
+      1,
+      [
+        { player_id: A, team: 1 },
+        { player_id: B, team: 1 },
+        { player_id: C, team: 2 },
+        { player_id: D, team: 2 },
+      ],
+      testWritePassphrase,
+    )
+    await recordMatchResult(
+      match1.id,
+      [{ game_number: 1, team1_score: 21, team2_score: 10 }],
+      testWritePassphrase,
+    )
 
     // match 2 (completed): team1={A,C} vs team2={B,D}
-    const match2 = await createMatch(tournamentId, 2, [
-      { player_id: A, team: 1 },
-      { player_id: C, team: 1 },
-      { player_id: B, team: 2 },
-      { player_id: D, team: 2 },
-    ])
-    await recordMatchResult(match2.id, [{ game_number: 1, team1_score: 21, team2_score: 10 }])
+    const match2 = await createMatch(
+      tournamentId,
+      2,
+      [
+        { player_id: A, team: 1 },
+        { player_id: C, team: 1 },
+        { player_id: B, team: 2 },
+        { player_id: D, team: 2 },
+      ],
+      testWritePassphrase,
+    )
+    await recordMatchResult(
+      match2.id,
+      [{ game_number: 1, team1_score: 21, team2_score: 10 }],
+      testWritePassphrase,
+    )
 
     // match 3 (still queued): team1={A,D} vs team2={B,C} -- must NOT count
-    await createMatch(tournamentId, 3, [
-      { player_id: A, team: 1 },
-      { player_id: D, team: 1 },
-      { player_id: B, team: 2 },
-      { player_id: C, team: 2 },
-    ])
+    await createMatch(
+      tournamentId,
+      3,
+      [
+        { player_id: A, team: 1 },
+        { player_id: D, team: 1 },
+        { player_id: B, team: 2 },
+        { player_id: C, team: 2 },
+      ],
+      testWritePassphrase,
+    )
 
     const { result } = renderHook(() => useDrawInputs(tournamentId!), {
       wrapper: createWrapper(),

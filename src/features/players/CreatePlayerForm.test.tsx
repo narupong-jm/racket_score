@@ -10,6 +10,10 @@ vi.mock('./playersApi', () => ({
   createPlayer: vi.fn(),
 }))
 
+vi.mock('../passphrase/usePassphraseGate', () => ({
+  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+}))
+
 function renderWithClient(ui: ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
@@ -44,11 +48,14 @@ describe('CreatePlayerForm', () => {
     await user.click(submitButton)
 
     await waitFor(() => {
-      expect(playersApi.createPlayer).toHaveBeenCalledWith({
-        name: 'New Player',
-        gender: 'female',
-        self_selected_level: 'advanced',
-      })
+      expect(playersApi.createPlayer).toHaveBeenCalledWith(
+        {
+          name: 'New Player',
+          gender: 'female',
+          self_selected_level: 'advanced',
+        },
+        'test-passphrase',
+      )
     })
   })
 })

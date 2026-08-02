@@ -41,6 +41,10 @@ vi.mock('../matchmaking/generateNextMatch', async (importOriginal) => {
   }
 })
 
+vi.mock('../passphrase/usePassphraseGate', () => ({
+  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+}))
+
 function createWrapper() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -101,8 +105,8 @@ describe('useCreateTournamentWithFirstDraw', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
-    expect(tournamentsApi.addParticipant).toHaveBeenNthCalledWith(1, 't1', 'p1')
-    expect(tournamentsApi.addParticipant).toHaveBeenNthCalledWith(2, 't1', 'p2')
+    expect(tournamentsApi.addParticipant).toHaveBeenNthCalledWith(1, 't1', 'p1', 'test-passphrase')
+    expect(tournamentsApi.addParticipant).toHaveBeenNthCalledWith(2, 't1', 'p2', 'test-passphrase')
     // The draw is computed, but persistence is deferred to the popup's Confirm
     // action (useStartNextMatch) -- this hook must never call createMatch itself.
     expect(matchesApi.createMatch).not.toHaveBeenCalled()

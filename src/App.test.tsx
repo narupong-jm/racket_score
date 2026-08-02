@@ -42,6 +42,10 @@ vi.mock('./features/scoreboard/scoreboardApi', async (importOriginal) => {
   }
 })
 
+vi.mock('./features/passphrase/usePassphraseGate', () => ({
+  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+}))
+
 function renderApp(initialPath = '/') {
   vi.mocked(playersApi.listPlayers).mockResolvedValue([])
   vi.mocked(playersApi.listPlayerStats).mockResolvedValue([])

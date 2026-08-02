@@ -14,6 +14,10 @@ vi.mock('./tournamentsApi', async (importOriginal) => {
   }
 })
 
+vi.mock('../passphrase/usePassphraseGate', () => ({
+  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+}))
+
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -52,7 +56,7 @@ describe('useCancelTournament', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
-    expect(tournamentsApi.cancelTournament).toHaveBeenCalledWith('t1')
+    expect(tournamentsApi.cancelTournament).toHaveBeenCalledWith('t1', 'test-passphrase')
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['tournaments'] })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['matches', 't1'] })
   })

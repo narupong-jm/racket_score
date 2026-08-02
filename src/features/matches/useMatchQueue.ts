@@ -9,6 +9,7 @@ import {
   type MatchHistoryEntry,
   type MatchParticipantInput,
 } from './matchesApi'
+import { usePassphraseGate } from '../passphrase/usePassphraseGate'
 
 export interface TournamentMatches {
   matches: Match[]
@@ -45,13 +46,15 @@ export interface StartNextMatchInput {
 
 export function useStartNextMatch(tournamentId: string) {
   const queryClient = useQueryClient()
+  const { getPassphrase } = usePassphraseGate()
 
   return useMutation({
     mutationFn: async ({ participants, manuallyAdjusted = false }: StartNextMatchInput) => {
+      const passphrase = await getPassphrase()
       const matches = await listMatches(tournamentId)
       const nextSequenceNumber =
         matches.reduce((max, m) => Math.max(max, m.sequence_number), 0) + 1
-      return createMatch(tournamentId, nextSequenceNumber, participants, manuallyAdjusted)
+      return createMatch(tournamentId, nextSequenceNumber, participants, passphrase, manuallyAdjusted)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['matches', tournamentId] })

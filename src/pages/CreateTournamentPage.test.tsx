@@ -48,6 +48,10 @@ vi.mock('../features/matchmaking/generateNextMatch', async (importOriginal) => {
   }
 })
 
+vi.mock('../features/passphrase/usePassphraseGate', () => ({
+  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+}))
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
@@ -173,12 +177,15 @@ describe('CreateTournamentPage', () => {
     await user.click(submitButton)
 
     await waitFor(() => {
-      expect(tournamentsApi.createTournament).toHaveBeenCalledWith({
-        name: 'Sunday Smash',
-        type: 'doubles',
-        games_per_match: 3,
-        points_per_game: 21,
-      })
+      expect(tournamentsApi.createTournament).toHaveBeenCalledWith(
+        {
+          name: 'Sunday Smash',
+          type: 'doubles',
+          games_per_match: 3,
+          points_per_game: 21,
+        },
+        'test-passphrase',
+      )
     })
 
     expect(
@@ -201,6 +208,7 @@ describe('CreateTournamentPage', () => {
           { player_id: 'p3', team: 2 },
           { player_id: 'p4', team: 2 },
         ],
+        'test-passphrase',
         false,
       )
     })
@@ -266,6 +274,7 @@ describe('CreateTournamentPage', () => {
           { player_id: 'p3', team: 2 },
           { player_id: 'p4', team: 2 },
         ],
+        'test-passphrase',
         true,
       )
     })

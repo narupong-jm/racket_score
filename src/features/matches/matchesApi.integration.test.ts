@@ -3,34 +3,49 @@ import { createMatch, getMatchHistory, recordMatchResult } from './matchesApi'
 import { createTournament, addParticipant } from '../tournaments/tournamentsApi'
 import { createPlayer } from '../players/playersApi'
 import { supabase } from '../../lib/supabaseClient'
+import { testWritePassphrase } from '../../test/testPassphrase'
 
 describe('matchesApi: manually_adjusted flag (real project, anon key)', () => {
   it('defaults to false and can be set true via the manuallyAdjusted param', async () => {
     const runId = crypto.randomUUID()
-    const tournament = await createTournament({
-      name: `Manually Adjusted Test ${runId}`,
-      type: 'singles',
-      games_per_match: 1,
-      points_per_game: 21,
-    })
-    const playerA = await createPlayer({
-      name: `Manually Adjusted A ${runId}`,
-      gender: 'male',
-      self_selected_level: 'beginner',
-    })
-    const playerB = await createPlayer({
-      name: `Manually Adjusted B ${runId}`,
-      gender: 'female',
-      self_selected_level: 'beginner',
-    })
-    await addParticipant(tournament.id, playerA.id)
-    await addParticipant(tournament.id, playerB.id)
+    const tournament = await createTournament(
+      {
+        name: `Manually Adjusted Test ${runId}`,
+        type: 'singles',
+        games_per_match: 1,
+        points_per_game: 21,
+      },
+      testWritePassphrase,
+    )
+    const playerA = await createPlayer(
+      {
+        name: `Manually Adjusted A ${runId}`,
+        gender: 'male',
+        self_selected_level: 'beginner',
+      },
+      testWritePassphrase,
+    )
+    const playerB = await createPlayer(
+      {
+        name: `Manually Adjusted B ${runId}`,
+        gender: 'female',
+        self_selected_level: 'beginner',
+      },
+      testWritePassphrase,
+    )
+    await addParticipant(tournament.id, playerA.id, testWritePassphrase)
+    await addParticipant(tournament.id, playerB.id, testWritePassphrase)
 
     try {
-      const defaultMatch = await createMatch(tournament.id, 1, [
-        { player_id: playerA.id, team: 1 },
-        { player_id: playerB.id, team: 2 },
-      ])
+      const defaultMatch = await createMatch(
+        tournament.id,
+        1,
+        [
+          { player_id: playerA.id, team: 1 },
+          { player_id: playerB.id, team: 2 },
+        ],
+        testWritePassphrase,
+      )
       expect(defaultMatch.manually_adjusted).toBe(false)
 
       const adjustedMatch = await createMatch(
@@ -40,6 +55,7 @@ describe('matchesApi: manually_adjusted flag (real project, anon key)', () => {
           { player_id: playerA.id, team: 1 },
           { player_id: playerB.id, team: 2 },
         ],
+        testWritePassphrase,
         true,
       )
       expect(adjustedMatch.manually_adjusted).toBe(true)
@@ -80,22 +96,28 @@ describe('matchesApi (real project, anon key)', () => {
   })
 
   it('seeds 4 players in a doubles tournament', async () => {
-    const tournament = await createTournament({
-      name: `Matches API Test ${runId}`,
-      type: 'doubles',
-      games_per_match: 3,
-      points_per_game: 21,
-    })
+    const tournament = await createTournament(
+      {
+        name: `Matches API Test ${runId}`,
+        type: 'doubles',
+        games_per_match: 3,
+        points_per_game: 21,
+      },
+      testWritePassphrase,
+    )
     tournamentId = tournament.id
 
     for (const label of ['A', 'B', 'C', 'D']) {
-      const player = await createPlayer({
-        name: `Matches API Test ${label} ${runId}`,
-        gender: label === 'A' || label === 'C' ? 'male' : 'female',
-        self_selected_level: 'beginner',
-      })
+      const player = await createPlayer(
+        {
+          name: `Matches API Test ${label} ${runId}`,
+          gender: label === 'A' || label === 'C' ? 'male' : 'female',
+          self_selected_level: 'beginner',
+        },
+        testWritePassphrase,
+      )
       playerIds.push(player.id)
-      await addParticipant(tournamentId, player.id)
+      await addParticipant(tournamentId, player.id, testWritePassphrase)
     }
   })
 
@@ -103,12 +125,17 @@ describe('matchesApi (real project, anon key)', () => {
     if (!tournamentId) throw new Error('tournamentId not set')
     const [a, b, c, d] = playerIds
 
-    const match = await createMatch(tournamentId, 1, [
-      { player_id: a, team: 1 },
-      { player_id: b, team: 1 },
-      { player_id: c, team: 2 },
-      { player_id: d, team: 2 },
-    ])
+    const match = await createMatch(
+      tournamentId,
+      1,
+      [
+        { player_id: a, team: 1 },
+        { player_id: b, team: 1 },
+        { player_id: c, team: 2 },
+        { player_id: d, team: 2 },
+      ],
+      testWritePassphrase,
+    )
     matchId = match.id
     expect(match.status).toBe('queued')
 
@@ -129,12 +156,17 @@ describe('matchesApi (real project, anon key)', () => {
       .eq('tournament_id', tournamentId)
 
     await expect(
-      createMatch(tournamentId, 2, [
-        { player_id: a, team: 1 },
-        { player_id: b, team: 1 },
-        { player_id: c, team: 2 },
-        { player_id: bogusPlayerId, team: 2 }, // violates FK -> whole call must fail
-      ]),
+      createMatch(
+        tournamentId,
+        2,
+        [
+          { player_id: a, team: 1 },
+          { player_id: b, team: 1 },
+          { player_id: c, team: 2 },
+          { player_id: bogusPlayerId, team: 2 }, // violates FK -> whole call must fail
+        ],
+        testWritePassphrase,
+      ),
     ).rejects.toThrow()
 
     const { count: afterCount } = await supabase
@@ -148,10 +180,14 @@ describe('matchesApi (real project, anon key)', () => {
   it('records a match result and reflects it in match history', async () => {
     if (!tournamentId || !matchId) throw new Error('setup not complete')
 
-    const result = await recordMatchResult(matchId, [
-      { game_number: 1, team1_score: 21, team2_score: 15 },
-      { game_number: 2, team1_score: 21, team2_score: 18 },
-    ])
+    const result = await recordMatchResult(
+      matchId,
+      [
+        { game_number: 1, team1_score: 21, team2_score: 15 },
+        { game_number: 2, team1_score: 21, team2_score: 18 },
+      ],
+      testWritePassphrase,
+    )
     expect(result.status).toBe('completed')
 
     // now that the match is completed, it must show up in match history

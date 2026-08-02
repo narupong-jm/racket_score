@@ -63,6 +63,10 @@ vi.mock('../matchmaking/generateNextMatch', async (importOriginal) => {
   }
 })
 
+vi.mock('../passphrase/usePassphraseGate', () => ({
+  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+}))
+
 function renderWithClient(ui: ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
@@ -210,6 +214,7 @@ describe('TournamentDetail: Next match card (Randomize / Start match)', () => {
           { player_id: 'p1', team: 1 },
           { player_id: 'p2', team: 2 },
         ],
+        'test-passphrase',
         false,
       )
     })
@@ -357,6 +362,7 @@ describe('TournamentDetail: Next match inline edit', () => {
           { player_id: 'p3', team: 1 },
           { player_id: 'p2', team: 2 },
         ],
+        'test-passphrase',
         true,
       )
     })
@@ -430,6 +436,7 @@ describe('TournamentDetail: Next match inline edit', () => {
           { player_id: 'p3', team: 2 },
           { player_id: 'p4', team: 2 },
         ],
+        'test-passphrase',
         true,
       )
     })
@@ -463,9 +470,11 @@ describe('TournamentDetail: Save result confirm dialog', () => {
     await user.click(screen.getByRole('button', { name: 'Confirm result' }))
 
     await waitFor(() => {
-      expect(matchesApi.recordMatchResult).toHaveBeenCalledWith('m1', [
-        { game_number: 1, team1_score: 21, team2_score: 15 },
-      ])
+      expect(matchesApi.recordMatchResult).toHaveBeenCalledWith(
+        'm1',
+        [{ game_number: 1, team1_score: 21, team2_score: 15 }],
+        'test-passphrase',
+      )
     })
   })
 })
@@ -529,7 +538,7 @@ describe('TournamentDetail: End tournament confirm dialog', () => {
     await user.click(screen.getByRole('button', { name: 'Yes, end tournament' }))
 
     await waitFor(() => {
-      expect(tournamentsApi.endTournament).toHaveBeenCalledWith('t1')
+      expect(tournamentsApi.endTournament).toHaveBeenCalledWith('t1', 'test-passphrase')
     })
     await waitFor(() => {
       expect(onEnded).toHaveBeenCalledTimes(1)
@@ -596,7 +605,7 @@ describe('TournamentDetail: Cancel tournament confirm dialog', () => {
     await user.click(screen.getByRole('button', { name: 'Yes, cancel tournament' }))
 
     await waitFor(() => {
-      expect(tournamentsApi.cancelTournament).toHaveBeenCalledWith('t1')
+      expect(tournamentsApi.cancelTournament).toHaveBeenCalledWith('t1', 'test-passphrase')
     })
     await waitFor(() => {
       expect(onCancelled).toHaveBeenCalledTimes(1)

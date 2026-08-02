@@ -14,6 +14,21 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_secrets: {
+        Row: {
+          id: boolean
+          passphrase_hash: string
+        }
+        Insert: {
+          id?: boolean
+          passphrase_hash: string
+        }
+        Update: {
+          id?: boolean
+          passphrase_hash?: string
+        }
+        Relationships: []
+      }
       match_games: {
         Row: {
           game_number: number
@@ -318,8 +333,26 @@ export type Database = {
       }
     }
     Functions: {
+      add_participant: {
+        Args: {
+          p_passphrase: string
+          p_player_id: string
+          p_tournament_id: string
+        }
+        Returns: {
+          joined_at: string
+          player_id: string
+          tournament_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tournament_participants"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       cancel_tournament: {
-        Args: { p_tournament_id: string }
+        Args: { p_passphrase: string; p_tournament_id: string }
         Returns: {
           created_at: string
           ended_at: string | null
@@ -339,10 +372,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      check_write_passphrase: {
+        Args: { p_passphrase: string }
+        Returns: undefined
+      }
       create_match: {
         Args: {
           p_manually_adjusted?: boolean
           p_participants: Json
+          p_passphrase: string
           p_sequence_number: number
           p_tournament_id: string
         }
@@ -362,8 +400,78 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_player: {
+        Args: {
+          p_gender: string
+          p_name: string
+          p_passphrase: string
+          p_self_selected_level: string
+        }
+        Returns: {
+          created_at: string
+          gender: string
+          id: string
+          name: string
+          self_selected_level: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "players"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_tournament: {
+        Args: {
+          p_games_per_match: number
+          p_name: string
+          p_passphrase: string
+          p_points_per_game: number
+          p_type: string
+          p_win_by?: number
+        }
+        Returns: {
+          created_at: string
+          ended_at: string | null
+          games_per_match: number
+          id: string
+          name: string
+          point_cap: number | null
+          points_per_game: number
+          status: string
+          type: string
+          win_by: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tournaments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      end_tournament: {
+        Args: { p_passphrase: string; p_tournament_id: string }
+        Returns: {
+          created_at: string
+          ended_at: string | null
+          games_per_match: number
+          id: string
+          name: string
+          point_cap: number | null
+          points_per_game: number
+          status: string
+          type: string
+          win_by: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tournaments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       record_match_result: {
-        Args: { p_games: Json; p_match_id: string }
+        Args: { p_games: Json; p_match_id: string; p_passphrase: string }
         Returns: {
           completed_at: string | null
           created_at: string
@@ -379,6 +487,32 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      update_player: {
+        Args: {
+          p_gender?: string
+          p_id: string
+          p_name?: string
+          p_passphrase: string
+          p_self_selected_level?: string
+        }
+        Returns: {
+          created_at: string
+          gender: string
+          id: string
+          name: string
+          self_selected_level: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "players"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      verify_write_passphrase: {
+        Args: { p_passphrase: string }
+        Returns: boolean
       }
     }
     Enums: {

@@ -40,13 +40,20 @@ tournaments.
   replaces the End action during that window, permanent, shown as a
   "Cancelled" row in History
 - Thai/English language toggle, light/dark theme support
+- Shared write-access passphrase — anyone can browse freely, but creating,
+  editing, or recording any data requires a passphrase, enforced at the
+  database level (not just the UI)
 
 ## Design decisions & intentional limitations
 
 These are deliberate design choices, not missing features:
 
-- **No authentication.** Anyone with the link can create or edit data — this
-  is meant for private, trusted club use.
+- **No user accounts.** Anyone with the link can browse all data — this is
+  meant for private, trusted club use. Writes (creating/editing/recording
+  anything) require a single shared passphrase, prompted for once per browser
+  session — see [Write-access passphrase](#write-access-passphrase) below.
+  This is a lightweight gate against accidental or drive-by edits, not a
+  real per-user auth system.
 - **Confirmed match results are permanently locked.** There is no edit UI
   and no admin override anywhere in the app. A drawn-but-not-yet-started
   match is different — the organizer can edit its lineup before it starts;
@@ -129,19 +136,25 @@ The dev server prints a local URL (default `http://localhost:5173`).
 
 Copy `.env.example` to `.env` and fill in:
 
-| Variable                 | Description                     | Where to find it                            |
-| ------------------------ | ------------------------------- | ------------------------------------------- |
-| `VITE_SUPABASE_URL`      | Your Supabase project's API URL | Supabase dashboard → Project Settings → API |
-| `VITE_SUPABASE_ANON_KEY` | Public anon/publishable API key | Supabase dashboard → Project Settings → API |
+| Variable                     | Description                                                                                                                                    | Where to find it                                                                                                             |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`          | Your Supabase project's API URL                                                                                                                | Supabase dashboard → Project Settings → API                                                                                  |
+| `VITE_SUPABASE_ANON_KEY`     | Public anon/publishable API key                                                                                                                | Supabase dashboard → Project Settings → API                                                                                  |
+| `VITE_TEST_WRITE_PASSPHRASE` | Write passphrase — only needed to run the write-exercising integration tests, not to run the app itself (the app prompts for it interactively) | Ask whoever administers the Supabase project's `app_secrets` table — see [Write-access passphrase](#write-access-passphrase) |
 
 Never commit `.env` — it's gitignored. `.env.example` contains placeholders
-only.
+only. **Never put the actual passphrase value in this README, a commit
+message, or any other file tracked by git** — it only belongs in a local
+`.env` and in the `app_secrets` hash.
 
 ## Database setup
 
 The app uses a Supabase Postgres project with Row Level Security enabled on
-every table, using permissive `anon` policies (this is a no-auth app by
+every table. Reads use a permissive `anon` policy (no per-user auth by
 design — see [Design decisions](#design-decisions--intentional-limitations)).
+Writes are handled differently: the `anon` role's direct write grants are
+revoked, and every write goes through a passphrase-checked RPC instead — see
+[Write-access passphrase](#write-access-passphrase) below.
 
 Computed stats are served by SQL views, so every read is automatically
 current rather than relying on batch recomputation:
@@ -156,6 +169,29 @@ This repository does not include a `migrations/` or `supabase/` folder —
 schema and views were applied directly to the live Supabase project. To
 reproduce the schema, provision a new Supabase project and recreate the
 tables/views described in [`docs/SPEC.md`](docs/SPEC.md).
+
+## Write-access passphrase
+
+Reading is always open — no passphrase needed to browse. Every write
+(create/update/delete, anywhere in the app) requires a single passphrase
+shared by the whole club:
+
+- **Enforced in the database, not just the UI.** Every write goes through a
+  Postgres RPC function that checks the passphrase against a hash stored in
+  an `app_secrets` table. The `anon` role's direct `INSERT`/`UPDATE`/
+  `DELETE`/`TRUNCATE` grants are revoked on every table, so a write is
+  impossible except through one of these RPCs — talking to the REST API
+  directly can't bypass it.
+- **Never stored in an env var or in source.** The app prompts for it in a
+  modal the first time a write is attempted in a browser tab, then caches it
+  in `sessionStorage` for the rest of that tab's session (cleared when the
+  tab closes — not persisted longer than that).
+- **Set/changed only via migration.** There's no in-app settings screen;
+  changing it means updating the hash in `app_secrets` directly (see
+  [`docs/PLAN.md`](docs/PLAN.md) Phase 16, step 1).
+- Integration tests that exercise real writes need the actual passphrase via
+  a `VITE_TEST_WRITE_PASSPHRASE` env var — see
+  [Environment variables](#environment-variables) and [Testing](#testing).
 
 ## Scripts
 
@@ -184,6 +220,7 @@ src/
     matches/         # match creation, results, validation
     matchmaking/      # pure-TS matchmaking algorithm (no React/Supabase)
     scoreboard/      # per-tournament and overall scoreboard data layer
+    passphrase/      # write-access passphrase gate (context, provider, API)
   pages/             # the 5 tab routes (Create/Active/Scoreboard/History/Member)
   components/        # shared UI components
   lib/               # Supabase client, generated DB types, shared utilities
@@ -204,7 +241,9 @@ project — it's the highest-risk, most heavily tested part of the codebase.
 Some tests are integration tests that hit a real Supabase project
 (`*.integration.test.ts`, e.g. `src/features/players/playersApi.integration.test.ts`)
 and require valid `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` env vars to
-pass.
+pass. The subset of those that perform writes (creating a player, a
+tournament, a match, etc.) also require `VITE_TEST_WRITE_PASSPHRASE` — see
+[Write-access passphrase](#write-access-passphrase).
 
 ## Deployment
 

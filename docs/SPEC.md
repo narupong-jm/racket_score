@@ -19,6 +19,11 @@ Updated: 2026-08-02 — adds **Cancel Tournament** (§4, §9): a permanent,
 non-reversible way to discard a tournament created by mistake, available
 only before its first match result is confirmed, in place of End
 Tournament during that window. Not yet implemented as of this note.
+Updated: 2026-08-02 (later same day) — adds a **write-access passphrase**
+(§2): a single shared secret required before any create/edit/record
+action, enforced at the database (RLS/RPC) level rather than only in the
+UI. Reading/browsing stays open to anyone, unchanged. Not yet implemented
+as of this note.
 
 ## 1. Overview
 
@@ -33,10 +38,38 @@ history/stats and standings within each tournament.
 - **Frontend:** React
 - **Backend/Database:** Supabase (new project, created for this app)
 - **Deployment:** Vercel
-- **No authentication / login system.** Anyone can create tournaments,
-  add players, generate matches, and record scores. This is an intentional
-  simplification for private/trusted use; access control (e.g. edit vs.
-  view links, or real auth) is a future enhancement, not part of this spec.
+- **No user accounts / login system.** Anyone can browse the app — the
+  member pool, tournaments, matches, and both scoreboards — without any
+  credential. Real per-user auth, roles, or edit-vs-view link separation
+  remain a future enhancement, not part of this spec.
+- **Write-access passphrase.** Every action that creates or modifies data
+  (adding/editing a member, creating a tournament, drawing/starting/
+  editing a match, recording a result, ending or cancelling a tournament)
+  requires a single **shared passphrase** — one secret for the whole app,
+  not per-tournament or per-person. This is enforced at the **database**
+  level, not just hidden in the UI:
+  - Every write goes through a **Postgres RPC function** that takes the
+    passphrase as a parameter, checks it against a **hashed** value stored
+    in a settings table, and only performs the insert/update if it
+    matches. The underlying tables have `INSERT`/`UPDATE`/`DELETE`
+    revoked for the `anon` role, so a write is only possible through one
+    of these passphrase-checked functions — never a direct table call.
+  - The passphrase is seeded once via a database migration and stored
+    only as a hash; there is no in-app Settings screen to change it —
+    changing it means writing and running a new migration.
+  - **In the UI:** browsing/reading needs nothing — there's no gate on
+    app entry. The **first** write-triggering action in a browser session
+    (e.g. tapping "Create tournament" or "Save result") pops up a
+    passphrase prompt. A correct entry completes that action and is
+    remembered for the rest of the browser session (cleared when the tab/
+    browser closes — not persisted longer than that), so later write
+    actions in the same session aren't re-prompted, though each is still
+    independently re-checked against the database. A wrong entry just
+    shows an inline error and can be retried any number of times — no
+    lockout or rate-limiting.
+  - Applies uniformly to every write path, present and future — any new
+    create/edit/delete action added later must go through the same
+    RPC-plus-passphrase pattern, not a direct table write.
 - **UI language:** Thai and English, switchable in-app.
 
 ## 3. Player Pool (central, persistent)

@@ -10,6 +10,7 @@ import {
 import { createMatch, recordMatchResult } from '../matches/matchesApi'
 import { createPlayer } from '../players/playersApi'
 import { supabase } from '../../lib/supabaseClient'
+import { testWritePassphrase } from '../../test/testPassphrase'
 
 describe('tournamentsApi (real project, anon key)', () => {
   const testPlayerName = `Tournaments API Test Player ${crypto.randomUUID()}`
@@ -27,12 +28,15 @@ describe('tournamentsApi (real project, anon key)', () => {
   })
 
   it('creates a tournament with a correctly computed point cap and lists it', async () => {
-    const created = await createTournament({
-      name: `Tournaments API Test ${crypto.randomUUID()}`,
-      type: 'doubles',
-      games_per_match: 3,
-      points_per_game: 21,
-    })
+    const created = await createTournament(
+      {
+        name: `Tournaments API Test ${crypto.randomUUID()}`,
+        type: 'doubles',
+        games_per_match: 3,
+        points_per_game: 21,
+      },
+      testWritePassphrase,
+    )
     tournamentId = created.id
 
     expect(created.point_cap).toBe(30) // round(21 * 30 / 21)
@@ -45,14 +49,17 @@ describe('tournamentsApi (real project, anon key)', () => {
   it('adds a participant and lists them', async () => {
     if (!tournamentId) throw new Error('tournamentId not set from previous test')
 
-    const player = await createPlayer({
-      name: testPlayerName,
-      gender: 'male',
-      self_selected_level: 'beginner',
-    })
+    const player = await createPlayer(
+      {
+        name: testPlayerName,
+        gender: 'male',
+        self_selected_level: 'beginner',
+      },
+      testWritePassphrase,
+    )
     playerId = player.id
 
-    await addParticipant(tournamentId, playerId)
+    await addParticipant(tournamentId, playerId, testWritePassphrase)
 
     const participants = await listParticipants(tournamentId)
     expect(participants.some((p) => p.player_id === playerId)).toBe(true)
@@ -61,7 +68,7 @@ describe('tournamentsApi (real project, anon key)', () => {
   it('ends a tournament, flipping status and setting ended_at', async () => {
     if (!tournamentId) throw new Error('tournamentId not set from previous test')
 
-    const ended = await endTournament(tournamentId)
+    const ended = await endTournament(tournamentId, testWritePassphrase)
     expect(ended.status).toBe('completed')
     expect(ended.ended_at).not.toBeNull()
   })
@@ -71,15 +78,18 @@ describe('cancelTournament (real project, anon key)', () => {
   const runId = crypto.randomUUID()
 
   it('cancels an active tournament with no confirmed matches, leaving ended_at null', async () => {
-    const tournament = await createTournament({
-      name: `Cancel Test - No Matches ${runId}`,
-      type: 'singles',
-      games_per_match: 1,
-      points_per_game: 21,
-    })
+    const tournament = await createTournament(
+      {
+        name: `Cancel Test - No Matches ${runId}`,
+        type: 'singles',
+        games_per_match: 1,
+        points_per_game: 21,
+      },
+      testWritePassphrase,
+    )
 
     try {
-      const cancelled = await cancelTournament(tournament.id)
+      const cancelled = await cancelTournament(tournament.id, testWritePassphrase)
       expect(cancelled.status).toBe('cancelled')
       expect(cancelled.ended_at).toBeNull()
     } finally {
@@ -88,33 +98,51 @@ describe('cancelTournament (real project, anon key)', () => {
   })
 
   it('rejects cancelling a tournament that already has a confirmed match result', async () => {
-    const tournament = await createTournament({
-      name: `Cancel Test - Confirmed Result ${runId}`,
-      type: 'singles',
-      games_per_match: 1,
-      points_per_game: 21,
-    })
-    const playerA = await createPlayer({
-      name: `Cancel Test A ${runId}`,
-      gender: 'male',
-      self_selected_level: 'beginner',
-    })
-    const playerB = await createPlayer({
-      name: `Cancel Test B ${runId}`,
-      gender: 'female',
-      self_selected_level: 'beginner',
-    })
+    const tournament = await createTournament(
+      {
+        name: `Cancel Test - Confirmed Result ${runId}`,
+        type: 'singles',
+        games_per_match: 1,
+        points_per_game: 21,
+      },
+      testWritePassphrase,
+    )
+    const playerA = await createPlayer(
+      {
+        name: `Cancel Test A ${runId}`,
+        gender: 'male',
+        self_selected_level: 'beginner',
+      },
+      testWritePassphrase,
+    )
+    const playerB = await createPlayer(
+      {
+        name: `Cancel Test B ${runId}`,
+        gender: 'female',
+        self_selected_level: 'beginner',
+      },
+      testWritePassphrase,
+    )
 
     try {
-      await addParticipant(tournament.id, playerA.id)
-      await addParticipant(tournament.id, playerB.id)
-      const match = await createMatch(tournament.id, 1, [
-        { player_id: playerA.id, team: 1 },
-        { player_id: playerB.id, team: 2 },
-      ])
-      await recordMatchResult(match.id, [{ game_number: 1, team1_score: 21, team2_score: 15 }])
+      await addParticipant(tournament.id, playerA.id, testWritePassphrase)
+      await addParticipant(tournament.id, playerB.id, testWritePassphrase)
+      const match = await createMatch(
+        tournament.id,
+        1,
+        [
+          { player_id: playerA.id, team: 1 },
+          { player_id: playerB.id, team: 2 },
+        ],
+        testWritePassphrase,
+      )
+      await recordMatchResult(
+        match.id,
+        [{ game_number: 1, team1_score: 21, team2_score: 15 }],
+        testWritePassphrase,
+      )
 
-      await expect(cancelTournament(tournament.id)).rejects.toThrow()
+      await expect(cancelTournament(tournament.id, testWritePassphrase)).rejects.toThrow()
 
       // proving no partial mutation: still active, match still there
       const { data: reread } = await supabase
