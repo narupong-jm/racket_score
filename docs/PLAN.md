@@ -1277,6 +1277,143 @@ between them, the tab with the stale cache should recover via one re-prompt, not
 infinite loop or a silent failure; test this path explicitly rather than trusting
 it works by inspection.
 
+## Phase 17 — Post-Phase-16 Patch: Matchmaking Race Fix, Save-Result Lock, Scoreboard Unification
+
+A narrower, post-launch patch found during real hands-on use of the live app (not a
+`docs/IMPROVEMENT*.md`-driven phase — surfaced directly in conversation and turned
+into `docs/SPEC.md` §5/§6/§7/§8 updates, dated 2026-08-03, before any code changed).
+Three independent fixes: (1) a real correctness bug in Current-match exclusion when
+combined with the Start-match promotion flow, (2) a new workflow lock requiring the
+Next match to be drawn before a Current match's result can be saved, and (3)
+unifying the two Scoreboards' columns/ranking and adding frozen header/identity
+columns to both.
+
+**Confirmed decisions (this session, via user interview — one question at a time,
+per explicit request):**
+- An initially-proposed Ranking change (primary sort switched from win-rate to
+  total points) was **explicitly withdrawn mid-interview** — win-rate stays the
+  **primary** sort criterion everywhere, unchanged from `docs/SPEC.md`'s existing
+  wording.
+- Final ranking, both Scoreboards identically: **win-rate (desc) → total points
+  scored (desc) as tiebreak**, replacing point-differential as the per-tournament
+  Scoreboard's old tiebreak. If both are tied, ranks are **not** broken further —
+  tied entries share a rank number using standard competition ranking (e.g. two
+  players tied for 1st → both show rank 1, the next distinct entry is rank 3, not
+  2).
+- Per-tournament Scoreboard's new Total Points column is computed by querying the
+  existing `player_match_history` view filtered by `tournament_id` (a new optional
+  filter added to `listPlayerMatchHistory`) — deliberately **not** a SQL view
+  migration, to reuse the exact same underlying metric Overall Scoreboard already
+  used, with zero schema change.
+- Save-Result lock applies to **every** Current match tournament-wide, regardless
+  of whether it was manually adjusted. The bypass ("Is last match" checkbox) does
+  **only** one thing — unlocks the Save-result button for that one save. It does
+  not draw a match, does not end the tournament, and does not persist anywhere;
+  ending the tournament afterward still requires the separate, pre-existing End
+  Tournament action.
+
+1. [x] **Bugfix: Current-match exclusion race.** Root cause, found via a dedicated
+   subagent trace through `useStartNextMatch`/`TournamentDetail.tsx`: the mutation's
+   `onSuccess` called `queryClient.invalidateQueries({ queryKey: ['matches',
+   tournamentId] })` without `return`-ing the promise, so TanStack Query didn't
+   await the refetch before running the `mutate()`-call-site `onSuccess` (which
+   resets the ephemeral Next-match draw state, re-enabling Randomize). A manual
+   adjust → Start match → immediate Randomize sequence could therefore draw against
+   a stale `['matches', tournamentId]` cache that didn't yet reflect who was
+   actually in the just-started Current match, letting that player be drawn right
+   back into Next. Fix: `return` the `invalidateQueries` promise in
+   `useMatchQueue.ts`'s `useStartNextMatch`; also added a `startNextMatch.isPending`
+   guard to the Randomize button (`TournamentDetail.tsx`) as defense-in-depth,
+   mirroring the existing guard already on Start match. _Test:_ new
+   `src/features/matches/useMatchQueue.test.tsx` — a deliberately-delayed refetch
+   proves the mutation does not resolve (and a caller `onSuccess` does not fire)
+   until the refetch lands; confirmed this test fails against the pre-fix code
+   (reverted the `return` locally, re-ran, saw the expected failure) and passes
+   once restored, so the regression coverage is verified, not assumed.
+2. [x] **Save-Result lock + "Is last match" checkbox.** The drawn-but-not-started
+   Next match was, and remains, ephemeral React state (`nextDraw`) — never
+   persisted until Start match. Lifted that state from `NextMatchCard` up to
+   `TournamentDetail` (now a controlled prop pair, `nextDraw`/`onNextDrawChange`)
+   so `CurrentMatchForm` can read "has a Next match been drawn" and gate its Save
+   Result button: `disabled={!isValid || (!hasNextMatchDrawn && !isLastMatch)}`.
+   Added the `isLastMatch` checkbox (plain `<input type="checkbox">`-in-`<label>`,
+   matching the existing precedent in `CreateTournamentPage.tsx`'s participant
+   checklist — no reusable checkbox component existed before this) plus a
+   `field-hint` message shown only while locked. New i18n keys `manage.isLastMatch`
+   / `manage.saveResultLockedHint` in both `en.json`/`th.json`. _Test:_
+   `TournamentDetail.test.tsx` — three new cases covering locked-by-default,
+   unlocked-after-Randomize, and unlocked/re-locked via the checkbox; the
+   pre-existing "Save result confirm dialog" test updated to check the box first
+   (no Next match drawn in that fixture).
+3. [x] **Scoreboard column/ranking unification + frozen header/columns.** New
+   shared `src/features/scoreboard/rankScoreboard.ts` (sorts win-rate desc → total
+   points desc, player-id as a stable-order-only tiebreak that never affects the
+   displayed rank number; assigns standard-competition rank numbers) used by both
+   `TournamentScoreboardRoute.tsx` and `OverallScoreboardPage.tsx`, replacing the
+   now-deleted `sortScoreboard.ts`. `TournamentScoreboardRoute.tsx` now runs a
+   second query (`listPlayerMatchHistory({ tournamentId })`, the new filter from
+   `scoreboardApi.ts`) alongside the existing `tournament_standings` query and
+   merges summed `points_for` per player into each row, replacing `point_diff`.
+   `ScoreboardTable.tsx`: `ScoreboardRow` gained a `rank` field (medal icon/number
+   keyed off it, not array index, so ties render identically) and lost the
+   `pointsColumn` prop (both callers now always show `scoreboard.columnTotalPoints`
+   — no more point-diff variant). Frozen header/columns implemented as CSS-only:
+   `.scoreboard-table-wrap` became its own bounded scroll box (`overflow: auto;
+   max-height: min(70vh, 640px)`, switched from page-level scrolling to avoid
+   coordinating a `top` offset against the unrelated sticky `.app-header`);
+   `border-collapse: collapse` → `separate` (collapsed borders break `position:
+   sticky` cells in some browsers); RANK/PHOTO/NAME cells get `.sticky-col` with
+   fixed cumulative `left` offsets (0 / 56px / 120px) matching the now-fixed
+   `.rank-col`/`.avatar-col` widths (56px/64px, previously `width: 1%`). _Test:_
+   `rankScoreboard.test.ts` (new), `ScoreboardTable.test.tsx` (rank-based
+   rendering + a new tied-ranks case), `TournamentScoreboardRoute.test.tsx`
+   (mocks both queries, asserts the merged Total Points column), unaffected
+   `OverallScoreboardPage.test.tsx` cases still pass unmodified.
+4. [x] **`docs/SPEC.md` updated ahead of code.** §5 (exclusion must use the
+   Current match's actual, up-to-date — i.e. post-manual-adjustment — roster), §6
+   (new Save-Result-lock rule + "Is last match" bypass), §7/§8 (both Scoreboards:
+   win-rate → total-points tiebreak, ties share a rank, identical column set,
+   frozen header/RANK/PHOTO/NAME columns), plus a new dated "Updated" note at the
+   top. Done in a separate pass before any implementation step above, per explicit
+   user instruction.
+5. [x] **Full regression + live smoke test.** `npx tsc -b`, `npm run lint`,
+   `npx vitest run` (46 files / 205 tests, all green) after every step above.
+   Dev-server + Chrome walkthrough against the **live Supabase data** (not mocks):
+   Overall Scoreboard's tie-aware ranking confirmed visually against real
+   duplicate-rank rows; per-tournament Scoreboard for "ตีแบดจนไหล่เบี่ยง ver
+   remake!" cross-checked column-for-column against numbers computed by hand
+   earlier the same session; horizontal frozen-column behavior confirmed by
+   shrinking `.scoreboard-table-wrap` via `javascript_tool` (the browser
+   automation's `resize_window` call didn't actually change the rendered
+   viewport in this environment — worked around by resizing the element under
+   test directly instead). Save-Result lock/checkbox verified live in the Manage
+   screen for a real tournament by typing a valid score and toggling the
+   checkbox — **did not** click Start match/Save result/Confirm for real, since
+   doing so requires the live write passphrase, which the agent does not have
+   access to and should not attempt to guess.
+
+**Known risks / gotcha found along the way:** running the bare `npx vitest run`
+(no path filter) executes every `*.integration.test.ts`/`*.integration.test.tsx`
+file too — these hit the **real, live** `racket-score` Supabase project using the
+real seeded write passphrase (`src/test/testPassphrase.ts`, from the gitignored
+`VITE_TEST_WRITE_PASSPHRASE` env var) with **no automatic cleanup**. Two bare
+full-suite runs during this phase's step 5 left 16 stray `tournaments` rows and 36
+stray `players` rows behind (named things like "Matches API Test ...", "Manually
+Adjusted Test ..." — the same fixture-naming pattern visible in the integration
+test source), cleanly separable from real data by `created_at` timestamp (stray
+rows all landed in a couple of seconds around 15:43 and 15:49 UTC on 2026-08-03;
+the real data all predates 12:06 UTC the same day) since `tournaments`/`players`
+have no test-run marker column. Deleted via `execute_sql` after explicit user
+confirmation (`tournaments`/`players` where `created_at >= '2026-08-03
+13:00:00+00'` — cascades cleaned up the associated `matches`/`match_participants`/
+`match_games`/`tournament_participants` rows automatically); verified back to the
+exact pre-pollution counts (2 tournaments, 8 players, 13 matches, 15 participants)
+afterward. This mirrors Phase 16's own step-8 walkthrough note (manually deleting
+demo data via `execute_sql` afterward) — it's an accepted, known characteristic of
+this project's integration-test setup, not something this phase changed, but
+**prefer running targeted test file paths day-to-day** (as every step above
+actually did) and budget a cleanup pass if a bare `vitest run` is ever needed.
+
 ---
 
 ## Critical Files
@@ -1334,15 +1471,33 @@ it works by inspection.
 - `src/test/testPassphrase.ts` — the real write passphrase for anon-key integration tests, read
   from the local, gitignored `VITE_TEST_WRITE_PASSPHRASE` env var (never hardcoded in source);
   every `*.integration.test.ts` file that performs a write imports from here (Phase 16)
+- `src/features/matches/useMatchQueue.ts` — `useStartNextMatch`'s `onSuccess` must `return` its
+  `invalidateQueries(...)` call (not fire-and-forget it), or the Current-match exclusion race from
+  Phase 17 step 1 resurfaces; regression-covered by `useMatchQueue.test.tsx`
+- `src/features/tournaments/TournamentDetail.tsx` — `nextDraw` is now lifted out of `NextMatchCard`
+  into the parent (controlled via `nextDraw`/`onNextDrawChange`) so `CurrentMatchForm` can gate
+  Save Result on "has a Next match been drawn," with the "Is last match" checkbox as the only
+  bypass (Phase 17)
+- `src/features/scoreboard/rankScoreboard.ts` — the single ranking/tiebreak/tied-rank-numbering
+  implementation shared by both Scoreboards (win-rate desc → total points desc → stable player-id
+  order; standard competition ranking for ties); `src/features/tournaments/sortScoreboard.ts` was
+  deleted as fully superseded by this (Phase 17)
+- `src/features/scoreboard/ScoreboardTable.tsx` + `src/index.css`'s `.scoreboard-table*`/
+  `.sticky-col` rules — shared table now takes a precomputed `rank` per row instead of deriving it
+  from array index, and implements the frozen header row + frozen RANK/PHOTO/NAME columns via
+  `position: sticky` (own bounded scroll box, `border-collapse: separate`, fixed column widths so
+  `left` offsets are predictable) (Phase 17)
 
 ## End-to-End Verification
 
-As of Phase 16, the full critical path has been exercised at three levels: pure-logic unit
+As of Phase 17, the full critical path has been exercised at three levels: pure-logic unit
 tests (Vitest, no I/O), component/hook tests mocking the API layer (including the passphrase
 gate itself), integration tests against the real Supabase project (via the JS client, exercising
-the actual live RPCs with the real seeded passphrase, not a mock — 201 tests across the suite as
-of this note), and full browser-driven runs via Playwright MCP against the local dev server
-(Phase 16's walkthrough, like Phase 15's, was run against the local dev server only; the deployed
+the actual live RPCs with the real seeded passphrase, not a mock — 205 tests across the suite as
+of this note), and full browser-driven runs (Phase 17's own smoke test used Claude-in-Chrome
+against the local dev server instead of Playwright MCP, re-verifying against the *live* Supabase
+data already in the project rather than fresh fixtures — see Phase 17 step 5). (Phase 16's
+walkthrough, like Phase 15's, was run against the local dev server only; the deployed
 Vercel URL has not yet been re-verified post-Phase-16 — see Phase 16 step 2's note that the live
 Vercel deployment was left in a broken-writes state mid-phase and needs a push + redeploy before
 it matches this local state). The path covered: create a player → create a tournament (singles or
@@ -1363,3 +1518,13 @@ write rather than silently completing it, and closing/reopening the tab clears t
 next write prompts again → toggle language and theme. All 5 tabs, both languages, no console
 errors (dark-theme rendering specifically was not re-verified this phase — see Phase 16 step 9's
 note; no new CSS was introduced, so risk is low but unconfirmed by tooling).
+
+Phase 17 additionally re-verified, against the live app: the per-tournament Scoreboard's new
+Total Points column and win-rate/total-points tiebreak ranking cross-checked number-for-number
+against a hand-computed reference from earlier the same session; Overall Scoreboard's tied-rank
+display (two real players tied at the same win-rate/points landing on the same rank number);
+frozen header row and RANK/PHOTO/NAME columns on both Scoreboards under both vertical and
+(artificially forced, since the viewport was wide enough not to overflow naturally) horizontal
+scroll; and the Save-Result lock/"Is last match" checkbox toggling correctly on a real in-progress
+match — stopping short of actually clicking Start match/Save result/Confirm, since those require
+the live write passphrase, which the agent doesn't have and didn't attempt to obtain or guess.

@@ -57,7 +57,12 @@ export function useStartNextMatch(tournamentId: string) {
       return createMatch(tournamentId, nextSequenceNumber, participants, passphrase, manuallyAdjusted)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['matches', tournamentId] })
+      // Must return this promise: React Query awaits a mutation-level
+      // onSuccess before running the mutate()-call-site onSuccess, so the
+      // refetched Current-match roster is in the cache before any caller
+      // resets Next-match state (which would otherwise re-enable Randomize
+      // against a stale/empty exclusion list).
+      return queryClient.invalidateQueries({ queryKey: ['matches', tournamentId] })
     },
   })
 }

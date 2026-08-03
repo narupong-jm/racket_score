@@ -462,6 +462,12 @@ describe('TournamentDetail: Save result confirm dialog', () => {
     await user.type(team1Input, '21')
     await user.type(team2Input, '15')
 
+    // No Next match has been drawn in this scenario, so Save result stays
+    // locked until "Is last match" is checked (see the dedicated lock tests
+    // below for the no-checkbox / Next-drawn cases).
+    expect(screen.getByRole('button', { name: 'Save result' })).toBeDisabled()
+    await user.click(screen.getByRole('checkbox', { name: 'This is the last match' }))
+
     await user.click(screen.getByRole('button', { name: 'Save result' }))
 
     expect(await screen.findByText('Confirm this result?')).toBeInTheDocument()
@@ -476,6 +482,69 @@ describe('TournamentDetail: Save result confirm dialog', () => {
         'test-passphrase',
       )
     })
+  })
+
+  it('locks Save result until a Next match is drawn, unless "Is last match" is checked', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([makeMatch('m1', 1, 'queued')])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([
+      { match_id: 'm1', player_id: 'p1', team: 1 },
+      { match_id: 'm1', player_id: 'p2', team: 2 },
+    ])
+    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
+      ok: true,
+      participants: [
+        { playerId: 'p3', team: 1 },
+        { playerId: 'p4', team: 2 },
+      ],
+    })
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    const team1Input = await screen.findByRole('spinbutton', { name: 'Alice -- Game 1' })
+    const team2Input = screen.getByRole('spinbutton', { name: 'Bob -- Game 1' })
+    await user.type(team1Input, '21')
+    await user.type(team2Input, '15')
+
+    expect(screen.getByRole('button', { name: 'Save result' })).toBeDisabled()
+    expect(
+      screen.getByText('Draw the Next match before saving this result, or check "This is the last match".'),
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Randomize' }))
+    await screen.findByText('p3 vs p4')
+
+    expect(screen.getByRole('button', { name: 'Save result' })).toBeEnabled()
+    expect(
+      screen.queryByText('Draw the Next match before saving this result, or check "This is the last match".'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('unchecking "Is last match" re-locks Save result if no Next match is drawn', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([makeMatch('m1', 1, 'queued')])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([
+      { match_id: 'm1', player_id: 'p1', team: 1 },
+      { match_id: 'm1', player_id: 'p2', team: 2 },
+    ])
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    const team1Input = await screen.findByRole('spinbutton', { name: 'Alice -- Game 1' })
+    const team2Input = screen.getByRole('spinbutton', { name: 'Bob -- Game 1' })
+    await user.type(team1Input, '21')
+    await user.type(team2Input, '15')
+
+    const checkbox = screen.getByRole('checkbox', { name: 'This is the last match' })
+    await user.click(checkbox)
+    expect(screen.getByRole('button', { name: 'Save result' })).toBeEnabled()
+
+    await user.click(checkbox)
+    expect(screen.getByRole('button', { name: 'Save result' })).toBeDisabled()
   })
 })
 

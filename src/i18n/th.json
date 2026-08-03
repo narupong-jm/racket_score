@@ -171,6 +171,8 @@
     "mixedDoublesWarning": "คู่นี้ไม่ได้ผสมชาย-หญิง ทั้งที่สามารถจับคู่แบบผสมได้",
     "gameTeamLabel": "{{team}} -- เกมที่ {{n}}",
     "saveResult": "บันทึกผล",
+    "isLastMatch": "เป็นแมตช์สุดท้าย",
+    "saveResultLockedHint": "สุ่ม Next match ก่อนจึงจะบันทึกผลนี้ได้ หรือติ๊ก \"เป็นแมตช์สุดท้าย\"",
     "confirmResultTitle": "ยืนยันผลนี้หรือไม่?",
     "confirmResultBody": "แก้ไขไม่ได้หลังจากบันทึกแล้ว",
     "gameScoreLine": "เกมที่ {{n}}: {{team1}} {{team1Score}} - {{team2}} {{team2Score}}",

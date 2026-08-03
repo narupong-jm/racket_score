@@ -171,6 +171,8 @@
     "mixedDoublesWarning": "This lineup isn't gender-mixed, though a mixed pairing was possible.",
     "gameTeamLabel": "{{team}} -- Game {{n}}",
     "saveResult": "Save result",
+    "isLastMatch": "This is the last match",
+    "saveResultLockedHint": "Draw the Next match before saving this result, or check \"This is the last match\".",
     "confirmResultTitle": "Confirm this result?",
     "confirmResultBody": "It can't be edited after.",
     "gameScoreLine": "Game {{n}}: {{team1}} {{team1Score}} - {{team2}} {{team2Score}}",

@@ -12,19 +12,15 @@ export interface ScoreboardRow {
   matchesPlayed: number
   matchesWon: number
   winRate: number | null
-  pointsValue: number
-}
-
-export interface ScoreboardPointsColumn {
-  label: string
+  totalPoints: number
+  rank: number
 }
 
 interface ScoreboardTableProps {
   rows: ScoreboardRow[]
-  pointsColumn: ScoreboardPointsColumn
 }
 
-export function ScoreboardTable({ rows, pointsColumn }: ScoreboardTableProps) {
+export function ScoreboardTable({ rows }: ScoreboardTableProps) {
   const { t } = useTranslation()
 
   return (
@@ -32,38 +28,38 @@ export function ScoreboardTable({ rows, pointsColumn }: ScoreboardTableProps) {
       <table className="scoreboard-table">
         <thead>
           <tr>
-            <th className="rank-col">{t('scoreboard.columnRank')}</th>
-            <th className="avatar-col">{t('scoreboard.columnAvatar')}</th>
-            <th>{t('scoreboard.columnName')}</th>
+            <th className="rank-col sticky-col">{t('scoreboard.columnRank')}</th>
+            <th className="avatar-col sticky-col">{t('scoreboard.columnAvatar')}</th>
+            <th className="name-col sticky-col">{t('scoreboard.columnName')}</th>
             <th>{t('scoreboard.columnMatchesPlayed')}</th>
             <th>{t('scoreboard.columnMatchesWon')}</th>
-            <th>{pointsColumn.label}</th>
+            <th>{t('scoreboard.columnTotalPoints')}</th>
             <th>{t('scoreboard.columnWinRate')}</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => {
-            const medal = MEDAL_ICONS[index]
+          {rows.map((row) => {
+            const medal = MEDAL_ICONS[row.rank - 1]
             return (
-              <tr key={row.playerId} className={index < 3 ? 'scoreboard-medal-row' : undefined}>
-                <td className="rank-col">
+              <tr key={row.playerId} className={row.rank <= 3 ? 'scoreboard-medal-row' : undefined}>
+                <td className="rank-col sticky-col">
                   {medal ? (
                     <img
                       className="medal-icon"
                       src={medal}
-                      alt={t('scoreboard.rankLabel', { rank: index + 1 })}
+                      alt={t('scoreboard.rankLabel', { rank: row.rank })}
                     />
                   ) : (
-                    index + 1
+                    row.rank
                   )}
                 </td>
-                <td className="avatar-col">
+                <td className="avatar-col sticky-col">
                   <Avatar name={row.name} size={32} />
                 </td>
-                <td>{row.name}</td>
+                <td className="name-col sticky-col">{row.name}</td>
                 <td>{row.matchesPlayed}</td>
                 <td>{row.matchesWon}</td>
-                <td>{row.pointsValue}</td>
+                <td>{row.totalPoints}</td>
                 <td>
                   {row.winRate === null
                     ? t('scoreboard.noWinRate')

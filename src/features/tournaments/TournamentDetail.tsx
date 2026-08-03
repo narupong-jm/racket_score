@@ -43,6 +43,7 @@ export function TournamentDetail({ tournamentId, onEnded, onCancelled }: Tournam
   const [endModalOpen, setEndModalOpen] = useState(false)
   const cancelTournament = useCancelTournament()
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
+  const [nextDraw, setNextDraw] = useState<GeneratedMatchParticipant[] | null>(null)
 
   if (!tournament) return <p>{t('tournaments.detail.notFound')}</p>
 
@@ -128,6 +129,7 @@ export function TournamentDetail({ tournamentId, onEnded, onCancelled }: Tournam
         winBy={tournament.win_by}
         cap={cap}
         isActive={isActive}
+        hasNextMatchDrawn={nextDraw !== null}
       />
 
       <NextMatchCard
@@ -140,6 +142,8 @@ export function TournamentDetail({ tournamentId, onEnded, onCancelled }: Tournam
         }
         rosterPlayers={rosterPlayers}
         playerNameById={playerNameById}
+        nextDraw={nextDraw}
+        onNextDrawChange={setNextDraw}
       />
 
       <RoundsPlayedList
@@ -245,6 +249,7 @@ interface CurrentMatchCardProps {
   winBy: number
   cap: number
   isActive: boolean
+  hasNextMatchDrawn: boolean
 }
 
 function CurrentMatchCard({
@@ -257,6 +262,7 @@ function CurrentMatchCard({
   winBy,
   cap,
   isActive,
+  hasNextMatchDrawn,
 }: CurrentMatchCardProps) {
   const { t } = useTranslation()
 
@@ -284,6 +290,7 @@ function CurrentMatchCard({
               pointsPerGame={pointsPerGame}
               winBy={winBy}
               cap={cap}
+              hasNextMatchDrawn={hasNextMatchDrawn}
             />
           )}
         </>
@@ -310,6 +317,7 @@ interface CurrentMatchFormProps {
   pointsPerGame: number
   winBy: number
   cap: number
+  hasNextMatchDrawn: boolean
 }
 
 function CurrentMatchForm({
@@ -321,10 +329,12 @@ function CurrentMatchForm({
   pointsPerGame,
   winBy,
   cap,
+  hasNextMatchDrawn,
 }: CurrentMatchFormProps) {
   const { t } = useTranslation()
   const [rows, setRows] = useState<RowState[]>(() => emptyRows(gamesPerMatch))
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [isLastMatch, setIsLastMatch] = useState(false)
   const recordResult = useRecordMatchResult(tournamentId)
 
   function updateRow(index: number, field: 'team1' | 'team2', value: string) {
@@ -383,10 +393,11 @@ function CurrentMatchForm({
       : null
 
   const isValid = !hasRowError && games.length > 0 && matchLevelError === null
+  const canSave = isValid && (hasNextMatchDrawn || isLastMatch)
 
   function handleSaveResultClick(event: FormEvent) {
     event.preventDefault()
-    if (!isValid) return
+    if (!canSave) return
     setConfirmOpen(true)
   }
 
@@ -440,9 +451,20 @@ function CurrentMatchForm({
           {matchLevelError}
         </p>
       )}
-      <button type="submit" disabled={!isValid}>
+      <label className="checkbox-row">
+        <input
+          type="checkbox"
+          checked={isLastMatch}
+          onChange={(event) => setIsLastMatch(event.target.checked)}
+        />
+        {t('manage.isLastMatch')}
+      </label>
+      <button type="submit" disabled={!canSave}>
         {t('manage.saveResult')}
       </button>
+      {isValid && !hasNextMatchDrawn && !isLastMatch && (
+        <p className="field-hint">{t('manage.saveResultLockedHint')}</p>
+      )}
 
       <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)}>
         <h3>{t('manage.confirmResultTitle')}</h3>
@@ -481,6 +503,8 @@ interface NextMatchCardProps {
   currentMatchParticipantIds: string[]
   rosterPlayers: RosterPlayer[]
   playerNameById: Map<string, string>
+  nextDraw: GeneratedMatchParticipant[] | null
+  onNextDrawChange: (draw: GeneratedMatchParticipant[] | null) => void
 }
 
 function NextMatchCard({
@@ -491,11 +515,12 @@ function NextMatchCard({
   currentMatchParticipantIds,
   rosterPlayers,
   playerNameById,
+  nextDraw,
+  onNextDrawChange,
 }: NextMatchCardProps) {
   const { t } = useTranslation()
   const { data: drawInputs } = useDrawInputs(tournamentId)
   const startNextMatch = useStartNextMatch(tournamentId)
-  const [nextDraw, setNextDraw] = useState<GeneratedMatchParticipant[] | null>(null)
   const [drawFailed, setDrawFailed] = useState(false)
   const [usedCurrentMatchFallback, setUsedCurrentMatchFallback] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -515,11 +540,11 @@ function NextMatchCard({
 
     const result = generateNextMatch(matchType, candidates, drawInputs.pairingHistory)
     if (result.ok) {
-      setNextDraw(result.participants)
+      onNextDrawChange(result.participants)
       setDrawFailed(false)
       setUsedCurrentMatchFallback(usedFallback)
     } else {
-      setNextDraw(null)
+      onNextDrawChange(null)
       setDrawFailed(true)
       setUsedCurrentMatchFallback(false)
     }
@@ -529,7 +554,7 @@ function NextMatchCard({
 
   function handleSwap(oldPlayerId: string, newPlayerId: string) {
     if (!nextDraw || oldPlayerId === newPlayerId) return
-    setNextDraw(
+    onNextDrawChange(
       nextDraw.map((p) => (p.playerId === oldPlayerId ? { ...p, playerId: newPlayerId } : p)),
     )
     setManuallyAdjusted(true)
@@ -544,7 +569,7 @@ function NextMatchCard({
       },
       {
         onSuccess: () => {
-          setNextDraw(null)
+          onNextDrawChange(null)
           setEditing(false)
           setManuallyAdjusted(false)
         },
@@ -623,7 +648,12 @@ function NextMatchCard({
       )}
 
       <div className="button-row">
-        <button type="button" className="secondary" onClick={handleRandomize} disabled={!isActive || notEnoughPlayers}>
+        <button
+          type="button"
+          className="secondary"
+          onClick={handleRandomize}
+          disabled={!isActive || notEnoughPlayers || startNextMatch.isPending}
+        >
           {t('manage.randomize')}
         </button>
         {nextDraw && (

@@ -24,6 +24,11 @@ Updated: 2026-08-02 (later same day) — adds a **write-access passphrase**
 action, enforced at the database (RLS/RPC) level rather than only in the
 UI. Reading/browsing stays open to anyone, unchanged. Not yet implemented
 as of this note.
+Updated: 2026-08-03 — post-launch corrections found during real usage: a
+match-generator exclusion bugfix and a new "must draw Next before saving
+Current's result" workflow lock (§5, §6, §9), plus unifying the two
+scoreboards' columns/ranking and adding frozen header/identity columns to
+both (§7, §8). Not yet implemented as of this note.
 
 ## 1. Overview
 
@@ -176,9 +181,14 @@ repeat pairings.
 
 **Excluding in-progress players:** while a Current match is in progress
 (§9), its participants are excluded from the candidate pool used to draw
-Next match — a player can't be drawn again while still on court. If
-excluding them would leave too few players to fill Next match, they may be
-reused as a fallback, with a visible warning in the UI that this happened.
+Next match — a player can't be drawn again while still on court. The
+excluded set must always be the Current match's **actual, up-to-date
+roster** — including any inline edit made via §6's manual-adjust affordance
+— never a stale or pre-edit snapshot; a player swapped into Current by a
+manual adjustment must be excluded from Next just as much as one who was
+drawn there normally. If excluding them would leave too few players to
+fill Next match, they may be reused as a fallback, with a visible warning
+in the UI that this happened.
 
 ## 6. Match Result Recording
 
@@ -204,6 +214,16 @@ reused as a fallback, with a visible warning in the UI that this happened.
   violates §5's gender-balance rule; the organizer can still confirm the
   override. An edited draw is flagged as manually adjusted, and that flag
   is visible later in History (§9).
+- **Next match must be drawn before Current match's result can be saved.**
+  For every Current match — manually adjusted or not — the **Save result**
+  button (§9) stays disabled until a Next match has been randomized. This
+  guarantees §5's exclusion rule always has an up-to-date Current roster to
+  draw against before that match's outcome is locked in. The organizer can
+  bypass this by checking an **"Is last match"** checkbox next to Save
+  result: checking it only unlocks the button for this one save — it does
+  not draw a match, end the tournament, or change any other state. The
+  tournament remains **active** afterward; ending it still requires the
+  separate End tournament action (§4, §9).
 
 ## 7. Tournament Scoreboard (per tournament)
 
@@ -220,12 +240,21 @@ Participants are ranked by:
    played in this tournament, descending. A participant with 0 matches
    played ranks below one who has played and lost every match (i.e. a
    real 0% win rate outranks "hasn't played yet").
-2. **Point differential** (total points scored minus conceded) —
-   tiebreaker.
+2. **Total points scored** (cumulative points scored across this
+   tournament's matches, not a differential) — tiebreaker, same metric and
+   column as §8's Overall Scoreboard.
 
-Each row shows: photo/avatar, name, matches played, matches won, point
-differential, win rate. Ranks 1–3 get a medal icon instead of a plain
-number.
+If both are tied, ranks are **not** broken further — tied participants
+share the same rank number.
+
+Each row shows: photo/avatar, name, matches played, matches won, total
+points scored, win rate — the same column set as §8's Overall Scoreboard.
+Ranks 1–3 get a medal icon instead of a plain number.
+
+**Frozen header/columns:** the table's header row and its RANK, PHOTO, and
+NAME columns stay fixed in place while the remaining columns scroll
+horizontally/vertically underneath — same behavior as §8's Overall
+Scoreboard.
 
 Reached by: opening a tournament from the History tab's tournament list
 (works for both active and ended tournaments, showing the live/partial
@@ -240,11 +269,20 @@ any single tournament:
 
 1. **Overall match win rate** — total matches won ÷ total matches played,
    descending, across every tournament the player has participated in.
-2. **Point differential** — tiebreaker, same aggregation scope.
+2. **Total points scored** — tiebreaker, same aggregation scope (replaces
+   the point-differential tiebreaker used in an earlier draft of this
+   spec).
+
+If both are tied, ranks are **not** broken further — tied players share
+the same rank number.
 
 Each row shows: photo/avatar, name, matches played, matches won, **total
 points scored** (cumulative points scored across all their matches — not
 a differential), win rate. Ranks 1–3 get a medal icon.
+
+**Frozen header/columns:** the table's header row and its RANK, PHOTO, and
+NAME columns stay fixed in place while the remaining columns scroll
+horizontally/vertically underneath.
 
 **Filters**, two independent, freely-combinable groups:
 - **Period**: All time / This month (calendar month, i.e. matches

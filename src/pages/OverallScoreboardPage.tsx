@@ -7,6 +7,7 @@ import {
 } from '../features/scoreboard/useOverallScoreboard'
 import { ScoreboardTable, type ScoreboardRow } from '../features/scoreboard/ScoreboardTable'
 import type { PlayerScoreboardEntry } from '../features/scoreboard/aggregateScoreboard'
+import { rankScoreboard } from '../features/scoreboard/rankScoreboard'
 
 const PERIODS: ScoreboardPeriod[] = ['all', 'month']
 const TYPES: ScoreboardTypeFilter[] = ['all', 'singles', 'doubles']
@@ -56,27 +57,20 @@ export function OverallScoreboardPage() {
       {!isLoading && !isError && rows.length === 0 && (
         <p className="empty-state">{t('scoreboard.empty')}</p>
       )}
-      {!isLoading && !isError && rows.length > 0 && (
-        <ScoreboardTable rows={rows} pointsColumn={{ label: t('scoreboard.columnTotalPoints') }} />
-      )}
+      {!isLoading && !isError && rows.length > 0 && <ScoreboardTable rows={rows} />}
     </section>
   )
 }
 
 function toScoreboardRows(entries: PlayerScoreboardEntry[]): ScoreboardRow[] {
-  const sorted = [...entries].sort((a, b) => {
-    const aRate = a.win_rate ?? -1
-    const bRate = b.win_rate ?? -1
-    if (bRate !== aRate) return bRate - aRate
-    return a.player_id.localeCompare(b.player_id)
-  })
-
-  return sorted.map((entry) => ({
-    playerId: entry.player_id,
-    name: entry.name,
-    matchesPlayed: entry.matches_played,
-    matchesWon: entry.matches_won,
-    winRate: entry.win_rate,
-    pointsValue: entry.total_points,
-  }))
+  return rankScoreboard(
+    entries.map((entry) => ({
+      playerId: entry.player_id,
+      name: entry.name,
+      matchesPlayed: entry.matches_played,
+      matchesWon: entry.matches_won,
+      winRate: entry.win_rate,
+      totalPoints: entry.total_points,
+    })),
+  )
 }

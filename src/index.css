@@ -260,6 +260,20 @@ p {
   margin-top: 4px;
 }
 
+.field-hint {
+  color: var(--text-muted, var(--text));
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
 .badge {
   display: inline-block;
   font-size: 11px;
@@ -595,12 +609,17 @@ button.danger {
 
 .scoreboard-table-wrap {
   padding: 0;
-  overflow-x: auto;
+  overflow: auto;
+  max-height: min(70vh, 640px);
 }
 
 .scoreboard-table {
   width: 100%;
-  border-collapse: collapse;
+  /* separate (not collapse) so sticky cells' borders/backgrounds render
+     correctly while scrolling -- collapsed borders break sticky in some
+     browsers. */
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 13px;
   white-space: nowrap;
 }
@@ -623,12 +642,55 @@ button.danger {
   border-bottom: none;
 }
 
-.scoreboard-table .rank-col,
+.scoreboard-table .rank-col {
+  width: 56px;
+}
+
 .scoreboard-table .avatar-col {
-  width: 1%;
+  width: 64px;
+}
+
+/* Frozen header row: sticks to the top of the table's own scroll area. */
+.scoreboard-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-elevated);
+}
+
+/* Frozen RANK/PHOTO/NAME columns: stick to the left as the rest of the
+   row scrolls underneath. Left offsets are cumulative fixed column
+   widths (rank-col, then avatar-col), so keep them in sync with the
+   width rules above. */
+.scoreboard-table .sticky-col {
+  position: sticky;
+  z-index: 1;
+  background: var(--bg-elevated);
+}
+
+.scoreboard-table thead .sticky-col {
+  /* Above both the plain sticky header row and the sticky body columns,
+     since header cells are sticky on two axes at once. */
+  z-index: 3;
+}
+
+.scoreboard-table .rank-col.sticky-col {
+  left: 0;
+}
+
+.scoreboard-table .avatar-col.sticky-col {
+  left: 56px;
+}
+
+.scoreboard-table .name-col.sticky-col {
+  left: 120px;
 }
 
 .scoreboard-medal-row {
+  background: var(--accent-bg);
+}
+
+.scoreboard-medal-row .sticky-col {
   background: var(--accent-bg);
 }
 
