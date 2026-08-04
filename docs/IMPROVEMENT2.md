@@ -191,3 +191,30 @@ commits:
 3. **§2 (manual edit)** — depends on §1 being settled first, since editing UI
    needs to know whether/how to validate an edited lineup against the
    corrected matchmaking rules.
+
+---
+
+## 5. Known issues found during hands-on testing (outside this patch's scope)
+
+Bugs surfaced while testing the shipped app that aren't part of the §1-§3
+scope above, logged here so they aren't lost, plus their resolution status.
+
+### 5.1 Scoreboard frozen header/columns visually overlapped scrolled content — fixed
+
+**Symptom:** on the Scoreboard tab's frozen-column table (sticky header row +
+sticky Rank/Photo/Name columns), scrolling left-right made the "ชื่อ" (Name)
+column and other scrolled-under column values overlap and become unreadable,
+specifically in the medal-highlighted rank 1-3 rows.
+
+**Root cause:** `.scoreboard-medal-row .sticky-col` in `src/index.css` used
+`--accent-bg`, a translucent `rgba(...)` color (alpha 0.1 light / 0.16 dark),
+for its background. Sticky cells sit on top of scrolled-under column content,
+so a translucent background let that content bleed through. Left offsets,
+z-index layering, and `border-collapse: separate` were all already correct
+and not the cause.
+
+**Fix (commit `5afefd2`):** added an opaque `--accent-bg-solid` variable
+(pre-blended over `--bg-elevated`, light `#e9f3ee` / dark `#1f3a2b`) and
+switched `.scoreboard-medal-row .sticky-col` to use it. Non-sticky cells in
+medal rows keep the original translucent `--accent-bg`. Verified visually
+with Playwright at multiple scroll positions, pushed to `origin/main`.
