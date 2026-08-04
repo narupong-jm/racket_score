@@ -6,6 +6,11 @@
   --border: #dce3da;
   --accent: #1e8a55;
   --accent-bg: rgba(30, 138, 85, 0.1);
+  /* Opaque equivalent of --accent-bg (pre-blended over --bg-elevated) for
+     sticky cells: translucent backgrounds let scrolled-under column
+     content show through sticky columns, so those cells need a solid
+     color instead. */
+  --accent-bg-solid: #e9f3ee;
   --accent-border: rgba(30, 138, 85, 0.45);
   --danger: #c0392b;
   --danger-bg: rgba(192, 57, 43, 0.1);
@@ -45,6 +50,7 @@
     --border: #263229;
     --accent: #4fc585;
     --accent-bg: rgba(79, 197, 133, 0.16);
+    --accent-bg-solid: #1f3a2b;
     --accent-border: rgba(79, 197, 133, 0.5);
     --danger: #e5776b;
     --danger-bg: rgba(229, 119, 107, 0.16);
@@ -691,7 +697,10 @@ button.danger {
 }
 
 .scoreboard-medal-row .sticky-col {
-  background: var(--accent-bg);
+  /* Opaque, not --accent-bg: this cell sits on top of scrolled-under
+     column content, and a translucent background would let it bleed
+     through and overlap the frozen text. */
+  background: var(--accent-bg-solid);
 }
 
 .medal-icon {
