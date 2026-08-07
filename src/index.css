@@ -21,6 +21,10 @@
   --shadow:
     rgba(16, 26, 20, 0.08) 0 8px 24px -8px,
     rgba(16, 26, 20, 0.06) 0 2px 6px -2px;
+  /* Edge shadow for horizontally-scrollable regions (e.g. the Scoreboard
+     table) -- a visual cue that more columns exist off-screen, since the
+     native scrollbar is invisible-until-scrolling on some OSes/browsers. */
+  --scroll-hint: rgba(16, 26, 20, 0.16);
 
   --radius-sm: 8px;
   --radius-md: 14px;
@@ -61,6 +65,7 @@
     --warning-border: rgba(224, 176, 79, 0.45);
     --shadow:
       rgba(0, 0, 0, 0.5) 0 10px 24px -8px, rgba(0, 0, 0, 0.35) 0 2px 6px -2px;
+    --scroll-hint: rgba(0, 0, 0, 0.4);
   }
 }
 
@@ -622,6 +627,23 @@ button.danger {
   padding: 0;
   overflow: auto;
   max-height: min(70vh, 640px);
+  position: relative;
+}
+
+/* A fixed shadow at the wrap's own right edge, cueing that more columns
+   exist off-screen. Positioned absolutely against the wrap itself (not the
+   scrolled table content), so -- unlike a sibling of the scrolled content --
+   it stays put as the table scrolls underneath it, and is clipped to the
+   wrap's own rounded corner by the wrap's `overflow: auto`. */
+.scoreboard-scroll-hint {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 28px;
+  background: linear-gradient(to left, var(--scroll-hint), transparent);
+  pointer-events: none;
+  z-index: 3;
 }
 
 .scoreboard-table {
