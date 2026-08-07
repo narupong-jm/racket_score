@@ -52,6 +52,20 @@ export async function addParticipant(
   return data
 }
 
+export async function leaveParticipant(
+  tournamentId: string,
+  playerId: string,
+  passphrase: string,
+): Promise<TournamentParticipant> {
+  const { data, error } = await supabase.rpc('leave_participant', {
+    p_tournament_id: tournamentId,
+    p_player_id: playerId,
+    p_passphrase: passphrase,
+  })
+  if (error) throw error
+  return data
+}
+
 export async function listParticipants(tournamentId: string): Promise<TournamentParticipant[]> {
   const { data, error } = await supabase
     .from('tournament_participants')

@@ -4,6 +4,7 @@ import {
   cancelTournament,
   createTournament,
   endTournament,
+  leaveParticipant,
   listParticipants,
   listTournaments,
 } from './tournamentsApi'
@@ -165,6 +166,126 @@ describe('cancelTournament (real project, anon key)', () => {
       await supabase.from('tournament_participants').delete().eq('tournament_id', tournament.id)
       await supabase.from('tournaments').delete().eq('id', tournament.id)
       await supabase.from('players').delete().in('id', [playerA.id, playerB.id])
+    }
+  })
+})
+
+describe('leaveParticipant (real project, anon key)', () => {
+  const runId = crypto.randomUUID()
+
+  it('round-trips: leaving an active participant flips their status to left', async () => {
+    const tournament = await createTournament(
+      {
+        name: `Leave Test - Round Trip ${runId}`,
+        type: 'singles',
+        games_per_match: 1,
+        points_per_game: 21,
+      },
+      testWritePassphrase,
+    )
+    const player = await createPlayer(
+      { name: `Leave Test A ${runId}`, gender: 'male', self_selected_level: 'beginner' },
+      testWritePassphrase,
+    )
+
+    try {
+      await addParticipant(tournament.id, player.id, testWritePassphrase)
+
+      const left = await leaveParticipant(tournament.id, player.id, testWritePassphrase)
+      expect(left.status).toBe('left')
+
+      const participants = await listParticipants(tournament.id)
+      const row = participants.find((p) => p.player_id === player.id)
+      expect(row?.status).toBe('left')
+    } finally {
+      await supabase.from('tournament_participants').delete().eq('tournament_id', tournament.id)
+      await supabase.from('tournaments').delete().eq('id', tournament.id)
+      await supabase.from('players').delete().eq('id', player.id)
+    }
+  })
+
+  it('rejects leaving a participant who is part of the queued Current match', async () => {
+    const tournament = await createTournament(
+      {
+        name: `Leave Test - Current Match ${runId}`,
+        type: 'singles',
+        games_per_match: 1,
+        points_per_game: 21,
+      },
+      testWritePassphrase,
+    )
+    const playerA = await createPlayer(
+      { name: `Leave Test B ${runId}`, gender: 'male', self_selected_level: 'beginner' },
+      testWritePassphrase,
+    )
+    const playerB = await createPlayer(
+      { name: `Leave Test C ${runId}`, gender: 'female', self_selected_level: 'beginner' },
+      testWritePassphrase,
+    )
+
+    try {
+      await addParticipant(tournament.id, playerA.id, testWritePassphrase)
+      await addParticipant(tournament.id, playerB.id, testWritePassphrase)
+      await createMatch(
+        tournament.id,
+        1,
+        [
+          { player_id: playerA.id, team: 1 },
+          { player_id: playerB.id, team: 2 },
+        ],
+        testWritePassphrase,
+      )
+
+      await expect(
+        leaveParticipant(tournament.id, playerA.id, testWritePassphrase),
+      ).rejects.toThrow()
+
+      // proving no partial mutation: still active
+      const participants = await listParticipants(tournament.id)
+      const row = participants.find((p) => p.player_id === playerA.id)
+      expect(row?.status).toBe('active')
+    } finally {
+      const { data: matches } = await supabase
+        .from('matches')
+        .select('id')
+        .eq('tournament_id', tournament.id)
+      const matchIds = (matches ?? []).map((m) => m.id)
+      if (matchIds.length > 0) {
+        await supabase.from('match_participants').delete().in('match_id', matchIds)
+        await supabase.from('matches').delete().in('id', matchIds)
+      }
+      await supabase.from('tournament_participants').delete().eq('tournament_id', tournament.id)
+      await supabase.from('tournaments').delete().eq('id', tournament.id)
+      await supabase.from('players').delete().in('id', [playerA.id, playerB.id])
+    }
+  })
+
+  it('rejects leaving a participant on a tournament that has already ended', async () => {
+    const tournament = await createTournament(
+      {
+        name: `Leave Test - Ended Tournament ${runId}`,
+        type: 'singles',
+        games_per_match: 1,
+        points_per_game: 21,
+      },
+      testWritePassphrase,
+    )
+    const player = await createPlayer(
+      { name: `Leave Test D ${runId}`, gender: 'male', self_selected_level: 'beginner' },
+      testWritePassphrase,
+    )
+
+    try {
+      await addParticipant(tournament.id, player.id, testWritePassphrase)
+      await endTournament(tournament.id, testWritePassphrase)
+
+      await expect(
+        leaveParticipant(tournament.id, player.id, testWritePassphrase),
+      ).rejects.toThrow()
+    } finally {
+      await supabase.from('tournament_participants').delete().eq('tournament_id', tournament.id)
+      await supabase.from('tournaments').delete().eq('id', tournament.id)
+      await supabase.from('players').delete().eq('id', player.id)
     }
   })
 })

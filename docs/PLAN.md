@@ -1528,3 +1528,422 @@ frozen header row and RANK/PHOTO/NAME columns on both Scoreboards under both ver
 scroll; and the Save-Result lock/"Is last match" checkbox toggling correctly on a real in-progress
 match — stopping short of actually clicking Start match/Save result/Confirm, since those require
 the live write passphrase, which the agent doesn't have and didn't attempt to obtain or guess.
+
+## Phase 18 — Mid-Tournament Leave & Add Participant (Fairness Offset)
+
+A spec-driven addition (`docs/SPEC.md` §4/§5/§9, `docs/IMPROVEMENT3.md`): lets the
+organizer soft-remove ("Leave") a participant from an in-progress tournament and add
+someone to the active roster mid-tournament — one action that covers both a genuinely
+new late-joiner and a rejoin of someone who previously left, distinguished purely by
+whether an existing `tournament_participants` row for that `(tournament_id,
+player_id)` pair is currently `'left'`. `tournament_participants` gains two columns
+(`status`, `match_count_offset`); the existing `add_participant` RPC (Phase 16,
+currently a bare, unvalidated insert) is modified in place to become an
+active-tournament-gated, fairness-offset-computing upsert, and a new sibling
+`leave_participant` RPC is added, both following Phase 16's
+`check_write_passphrase` → `security definer` → `set search_path` → `grant execute to
+anon` pattern exactly. `useDrawInputs.ts`'s candidate assembly picks up both new
+columns; `TournamentDetail.tsx` gets the two pieces of UI, and the already-shipped-but-
+unused `useAddParticipant` hook is finally wired to real UI.
+
+**Confirmed decisions (this session):**
+- Leave is a soft-remove (`status: 'active' → 'left'`, row never deleted), immediately
+  excludes the participant from the Match Generator's candidate pool
+  (`useDrawInputs.ts`), and leaves History/Scoreboard untouched (those read
+  `player_match_history`/`tournament_standings`, not `tournament_participants`).
+- Leave is blocked while the participant is part of the in-progress Current match
+  (`matches.status = 'queued'`) and blocked entirely once `tournaments.status !==
+  'active'`; it uses the same two-step confirm-dialog-then-passphrase pattern as
+  End/Cancel Tournament (`TournamentDetail.tsx` lines 175-237 today), including reusing
+  the bare `manage.cancel` key for the dialog's dismiss button.
+- If the left participant is part of the ephemeral, not-yet-persisted `nextDraw` state
+  (owned by `TournamentDetail`, passed into `NextMatchCard`), Leave discards it
+  (`onNextDrawChange(null)`) as a side effect — no server round-trip needed since it was
+  never written.
+- Add participant (mid-tournament) covers both late-join and rejoin with one RPC call:
+  the picker's options are the member pool minus whoever is currently `status =
+  'active'` on this tournament, so a previously-left participant reappears there and
+  picking them again reactivates their existing row instead of erroring on the
+  composite PK `(tournament_id, player_id)`. No confirm dialog — straight to the
+  passphrase prompt, mirroring today's `addParticipant` call shape.
+- Fairness offset: `match_count_offset = COALESCE(min(real completed count among
+  currently-active other participants), 0) - thisPlayer'sOwnRealCompletedCount`,
+  computed server-side inside `add_participant` from the `player_match_history` view
+  (already one row per player per **completed** match, per its Phase 13 definition — no
+  extra status filtering needed). The offset is folded into `useDrawInputs.ts`'s
+  `matchesPlayedInTournament` for the draw algorithm only; every other real count
+  (History, Scoreboard, win-rate) is untouched since none of those read
+  `tournament_participants` at all.
+- `add_participant`'s new body is an `INSERT ... ON CONFLICT (tournament_id,
+  player_id) DO UPDATE ... WHERE tournament_participants.status <> 'active'` — a
+  duplicate/stale call against an already-active participant is a safe no-op (offset
+  not recomputed, no rows changed) rather than an error, since the picker's own
+  exclusion logic should already prevent this but the RPC re-validates independently
+  per this codebase's "server is the real enforcement" convention.
+- New i18n keys live under the existing `manage.*` namespace, following its established
+  naming convention (verb/noun action key, `confirm{Action}Title/Body/Button` for
+  Leave's two-step dialog, dismiss always reuses bare `manage.cancel`). The pre-existing
+  dead `tournaments.participants.addExistingHeading`/`createAndAdd`/etc. block (verified
+  unreferenced anywhere in `src/` outside the i18n files themselves) is left untouched —
+  out of scope, not repurposed.
+
+1. [x] **Migration: `tournament_participants` schema (status + offset columns).** Via
+   the Supabase MCP connector's `apply_migration`: `alter table
+   tournament_participants add column status text not null default 'active' check
+   (status in ('active', 'left')), add column match_count_offset integer not null
+   default 0` — no separate backfill statement needed, since a `NOT NULL DEFAULT`
+   column add in Postgres 11+ populates existing rows from the default without a table
+   rewrite. `match_count_offset` intentionally has no `CHECK ... >= 0` — it must accept
+   negative values (a rejoiner whose own real completed-match count exceeds the current
+   active minimum). No RLS/grant changes needed: the table's RLS/anon-write posture is
+   already fully locked down from Phase 16 (anon `INSERT/UPDATE/DELETE` already
+   revoked; every write already goes exclusively through `add_participant`, and this
+   phase's new `leave_participant`), so a plain column add is safe as-is. _Test:_
+   `execute_sql` — confirms both columns exist with the stated types/defaults/check
+   constraint; confirms every pre-existing row now reads `status = 'active'`,
+   `match_count_offset = 0`; a scratch insert/rollback confirms a negative
+   `match_count_offset` value is accepted (proving no unintended CHECK blocks it) and
+   that `status = 'left'` is accepted while e.g. `status = 'bogus'` is rejected by the
+   new CHECK constraint.
+2. [x] **Migration: modify `add_participant` (active guard + fairness-offset upsert).**
+   `CREATE OR REPLACE FUNCTION add_participant(p_tournament_id uuid, p_player_id uuid,
+   p_passphrase text) RETURNS tournament_participants` — same signature as today (no
+   grant/security changes needed; it's already `SECURITY DEFINER` with `search_path`
+   pinned and `anon`-executable from Phase 16), but a new body: `perform
+   check_write_passphrase(p_passphrase)` first (unchanged), then `raise exception
+   'tournament_not_active'` unless the target tournament's `status = 'active'`; then
+   compute `v_own_count` (`count(*) from player_match_history where tournament_id =
+   p_tournament_id and player_id = p_player_id`) and `v_min_active_others`
+   (`min(count(*) from player_match_history ... group by player_id)` over every other
+   `tournament_participants` row on this tournament with `status = 'active'`), giving
+   `v_offset := coalesce(v_min_active_others, 0) - v_own_count` (the `coalesce` covers
+   the very-first-participant-ever case, where "other active participants" is empty);
+   then `INSERT ... (tournament_id, player_id, status, match_count_offset) VALUES (...,
+   'active', v_offset) ON CONFLICT (tournament_id, player_id) DO UPDATE SET status =
+   'active', match_count_offset = v_offset WHERE tournament_participants.status <>
+   'active' RETURNING * INTO v_participant`; since a `WHERE`-guarded `DO UPDATE` that
+   doesn't fire returns no row, follow with `IF NOT FOUND THEN SELECT * INTO
+   v_participant FROM tournament_participants WHERE tournament_id = p_tournament_id AND
+   player_id = p_player_id; END IF` so an already-active no-op call still returns the
+   current row rather than nothing. _Test:_ `execute_sql`, all against seeded fixture
+   tournaments/players (cleaned up after): (a) brand-new participant added into a
+   tournament with existing active participants at varying real completed counts —
+   asserts `match_count_offset = min(others' real counts) - 0`; (b) rejoin — seed a
+   `status = 'left'` row for a player with 2 real completed matches (via
+   `player_match_history` fixture rows), re-add them, assert `status` flips back to
+   `'active'` and the offset lands exactly on the current active minimum (asserting a
+   *negative* offset case specifically, where the rejoiner's own count exceeds the
+   minimum); (c) idempotency — call `add_participant` again on an already-`'active'`
+   participant, assert the row and its `match_count_offset` are byte-for-byte unchanged
+   (the `NOT FOUND` fallback path); (d) first-ever participant on a brand-new
+   tournament — asserts `match_count_offset = 0` via the `coalesce` fallback, not an
+   error; (e) tournament `status = 'completed'`/`'cancelled'` — rejects with
+   `tournament_not_active`, no row change; (f) wrong passphrase — rejects before any of
+   the above logic runs, no row change. `get_advisors` (security) spot-check — no new
+   warnings beyond the pre-existing expected anon-executable-`SECURITY DEFINER` one.
+3. [x] **Migration: new `leave_participant` RPC.** `CREATE FUNCTION
+   leave_participant(p_tournament_id uuid, p_player_id uuid, p_passphrase text)
+   RETURNS tournament_participants`, `security definer`, `set search_path = public,
+   pg_temp`, explicit `grant execute on function leave_participant(uuid, uuid, text) to
+   anon` — mirrors `cancel_tournament`'s/`end_tournament`'s creation ritual exactly.
+   Body: `perform check_write_passphrase(p_passphrase)` first; `raise exception
+   'tournament_not_active'` unless the tournament's `status = 'active'`; `raise
+   exception 'participant_in_current_match'` if `exists (select 1 from
+   match_participants mp join matches m on m.id = mp.match_id where m.tournament_id =
+   p_tournament_id and m.status = 'queued' and mp.player_id = p_player_id)`; then
+   `UPDATE tournament_participants SET status = 'left' WHERE tournament_id =
+   p_tournament_id AND player_id = p_player_id AND status = 'active' RETURNING * INTO
+   v_participant`, `raise exception 'participant_not_active'` if `NOT FOUND` (mirrors
+   `update_player`/`end_tournament`'s not-found-raise convention from Phase 16, rather
+   than silently no-op-ing — unlike Add, there's no spec requirement for Leave to be
+   idempotent). Deliberately does **not** reset `match_count_offset` back to `0` on
+   leave — it's meaningless while the row is inactive and gets fully recomputed by
+   `add_participant` on any future re-add regardless of its stale value, so touching it
+   here would be an unnecessary write. _Test:_ `execute_sql` against seeded fixtures:
+   (a) active participant with no queued-match involvement — leave succeeds, `status`
+   becomes `'left'`; (b) a participant who is one of a queued Current match's
+   `match_participants` rows — rejects with `participant_in_current_match`, row
+   unchanged; (c) tournament `status = 'completed'`/`'cancelled'` — rejects with
+   `tournament_not_active`; (d) already-`'left'` or nonexistent `(tournament_id,
+   player_id)` pair — rejects with `participant_not_active`; (e) wrong passphrase —
+   rejects first, before any of the above checks, no row change. `get_advisors`
+   (security) spot-check — only the expected new anon-executable-`SECURITY DEFINER`
+   warning for `leave_participant`, nothing else new.
+4. [x] **Regenerate TS types + advisors re-check.** `generate_typescript_types` →
+   `src/lib/database.types.ts`, picking up `tournament_participants.status`/
+   `match_count_offset` in the table's `Row`/`Insert`/`Update` shapes and
+   `leave_participant`'s new `Functions` signature (`add_participant`'s signature is
+   unchanged, so no client call site needs touching for it). _Test:_ `npm run build`
+   (via `tsc -b`) — expect **zero new errors**: `tournamentsApi.ts`'s existing
+   `addParticipant` call site still type-checks (same RPC args as before), and nothing
+   in the client calls `leave_participant` yet (that's step 5), so this step's regen
+   should be a clean, inert build on its own. `get_advisors` re-checked once more for
+   drift.
+   **Gotcha found here:** the "clean, inert build" prediction missed that several
+   `*.test.tsx` files (`TournamentDetail.test.tsx`, `useCreateTournamentWithFirstDraw
+   .test.tsx`, `CreateTournamentPage.test.tsx`) construct `TournamentParticipant`-typed
+   fixture literals for `listParticipants`/`addParticipant` mocks — those objects'
+   `Row` type is now stricter (two new required fields), so 13 fixture literals across
+   3 files needed `status: 'active', match_count_offset: 0` added before `npm run
+   build` was actually clean. Also caught (during the manual write, since
+   `generate_typescript_types`' output can only be pasted into the file, not applied
+   as a diff) a repeat of Phase 16 step 5's transcription-slip risk: the bottom
+   boilerplate's helper type was mistyped as `DefaultSchemaWithoutInternals` instead of
+   the generator's actual `DatabaseWithoutInternals`, and the final `CompositeTypes`
+   branch as `DefaultSchema["CompositeTypes"][CompositeTypeName]` instead of
+   `[PublicCompositeTypeNameOrOptions]` — both fixed by diffing back against the
+   generator's literal output before running the build, not by inspection alone.
+5. [x] **`tournamentsApi.ts`: add `leaveParticipant`.** New `leaveParticipant(
+   tournamentId: string, playerId: string, passphrase: string):
+   Promise<TournamentParticipant>` in `src/features/tournaments/tournamentsApi.ts`,
+   wrapping `supabase.rpc('leave_participant', { p_tournament_id: tournamentId,
+   p_player_id: playerId, p_passphrase: passphrase })`, mirroring `addParticipant`'s/
+   `cancelTournament`'s exact shape (`if (error) throw error; return data`). No change
+   to `addParticipant`'s signature or `listParticipants` (the latter now returns rows
+   including `status`/`match_count_offset` for free, once types are regenerated — no
+   code change needed there). _Test:_ new cases in
+   `tournamentsApi.integration.test.ts` (new `describe('leaveParticipant (real
+   project, anon key)', ...)` block, `try/finally` + `crypto.randomUUID()` fixture
+   naming, mirroring the file's `cancelTournament` describe block's style): (a)
+   round-trip — add a fixture participant, leave them, `listParticipants` shows
+   `status: 'left'` for that row; (b) leave rejected while the participant is part of a
+   queued match created via `createMatch` — `rejects.toThrow()`, and a follow-up
+   `listParticipants` re-read confirms `status` is still `'active'` (no partial
+   mutation); (c) leave rejected against an `endTournament`-completed fixture
+   tournament. Also confirmed via existing-test audit: no current
+   `tournamentsApi.integration.test.ts`/`useDrawInputs.integration.test.tsx` case calls
+   `addParticipant` against an already-ended/cancelled tournament, so step 2's new
+   active-tournament guard cannot break any pre-existing passing test.
+   **Gotcha found here (pre-existing, not introduced by this phase):** running this
+   file live revealed that its `finally`/`afterAll` cleanup blocks — in the new
+   `leaveParticipant` tests *and* the pre-existing `cancelTournament`/top-level
+   describe blocks — silently fail to delete their fixture rows. Since Phase 16
+   revoked `anon`'s direct `INSERT`/`UPDATE`/`DELETE` grants on every base table
+   (all writes must go through a passphrase RPC now), the anon-key `supabase.from(
+   'tournaments').delete()...` calls these `finally` blocks use have had no
+   privilege to actually delete anything since Phase 16 shipped — the Supabase JS
+   client doesn't throw on a permission-denied delete by default, so the tests kept
+   passing while quietly leaving fixture debris in the live project on every run.
+   Manually swept the accumulated debris (6 tournaments + 4 players from this run,
+   including three pre-existing "Cancel Test"/"Tournaments API Test" rows) via the
+   Supabase MCP `execute_sql` (service-role, bypasses the grant). Left unfixed here
+   as out-of-scope for this phase — the fix (routing cleanup through a
+   passphrase-gated delete path, or a service-role-only test cleanup RPC) touches
+   every anon-key integration test file, not just this one; flagging for a future
+   narrow cleanup phase rather than scope-creeping it into Phase 18.
+6. [x] **New `useLeaveParticipant.ts` hook (+ backfill `useAddParticipant.test.tsx`).**
+   `src/features/tournaments/useLeaveParticipant.ts`, mirroring `useAddParticipant.ts`'s
+   exact structure: takes `tournamentId`, resolves `getPassphrase()` from
+   `usePassphraseGate()` inside `mutationFn`, calls `leaveParticipant(tournamentId,
+   playerId, passphrase)`, and on success invalidates the same two query keys
+   `useAddParticipant` does (`['tournamentParticipants', tournamentId]`,
+   `['drawInputs', tournamentId]`) — both Leave and Add change the same candidate pool.
+   `useAddParticipant.ts` currently has **zero test coverage** (verified: no
+   `useAddParticipant.test.tsx` exists, and it has no callers anywhere in `src/` today)
+   — since step 9 finally wires it to live UI, add `useAddParticipant.test.tsx` in this
+   step too, alongside the new hook, both mirroring `useCancelTournament.test.tsx`'s
+   exact pattern (`vi.mock('./tournamentsApi', ...)`, `vi.mock('../passphrase/
+   usePassphraseGate', ...)` resolving `'test-passphrase'`, `renderHook` + `invalidateSpy`
+   assertions). _Test:_ `useLeaveParticipant.test.tsx` — mock `tournamentsApi.
+   leaveParticipant`, mock `usePassphraseGate` to resolve `'test-passphrase'`, assert
+   `leaveParticipant` called with `(tournamentId, playerId, 'test-passphrase')` and both
+   `invalidateQueries` calls fire on success. `useAddParticipant.test.tsx` — identical
+   shape, asserting `addParticipant` called with `(tournamentId, playerId,
+   'test-passphrase')` and the same two query keys invalidated.
+7. [x] **`useDrawInputs.ts`: exclude left participants, fold in the offset.** In
+   `assembleDrawInputs()` (`src/features/matches/useDrawInputs.ts`), filter
+   `participants` to `participant.status === 'active'` before the `candidates.flatMap`
+   that builds `CandidatePlayer[]`; change
+   `matchesPlayedInTournament: matchCountByPlayer.get(participant.player_id) ?? 0` to
+   `matchesPlayedInTournament: (matchCountByPlayer.get(participant.player_id) ?? 0) +
+   (participant.match_count_offset ?? 0)`. No change to `CandidatePlayer`'s type or to
+   `matchCountByPlayer`'s construction (it already only counts real completed matches
+   via `getMatchHistory`, which already filters to `status = 'completed'`). _Test:_
+   extend `useDrawInputs.integration.test.tsx`'s existing fixture-tournament test (reuse
+   its `runId`/`playerIds`/`afterAll` cleanup helpers) with a fifth fixture participant
+   who is left via `leaveParticipant` after being added (asserting they're **absent**
+   from `candidates` entirely, and existing A/B/C/D assertions are unaffected) plus a
+   sixth participant added via `addParticipant` *after* seeding some completed-match
+   history for the existing four (so their computed offset is nonzero), asserting their
+   `matchesPlayedInTournament` equals real-count-plus-offset — including confirming the
+   existing test's unchanged assertion that A/B/C/D's `matchesPlayedInTournament` stays
+   `2` (offset `0` for participants added at the very start, per the Known Risks
+   reasoning below).
+   **Gotcha found here:** the extra fixture setup (two more `createPlayer` calls plus
+   an `addParticipant`/`leaveParticipant` round-trip for E and a third `addParticipant`
+   for F, all real network round-trips against the live project) pushed this single
+   `it` past Vitest's default 5000ms test timeout — bumped to an explicit `20000` as
+   the `it(...)` call's third argument. Also re-confirmed the same pre-existing
+   cleanup-permission gap from step 5's gotcha (this file's `afterAll` uses anon-key
+   `supabase.from(...).delete()`, which has had no privilege to actually delete since
+   Phase 16): 3 tournaments + 18 players accumulated across this step's several manual
+   re-runs and were swept via `execute_sql` afterward.
+8. [x] **`TournamentDetail.tsx`: Leave button, two-step confirm, greyed-out left rows.**
+   Extract the current inline Participants block (lines 156-173) into a new
+   `ParticipantsCard` subcomponent, following the file's existing pattern of
+   self-contained subcomponents (`CurrentMatchCard`/`NextMatchCard`/
+   `RoundsPlayedList`), receiving `tournamentId`, `participants`, `playerNameById`,
+   `isActive`, `currentMatchParticipantIds` (already computed in the parent for
+   `NextMatchCard`, reused as-is), `nextDraw`, `onNextDrawChange`. Internally:
+   `useLeaveParticipant(tournamentId)`; local state `leavingParticipant: {
+   playerId: string; name: string } | null` for which row's confirm dialog is open.
+   Active rows get a `manage.leave` button, `disabled={!isActive ||
+   currentMatchParticipantIds.includes(participant.player_id) ||
+   leaveParticipant.isPending}`; clicking opens a `Modal` with `manage.confirmLeaveTitle`
+   (interpolating `{{name}}`), `manage.confirmLeaveBody`, a `manage.cancel` dismiss
+   button, and a `manage.confirmLeaveButton` confirm button whose handler calls
+   `leaveParticipant.mutate(playerId, { onSuccess: () => { setLeavingParticipant(null);
+   if (nextDraw?.some(p => p.playerId === playerId)) onNextDrawChange(null) } })` —
+   mirroring End/Cancel's `handleConfirm*` shape, including leaving the dialog open
+   with no extra error text on failure (same minimalism as those two). Rows with
+   `status === 'left'` render with a new `.participant-left` CSS class on the `<li>`
+   (new rule in `src/index.css`, `opacity: 0.5`, mirroring the existing
+   `.icon-choice:disabled .icon-choice-option` convention) plus a `manage.leftBadge`
+   `.badge` next to the name, and no Leave button. New i18n keys in both
+   `en.json`/`th.json` under `manage`: `leave` ("Leave" / "ออก"), `confirmLeaveTitle`
+   ("Remove {{name}} from this tournament?" / "นำ {{name}} ออกจากทัวร์นาเมนต์นี้หรือไม่?"),
+   `confirmLeaveBody` ("They'll stop appearing in the Match Generator's draw pool. You
+   can add them back later from this same list." / Thai equivalent),
+   `confirmLeaveButton` ("Yes, remove" / "ใช่ นำออก"), `leftBadge` ("Left" / "ออกแล้ว").
+   _Test:_ new `TournamentDetail.test.tsx` describe block `'TournamentDetail: Leave
+   participant'` mirroring the Cancel block's shape: (a) Leave button visible+enabled
+   for an active participant not on the Current match; (b) Leave button disabled for a
+   participant who *is* on the queued Current match (fixture with a `'queued'` match
+   whose participants include them); (c) Leave button absent entirely for a non-active
+   tournament; (d) a `status: 'left'` fixture participant renders with the `Left`
+   badge, `.participant-left` class, and no Leave button; (e) full click-through —
+   click Leave → confirm-dialog text appears → `leaveParticipant` not yet called →
+   click confirm → `waitFor` asserts it's called with `(tournamentId, playerId,
+   'test-passphrase')`; (f) a case seeding `nextDraw` (via the existing
+   Randomize-mocking pattern already used by the Next-match-card tests in this file) to
+   include the left player, confirming `manage.notPickedYet` reappears (Next match
+   cleared) after the Leave confirms, and a sibling case confirming `nextDraw` is
+   **not** cleared when the left player isn't part of it.
+   **Clarified during implementation:** this step's own prose said the Leave button's
+   `disabled` prop should include `!isActive`, but its own test case (c) says the
+   button should be **absent entirely** for a non-active tournament — those two are
+   contradictory (a disabled-but-rendered button is not "absent"). Went with "absent":
+   the button is conditionally rendered only when `isActive`, and `disabled` covers
+   only the Current-match/pending conditions — this matches the established
+   End/Cancel-tournament convention (whole danger-zone blocks are conditionally
+   rendered, never just disabled-and-shown) and is what the test suite actually
+   verifies.
+9. [x] **`ParticipantsCard`: Add-participant picker, wiring `useAddParticipant`.**
+   Same `ParticipantsCard` subcomponent from step 8 additionally takes `players` (the
+   full member pool, already fetched in `TournamentDetail` via `usePlayers()`) and owns
+   `useAddParticipant(tournamentId)` plus local state `selectedPlayerId: string`. Above
+   the participant list, when `isActive`, render a small inline form: a `<select>`
+   (`manage.addParticipantLabel` field label, a disabled default option
+   `manage.addParticipantPlaceholder`) whose options are `players` filtered to exclude
+   anyone with a **currently-`'active'`** row in `participants` (so a `'left'` row's
+   player reappears, surfacing the rejoin path with no separate button, per spec), and
+   a `manage.addParticipantButton` ("Add") button, `disabled={!selectedPlayerId ||
+   addParticipant.isPending}`, calling `addParticipant.mutate(selectedPlayerId, {
+   onSuccess: () => setSelectedPlayerId('') })` directly — **no confirm dialog**,
+   straight to the passphrase prompt inside the hook, per spec. Show
+   `manage.noPlayersToAdd` in place of the picker when the filtered options list is
+   empty. Because there's no confirm dialog to naturally surface a failure (unlike
+   Leave), add `{addParticipant.isError && <p className="field-error">{t(
+   'manage.addParticipantFailed')}</p>}`, mirroring `NextMatchCard`'s existing
+   `startNextMatch.isError` → `manage.drawFailed` pattern (the closest existing analog
+   for a no-confirm-dialog mutation). Hidden entirely (picker + button) when
+   `!isActive`. New i18n keys under `manage`: `addParticipant` ("Add participant" /
+   "เพิ่มผู้เล่น"), `addParticipantLabel` ("Player" / "ผู้เล่น"),
+   `addParticipantPlaceholder` ("Select a player…" / "เลือกผู้เล่น…"),
+   `addParticipantButton` ("Add" / "เพิ่ม"), `noPlayersToAdd` ("Everyone in the member
+   pool is already active in this tournament." / Thai equivalent),
+   `addParticipantFailed` ("Couldn't add that participant. Please try again." / Thai
+   equivalent). _Test:_ new `TournamentDetail.test.tsx` describe block
+   `'TournamentDetail: Add participant'`: (a) picker+button visible when active, absent
+   when not; (b) picker options exclude every currently-`'active'` fixture participant
+   but **include** a `status: 'left'` fixture participant (proving the rejoin surface);
+   (c) select + click Add calls `addParticipant` with `(tournamentId, selectedId,
+   'test-passphrase')` and no dialog ever renders (assert no new
+   `role="dialog"`/modal text appears before the call); (d) `manage.noPlayersToAdd`
+   renders instead of the picker when every member is already active; (e) a rejected
+   `addParticipant` call renders `manage.addParticipantFailed`.
+   **Simplified during implementation:** dropped the separately-listed
+   `manage.addParticipantLabel` ("Player") key — a two-line "Add participant" heading
+   plus a "Player" field label for a single `<select>` was redundant; `manage
+   .addParticipant` ("Add participant") now does double duty as the one field's
+   visible label, consistent with not adding UI elements the acceptance criteria
+   didn't actually require.
+10. [x] **Full regression + walkthrough.** `npm run lint`, `npm run build`, `npm test`
+    (run the new/touched files' targeted paths first, then the full suite). Playwright
+    MCP click-through against the live dev server / live Supabase project: open an
+    active tournament with ≥3 active participants → Participants section shows Leave
+    buttons on every active row, none on any pre-existing left row → attempt Leave on
+    the Current match's own participant, confirm it's disabled → Leave a different,
+    idle participant → confirm dialog appears, dismiss it (nothing changes) → trigger
+    it again, confirm for real → passphrase prompt → correct value → row greys out with
+    a "Left" badge, disappears from a subsequent Randomize draw → separately, draw a
+    Next match, then Leave one of the players in that draw → confirm Next match reverts
+    to "not picked yet" → Add participant: open the picker, confirm the just-left
+    player appears in it (rejoin path) alongside any genuinely new member, pick them,
+    submit → passphrase prompt (no extra confirm dialog) → they reappear active in the
+    list → draw a new match and confirm the rejoined/newly-added player is eligible and
+    gets prioritized under the equal-match-count invariant consistent with their
+    fairness offset → attempt both Leave and Add on an Ended/Cancelled tournament,
+    confirm both are absent. Both languages, both themes, no console errors. Delete all
+    walkthrough-created tournaments/players/participants afterward via `execute_sql`.
+    **Actually run:** `npm run lint` (clean), `npm run build` (clean), `npx vitest run`
+    full suite including integration tests against the live project (223/223 passing,
+    48 files). Playwright MCP click-through against the local dev server + live
+    Supabase project covered the full path above end-to-end: created a singles
+    tournament with 4 participants (auto-drawn first match) → confirmed Leave
+    disabled for both Current-match participants, enabled for the two idle ones →
+    dismissed the confirm dialog once (no-op verified), then confirmed for real → row
+    greyed out with a "Left" badge, cached passphrase reused with no re-prompt →
+    Randomize with only 1 truly-idle player left correctly fell back to reusing a
+    Current-match player with the warning, while the left participant was never
+    reused even in that fallback (confirming §1.3's fallback and §4's unconditional
+    left-exclusion are independently correct) → re-added the left participant via the
+    picker (no confirm dialog, no re-prompt, instant reactivation) → Randomize then
+    drew a clean pairing with no fallback needed → Leave on a participant who was
+    part of that Next-match draw correctly reverted it to "Not picked yet" → Cancel
+    tournament, then confirmed both Leave buttons and the entire Add-participant
+    picker were completely absent on the now-cancelled tournament, with the earlier
+    left participant's "Left" badge still correctly preserved. Repeated the
+    create-and-inspect path in Thai (สร้าง → เพิ่มผู้เล่น/เลือกผู้เล่น.../เพิ่ม on the
+    picker, ออก on each row, and the full "นำ {{name}} ออกจากทัวร์นาเมนต์นี้หรือไม่?"
+    confirm dialog) — all new strings rendered correctly with proper interpolation, no
+    missing-key fallbacks. Zero console errors or warnings across the entire session.
+    Dark theme was **not** re-verified via a live toggle — this app has no in-app
+    theme switch (only OS-level `prefers-color-scheme` is honored, same as every
+    earlier phase's walkthrough note on this point) — instead verified by code review
+    that the phase's only new CSS rule (`.participant-left { opacity: 0.5 }`) sets no
+    colors of its own, and the reused `.badge` class already resolves entirely through
+    the `--text`/`--bg`/`--border` custom properties that flip under the existing
+    `prefers-color-scheme: dark` block, the same mechanism already validated visually
+    in Phase 15's Cancelled-badge work. All walkthrough-created tournaments (2) were
+    deleted via `execute_sql` afterward; no new players were created (existing pool
+    members were reused), so no player cleanup was needed this time.
+
+**Known risks:** RLS on `tournament_participants` is permissive `anon` per Phase 16's
+established posture, so `add_participant`'s active-tournament/idempotency guard and
+`leave_participant`'s active-tournament/current-match guard are the *only* real
+enforcement — the picker's client-side exclusion list and the Leave button's
+`disabled` state are UX conveniences, not security, exactly like every other RPC in
+this codebase. The `ON CONFLICT ... WHERE status <> 'active'` upsert with a
+`NOT FOUND`-then-`SELECT` fallback is new territory for this codebase (no prior RPC has
+used a conditional `DO UPDATE`); it's correct under Postgres's row-level locking (two
+concurrent `add_participant` calls for the same pair serialize on the row, one wins the
+`UPDATE` and the other legitimately falls through to the plain `SELECT`), but it's
+worth double-checking behavior under `execute_sql` against a genuinely concurrent
+scenario rather than trusting single-threaded test runs, since it's a new pattern.
+`useCreateTournamentWithFirstDraw.ts`'s creation-time loop calls the plain
+`addParticipant` API function (not the hook) once per selected member against a
+brand-new tournament with zero prior participants and zero completed matches — since
+every participant's own real count is `0` and, per the `coalesce` fallback, the
+active-others minimum is also always `0` at every iteration (no completed matches can
+exist yet), the offset formula reduces to `0` for every creation-time add with no
+special-casing, exactly as assumed; re-verify this holds via
+`useCreateTournamentWithFirstDraw.test.tsx`/its integration counterpart and via
+`useDrawInputs.integration.test.tsx`'s existing A/B/C/D fixture (step 7) rather than by
+inspection alone, since this phase changes the RPC body those tests exercise. Finally,
+a negative `matchesPlayedInTournament` is new input to `selectCandidatePool.ts`/
+`generateNextMatch.ts`, which have only ever seen non-negative real counts before — the
+equal-match-count invariant only ever compares relative values (min/max grouping)
+rather than clamping or indexing on the count, so it should be unaffected, but this
+phase should add an explicit negative-count fixture to that layer's existing test suite
+rather than assume it, since it's genuinely never-before-exercised input.

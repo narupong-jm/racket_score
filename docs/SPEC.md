@@ -29,6 +29,15 @@ match-generator exclusion bugfix and a new "must draw Next before saving
 Current's result" workflow lock (§5, §6, §9), plus unifying the two
 scoreboards' columns/ranking and adding frozen header/identity columns to
 both (§7, §8). Not yet implemented as of this note.
+Updated: 2026-08-07 — adds **mid-tournament roster changes** (§4, §5, §9),
+based on `docs/IMPROVEMENT3.md`: a participant can **Leave** an in-progress
+tournament (soft-remove, reversible), and the organizer can **Add
+participant** to add a late arrival or bring back someone who left
+(rejoin), both gated behind the existing write-access passphrase (§2) and
+blocked once the tournament has ended or been cancelled. This is a
+**deliberate reversal** of §4's earlier "participants are chosen once, at
+creation time, and never after" rule — see §4 for the reversal note. Not
+yet implemented as of this note.
 
 ## 1. Overview
 
@@ -108,12 +117,51 @@ history/stats and standings within each tournament.
   - Deuce rule: must win by 2 points, capped at a ceiling scaled to the
     target (mirrors BWF's 21-point-target/30-cap ratio). Score entry is
     validated against this rule.
-- **Participants are selected once, at creation time, from the member
-  pool — and only then.** There is no way to add a player to an
-  in-progress tournament; the participant list is fixed for the
-  tournament's lifetime. (This reverses an earlier draft of this spec,
-  which allowed late joins — the organizer now finalizes the roster
-  before the first match is drawn.)
+- **Participants are selected at creation time, from the member pool** —
+  this remains the *only* way to build the initial roster. Once the
+  tournament is running, the roster can still change in two narrow,
+  explicitly-gated ways (below); there is still no general-purpose "edit
+  the roster" screen. (An earlier draft of this spec allowed late joins at
+  any time; that was reversed once, then partially re-reversed again here
+  — see the two bullets below and `docs/IMPROVEMENT3.md`.)
+- **Leave (mid-tournament, per participant).** An active participant can be
+  marked as **left** — a soft, reversible removal (`status = 'left'`, no
+  row deleted). A left participant is immediately excluded from the Match
+  Generator's candidate pool (§5) but stays visible (greyed out) in the
+  Participants list, and nothing about their already-completed matches
+  changes in History or either Scoreboard. Leave is **blocked** while the
+  participant is one of the Current match's participants (§9) — they must
+  finish that match first — and blocked entirely once the tournament has
+  ended or been cancelled. Triggering Leave asks for confirmation before
+  the write-access passphrase prompt (§2), same two-step pattern as Cancel/
+  End Tournament. If the participant being left is part of an already-drawn
+  but not-yet-started **Next match** (§9), Leave is still allowed and the
+  Next match draw is discarded automatically (it hasn't started, so nothing
+  is lost except the pairing itself — the organizer draws again).
+- **Add participant (mid-tournament: late arrival or rejoin).** The
+  organizer can add someone to an in-progress tournament's active roster
+  from the member pool, minus whoever is already active on this
+  tournament. This covers two cases with one action:
+  - **A genuinely new participant** for this tournament: added with a
+    **fairness offset** equal to the lowest `matchesPlayedInTournament`
+    among currently-active participants, so the Match Generator (§5) treats
+    them as level with whoever's currently furthest behind rather than
+    penalizing them for arriving late.
+  - **Someone who previously left this same tournament** (a participant
+    whose row is `status = 'left'`): re-adding them through this same
+    action **reactivates** their existing row (`status` back to `active`)
+    rather than creating a duplicate — this is how "rejoin" works; there is
+    no separate rejoin button. Because they may already have real completed
+    matches from before they left, their fairness offset is recomputed so
+    their fairness-facing match count lands exactly on the current
+    lowest-count tier (offset = lowest active count − their real completed
+    count so far), not stacked on top of the plain new-participant formula.
+  - Either way, the offset is **invisible outside the draw algorithm** —
+    every displayed match count, win rate, and Scoreboard/History figure
+    always reflects real completed matches only, never the offset. Add
+    participant has no extra confirm dialog beyond the passphrase prompt
+    (matching how adding participants works at creation time), and is
+    blocked entirely once the tournament has ended or been cancelled.
 - **Single court**: matches are played one at a time. The system does not
   need to track concurrent in-progress matches across multiple courts,
   though the organizer can pre-generate the next match into a queue while
@@ -189,6 +237,17 @@ manual adjustment must be excluded from Next just as much as one who was
 drawn there normally. If excluding them would leave too few players to
 fill Next match, they may be reused as a fallback, with a visible warning
 in the UI that this happened.
+
+**Excluding participants who left:** a participant marked as **left**
+(§4) is removed from the candidate pool entirely, unconditionally — unlike
+the Current-match exclusion above, there is no fallback that reuses a left
+participant, since they've told the organizer they're not available. A
+participant added mid-tournament (§4, late arrival or rejoin) enters the
+pool with their **fairness offset** already folded into the
+`matchesPlayedInTournament` value the generator sees, so the existing
+equal-match-count invariant (item 1 above) applies to them exactly as it
+does to everyone else, with no special-casing needed elsewhere in the
+algorithm.
 
 ## 6. Match Result Recording
 
@@ -312,6 +371,17 @@ every screen size (not a responsive top-nav on wider viewports):
    name, type, current round number (e.g. "Round 7" — there is no fixed
    total round count and therefore no round-progress fraction/bar).
    Tapping a card opens **Manage tournament** for it:
+   - **Participants** — the tournament's roster (photo/avatar, name, level),
+     each active row with a **Leave** button (§4) that opens a confirm
+     dialog before the passphrase prompt, disabled while that participant
+     is part of the Current match; participants who left show greyed out
+     in the same list rather than a separate section. An **Add
+     participant** entry point above/near the list opens a picker over the
+     member pool (minus everyone already active on this tournament — which
+     includes anyone who left, letting them be picked again to rejoin, §4)
+     and goes straight to the passphrase prompt with no extra confirm.
+     Both Leave and Add participant are hidden/disabled once the
+     tournament is no longer active (ended or cancelled).
    - **Current match** — the two sides playing now, each side's name
      directly above its own score input (unambiguous which input belongs
      to which side), and a **Save result** button. Empty state ("No
@@ -376,4 +446,8 @@ every screen size (not a responsive top-nav on wider viewports):
 - Real player photo upload/storage — placeholder avatars only for now
   (§3).
 - Any edit or admin-override path for a confirmed match result (§6).
-- Adding a participant to a tournament after it has started (§4).
+- A dedicated "rejoin" UI distinct from Add participant — rejoining a
+  participant who left reuses the same Add participant action (§4).
+- Real-time/automatic re-draw of an in-progress Next match when a
+  participant leaves — the draw is simply discarded, not regenerated
+  (§4); the organizer taps Randomize again manually.

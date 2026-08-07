@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useDrawInputs } from './useDrawInputs'
 import { createMatch, recordMatchResult } from './matchesApi'
-import { createTournament, addParticipant } from '../tournaments/tournamentsApi'
+import { createTournament, addParticipant, leaveParticipant } from '../tournaments/tournamentsApi'
 import { createPlayer } from '../players/playersApi'
 import { canonicalPairKey } from '../matchmaking/pairKey'
 import { supabase } from '../../lib/supabaseClient'
@@ -20,7 +20,7 @@ function createWrapper() {
 describe('useDrawInputs (real project, anon key)', () => {
   const runId = crypto.randomUUID()
   let tournamentId: string | undefined
-  const playerIds = {} as Record<'A' | 'B' | 'C' | 'D', string>
+  const playerIds = {} as Record<'A' | 'B' | 'C' | 'D' | 'E' | 'F', string>
 
   afterAll(async () => {
     if (tournamentId) {
@@ -44,6 +44,8 @@ describe('useDrawInputs (real project, anon key)', () => {
   })
 
   it('assembles candidates and pairing history from a seeded fixture tournament', async () => {
+    // more real network round-trips than the default 5s allows, now that this test
+    // also seeds a left participant (E) and a mid-tournament join (F)
     const tournament = await createTournament(
       {
         name: `Draw Inputs Test ${runId}`,
@@ -70,6 +72,23 @@ describe('useDrawInputs (real project, anon key)', () => {
       await addParticipant(tournamentId, player.id, testWritePassphrase)
     }
     const { A, B, C, D } = playerIds
+
+    // E joins then immediately leaves -- must be excluded from candidates entirely,
+    // with no reuse fallback (unlike the Current-match exclusion).
+    const playerE = await createPlayer(
+      { name: `Draw Inputs Test E ${runId}`, gender: 'male', self_selected_level: 'beginner' },
+      testWritePassphrase,
+    )
+    playerIds.E = playerE.id
+    await addParticipant(tournamentId, playerE.id, testWritePassphrase)
+    await leaveParticipant(tournamentId, playerE.id, testWritePassphrase)
+
+    // F is created now but only added mid-tournament, after match 1
+    const playerF = await createPlayer(
+      { name: `Draw Inputs Test F ${runId}`, gender: 'female', self_selected_level: 'beginner' },
+      testWritePassphrase,
+    )
+    playerIds.F = playerF.id
 
     // match 1 (completed): team1={A,B} vs team2={C,D}
     const match1 = await createMatch(
@@ -107,6 +126,10 @@ describe('useDrawInputs (real project, anon key)', () => {
       testWritePassphrase,
     )
 
+    // F joins now, after A/B/C/D each have 2 real completed matches -- their fairness
+    // offset should land them at the current active minimum (2), with 0 real matches.
+    await addParticipant(tournamentId, playerF.id, testWritePassphrase)
+
     // match 3 (still queued): team1={A,D} vs team2={B,C} -- must NOT count
     await createMatch(
       tournamentId,
@@ -128,17 +151,24 @@ describe('useDrawInputs (real project, anon key)', () => {
 
     const { candidates, pairingHistory } = result.current.data!
 
-    expect(candidates).toHaveLength(4)
+    // E (added then left) is excluded entirely; F (mid-tournament join) is included.
+    expect(candidates).toHaveLength(5)
     const byId = new Map(candidates.map((c) => [c.id, c]))
     expect(byId.get(A)).toMatchObject({ gender: 'male', skillValue: 12.5 })
     expect(byId.get(B)).toMatchObject({ gender: 'female', skillValue: 37.5 })
     expect(byId.get(C)).toMatchObject({ gender: 'male', skillValue: 62.5 })
     expect(byId.get(D)).toMatchObject({ gender: 'female', skillValue: 87.5 })
+    expect(byId.get(playerIds.E)).toBeUndefined()
 
-    // only the 2 completed matches count -- the queued match must be excluded
+    // only the 2 completed matches count -- the queued match must be excluded, and
+    // A/B/C/D's real counts are unaffected by F's later mid-tournament join
     for (const id of [A, B, C, D]) {
       expect(byId.get(id)?.matchesPlayedInTournament).toBe(2)
     }
+
+    // F has 0 real completed matches but joined with a fairness offset of 2 (the
+    // active minimum at join time), so their draw-facing count is real + offset = 2
+    expect(byId.get(playerIds.F)).toMatchObject({ matchesPlayedInTournament: 2 })
 
     expect(pairingHistory.teammatePairs).toEqual(
       new Set([
@@ -162,5 +192,5 @@ describe('useDrawInputs (real project, anon key)', () => {
         canonicalPairKey(C, D),
       ]),
     )
-  })
+  }, 20000)
 })

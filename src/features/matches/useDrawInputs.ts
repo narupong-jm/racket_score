@@ -37,23 +37,27 @@ export async function assembleDrawInputs(tournamentId: string): Promise<DrawInpu
 
   const pairingHistory = buildPairingHistory(entriesByMatchId)
 
-  const candidates: CandidatePlayer[] = participants.flatMap((participant) => {
-    const stats = statsById.get(participant.player_id)
-    if (!stats || !stats.gender || !stats.self_selected_level) return []
+  const candidates: CandidatePlayer[] = participants
+    .filter((participant) => participant.status === 'active')
+    .flatMap((participant) => {
+      const stats = statsById.get(participant.player_id)
+      if (!stats || !stats.gender || !stats.self_selected_level) return []
 
-    return [
-      {
-        id: participant.player_id,
-        gender: stats.gender as CandidatePlayer['gender'],
-        skillValue: resolveSkillValue({
-          selfSelectedLevel: stats.self_selected_level as SelfSelectedLevel,
-          totalMatches: stats.total_matches ?? 0,
-          winRate: stats.win_rate,
-        }),
-        matchesPlayedInTournament: matchCountByPlayer.get(participant.player_id) ?? 0,
-      },
-    ]
-  })
+      return [
+        {
+          id: participant.player_id,
+          gender: stats.gender as CandidatePlayer['gender'],
+          skillValue: resolveSkillValue({
+            selfSelectedLevel: stats.self_selected_level as SelfSelectedLevel,
+            totalMatches: stats.total_matches ?? 0,
+            winRate: stats.win_rate,
+          }),
+          matchesPlayedInTournament:
+            (matchCountByPlayer.get(participant.player_id) ?? 0) +
+            (participant.match_count_offset ?? 0),
+        },
+      ]
+    })
 
   return { candidates, pairingHistory }
 }

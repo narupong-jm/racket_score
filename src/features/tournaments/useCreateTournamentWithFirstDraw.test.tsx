@@ -76,6 +76,8 @@ describe('useCreateTournamentWithFirstDraw', () => {
       tournament_id: 't1',
       player_id: 'p1',
       joined_at: '2026-01-01T00:00:00Z',
+      status: 'active',
+      match_count_offset: 0,
     })
     vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
       candidates: [],
@@ -125,6 +127,8 @@ describe('useCreateTournamentWithFirstDraw', () => {
       tournament_id: 't1',
       player_id: 'p1',
       joined_at: '2026-01-01T00:00:00Z',
+      status: 'active',
+      match_count_offset: 0,
     })
     vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
       candidates: [],
@@ -162,6 +166,8 @@ describe('useCreateTournamentWithFirstDraw', () => {
         tournament_id: 't1',
         player_id: 'p1',
         joined_at: '2026-01-01T00:00:00Z',
+        status: 'active',
+        match_count_offset: 0,
       })
       .mockRejectedValueOnce(new Error('network error'))
 

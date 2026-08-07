@@ -4,11 +4,15 @@ import { useTournaments } from './useTournaments'
 import { useEndTournament } from './useEndTournament'
 import { useCancelTournament } from './useCancelTournament'
 import { useParticipants } from './useParticipants'
+import { useLeaveParticipant } from './useLeaveParticipant'
+import { useAddParticipant } from './useAddParticipant'
+import type { TournamentParticipant } from './tournamentsApi'
 import { computePointCap } from './computePointCap'
 import { formatDate } from '../../i18n/formatDate'
 import { Modal } from '../../components/Modal'
 import { Avatar } from '../../components/Avatar'
 import { usePlayers } from '../players/usePlayers'
+import type { Player } from '../players/playersApi'
 import { useDrawInputs } from '../matches/useDrawInputs'
 import { useTournamentMatches, useStartNextMatch } from '../matches/useMatchQueue'
 import { useRecordMatchResult } from '../matches/useRecordMatchResult'
@@ -66,6 +70,9 @@ export function TournamentDetail({ tournamentId, onEnded, onCancelled }: Tournam
     .filter((m) => m.status === 'completed')
     .sort((a, b) => b.sequence_number - a.sequence_number)
   const hasConfirmedResult = completedMatches.length > 0
+  const currentMatchParticipantIds = currentMatch
+    ? participantsFor(currentMatch.id).map((p) => p.player_id)
+    : []
 
   function participantsFor(matchId: string): MatchHistoryEntry[] {
     return matchParticipants.filter((p) => p.match_id === matchId)
@@ -137,9 +144,7 @@ export function TournamentDetail({ tournamentId, onEnded, onCancelled }: Tournam
         matchType={matchType}
         isActive={isActive}
         hasCurrentMatch={currentMatch !== null}
-        currentMatchParticipantIds={
-          currentMatch ? participantsFor(currentMatch.id).map((p) => p.player_id) : []
-        }
+        currentMatchParticipantIds={currentMatchParticipantIds}
         rosterPlayers={rosterPlayers}
         playerNameById={playerNameById}
         nextDraw={nextDraw}
@@ -153,24 +158,16 @@ export function TournamentDetail({ tournamentId, onEnded, onCancelled }: Tournam
         playerNameById={playerNameById}
       />
 
-      <section className="card">
-        <h3>{t('tournaments.detail.participantsHeading')}</h3>
-        {!participants || participants.length === 0 ? (
-          <p className="empty-state">{t('tournaments.participants.empty')}</p>
-        ) : (
-          <ul className="avatar-list">
-            {participants.map((participant) => {
-              const name = playerNameById.get(participant.player_id) ?? participant.player_id
-              return (
-                <li key={participant.player_id} className="avatar-list-item">
-                  <Avatar name={name} size={32} />
-                  <span>{name}</span>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </section>
+      <ParticipantsCard
+        tournamentId={tournamentId}
+        participants={participants}
+        players={players}
+        playerNameById={playerNameById}
+        isActive={isActive}
+        currentMatchParticipantIds={currentMatchParticipantIds}
+        nextDraw={nextDraw}
+        onNextDrawChange={setNextDraw}
+      />
 
       {isActive && hasConfirmedResult && (
         <div className="danger-zone">
@@ -235,6 +232,157 @@ export function TournamentDetail({ tournamentId, onEnded, onCancelled }: Tournam
           </Modal>
         </div>
       )}
+    </section>
+  )
+}
+
+interface ParticipantsCardProps {
+  tournamentId: string
+  participants: TournamentParticipant[] | undefined
+  players: Player[] | undefined
+  playerNameById: Map<string, string>
+  isActive: boolean
+  currentMatchParticipantIds: string[]
+  nextDraw: GeneratedMatchParticipant[] | null
+  onNextDrawChange: (draw: GeneratedMatchParticipant[] | null) => void
+}
+
+function ParticipantsCard({
+  tournamentId,
+  participants,
+  players,
+  playerNameById,
+  isActive,
+  currentMatchParticipantIds,
+  nextDraw,
+  onNextDrawChange,
+}: ParticipantsCardProps) {
+  const { t } = useTranslation()
+  const leaveParticipant = useLeaveParticipant(tournamentId)
+  const addParticipant = useAddParticipant(tournamentId)
+  const [leavingParticipant, setLeavingParticipant] = useState<{
+    playerId: string
+    name: string
+  } | null>(null)
+  const [selectedPlayerId, setSelectedPlayerId] = useState('')
+
+  function handleConfirmLeave() {
+    if (!leavingParticipant) return
+    const { playerId } = leavingParticipant
+    leaveParticipant.mutate(playerId, {
+      onSuccess: () => {
+        setLeavingParticipant(null)
+        if (nextDraw?.some((p) => p.playerId === playerId)) onNextDrawChange(null)
+      },
+    })
+  }
+
+  function handleAddParticipant() {
+    if (!selectedPlayerId) return
+    addParticipant.mutate(selectedPlayerId, {
+      onSuccess: () => setSelectedPlayerId(''),
+    })
+  }
+
+  const activeParticipantIds = new Set(
+    (participants ?? []).filter((p) => p.status === 'active').map((p) => p.player_id),
+  )
+  const availablePlayers = (players ?? []).filter((player) => !activeParticipantIds.has(player.id))
+
+  return (
+    <section className="card">
+      <h3>{t('tournaments.detail.participantsHeading')}</h3>
+      {isActive &&
+        (availablePlayers.length === 0 ? (
+          <p className="empty-state">{t('manage.noPlayersToAdd')}</p>
+        ) : (
+          <div className="field-row">
+            <label className="field">
+              <span className="field-label">{t('manage.addParticipant')}</span>
+              <select
+                value={selectedPlayerId}
+                onChange={(event) => setSelectedPlayerId(event.target.value)}
+              >
+                <option value="" disabled>
+                  {t('manage.addParticipantPlaceholder')}
+                </option>
+                {availablePlayers.map((player) => (
+                  <option key={player.id} value={player.id}>
+                    {player.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="secondary"
+              onClick={handleAddParticipant}
+              disabled={!selectedPlayerId || addParticipant.isPending}
+            >
+              {t('manage.addParticipantButton')}
+            </button>
+          </div>
+        ))}
+      {addParticipant.isError && (
+        <p className="field-error">{t('manage.addParticipantFailed')}</p>
+      )}
+
+      {!participants || participants.length === 0 ? (
+        <p className="empty-state">{t('tournaments.participants.empty')}</p>
+      ) : (
+        <ul className="avatar-list">
+          {participants.map((participant) => {
+            const name = playerNameById.get(participant.player_id) ?? participant.player_id
+            const isLeft = participant.status === 'left'
+            return (
+              <li
+                key={participant.player_id}
+                className={isLeft ? 'avatar-list-item participant-left' : 'avatar-list-item'}
+              >
+                <Avatar name={name} size={32} />
+                <span>{name}</span>
+                {isLeft ? (
+                  <span className="badge">{t('manage.leftBadge')}</span>
+                ) : (
+                  isActive && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() =>
+                        setLeavingParticipant({ playerId: participant.player_id, name })
+                      }
+                      disabled={
+                        currentMatchParticipantIds.includes(participant.player_id) ||
+                        leaveParticipant.isPending
+                      }
+                    >
+                      {t('manage.leave')}
+                    </button>
+                  )
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      <Modal open={leavingParticipant !== null} onClose={() => setLeavingParticipant(null)}>
+        <h3>{t('manage.confirmLeaveTitle', { name: leavingParticipant?.name ?? '' })}</h3>
+        <p>{t('manage.confirmLeaveBody')}</p>
+        <div className="modal-actions">
+          <button type="button" className="secondary" onClick={() => setLeavingParticipant(null)}>
+            {t('manage.cancel')}
+          </button>
+          <button
+            type="button"
+            className="danger"
+            onClick={handleConfirmLeave}
+            disabled={leaveParticipant.isPending}
+          >
+            {t('manage.confirmLeaveButton')}
+          </button>
+        </div>
+      </Modal>
     </section>
   )
 }

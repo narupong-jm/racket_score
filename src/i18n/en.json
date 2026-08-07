@@ -189,7 +189,17 @@
     "cancelTournament": "Cancel tournament",
     "confirmCancelTitle": "Cancel this tournament?",
     "confirmCancelBody": "This can't be undone. Any drawn-but-unplayed match will be discarded.",
-    "confirmCancelButton": "Yes, cancel tournament"
+    "confirmCancelButton": "Yes, cancel tournament",
+    "leave": "Leave",
+    "confirmLeaveTitle": "Remove {{name}} from this tournament?",
+    "confirmLeaveBody": "They'll stop appearing in the Match Generator's draw pool. You can add them back later from this same list.",
+    "confirmLeaveButton": "Yes, remove",
+    "leftBadge": "Left",
+    "addParticipant": "Add participant",
+    "addParticipantPlaceholder": "Select a player...",
+    "addParticipantButton": "Add",
+    "noPlayersToAdd": "Everyone in the member pool is already active in this tournament.",
+    "addParticipantFailed": "Couldn't add that participant. Please try again."
   },
   "matches": {
     "draw": {

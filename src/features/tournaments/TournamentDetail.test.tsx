@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -9,7 +9,7 @@ import * as playersApi from '../players/playersApi'
 import * as useDrawInputsModule from '../matches/useDrawInputs'
 import * as matchesApi from '../matches/matchesApi'
 import * as generateNextMatchModule from '../matchmaking/generateNextMatch'
-import type { Tournament } from './tournamentsApi'
+import type { Tournament, TournamentParticipant } from './tournamentsApi'
 import type { Player } from '../players/playersApi'
 import type { Match, MatchHistoryEntry } from '../matches/matchesApi'
 import type { CandidatePlayer } from '../matchmaking/types'
@@ -22,6 +22,8 @@ vi.mock('./tournamentsApi', async (importOriginal) => {
     listParticipants: vi.fn(),
     endTournament: vi.fn(),
     cancelTournament: vi.fn(),
+    leaveParticipant: vi.fn(),
+    addParticipant: vi.fn(),
   }
 })
 
@@ -112,6 +114,19 @@ function makeMatch(id: string, sequenceNumber: number, status: 'queued' | 'compl
     created_at: '2026-01-01T00:00:00Z',
     completed_at: status === 'completed' ? '2026-01-01T00:00:00Z' : null,
     manually_adjusted: false,
+  }
+}
+
+function makeParticipant(
+  playerId: string,
+  status: 'active' | 'left' = 'active',
+): TournamentParticipant {
+  return {
+    tournament_id: 't1',
+    player_id: playerId,
+    joined_at: '2026-01-01T00:00:00Z',
+    status,
+    match_count_offset: 0,
   }
 }
 
@@ -323,9 +338,27 @@ describe('TournamentDetail: Next match inline edit', () => {
     vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
     setupCommonMocks()
     vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
-      { tournament_id: 't1', player_id: 'p1', joined_at: '2026-01-01T00:00:00Z' },
-      { tournament_id: 't1', player_id: 'p2', joined_at: '2026-01-01T00:00:00Z' },
-      { tournament_id: 't1', player_id: 'p3', joined_at: '2026-01-01T00:00:00Z' },
+      {
+        tournament_id: 't1',
+        player_id: 'p1',
+        joined_at: '2026-01-01T00:00:00Z',
+        status: 'active',
+        match_count_offset: 0,
+      },
+      {
+        tournament_id: 't1',
+        player_id: 'p2',
+        joined_at: '2026-01-01T00:00:00Z',
+        status: 'active',
+        match_count_offset: 0,
+      },
+      {
+        tournament_id: 't1',
+        player_id: 'p3',
+        joined_at: '2026-01-01T00:00:00Z',
+        status: 'active',
+        match_count_offset: 0,
+      },
     ])
     vi.mocked(playersApi.listPlayers).mockResolvedValue([
       ...players,
@@ -373,11 +406,41 @@ describe('TournamentDetail: Next match inline edit', () => {
     vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([doublesTournament])
     setupCommonMocks()
     vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
-      { tournament_id: 't1', player_id: 'p1', joined_at: '2026-01-01T00:00:00Z' },
-      { tournament_id: 't1', player_id: 'p2', joined_at: '2026-01-01T00:00:00Z' },
-      { tournament_id: 't1', player_id: 'p3', joined_at: '2026-01-01T00:00:00Z' },
-      { tournament_id: 't1', player_id: 'p4', joined_at: '2026-01-01T00:00:00Z' },
-      { tournament_id: 't1', player_id: 'p5', joined_at: '2026-01-01T00:00:00Z' },
+      {
+        tournament_id: 't1',
+        player_id: 'p1',
+        joined_at: '2026-01-01T00:00:00Z',
+        status: 'active',
+        match_count_offset: 0,
+      },
+      {
+        tournament_id: 't1',
+        player_id: 'p2',
+        joined_at: '2026-01-01T00:00:00Z',
+        status: 'active',
+        match_count_offset: 0,
+      },
+      {
+        tournament_id: 't1',
+        player_id: 'p3',
+        joined_at: '2026-01-01T00:00:00Z',
+        status: 'active',
+        match_count_offset: 0,
+      },
+      {
+        tournament_id: 't1',
+        player_id: 'p4',
+        joined_at: '2026-01-01T00:00:00Z',
+        status: 'active',
+        match_count_offset: 0,
+      },
+      {
+        tournament_id: 't1',
+        player_id: 'p5',
+        joined_at: '2026-01-01T00:00:00Z',
+        status: 'active',
+        match_count_offset: 0,
+      },
     ])
     vi.mocked(playersApi.listPlayers).mockResolvedValue([
       { id: 'p1', name: 'Ann', gender: 'male', self_selected_level: 'beginner', created_at: '' },
@@ -679,5 +742,306 @@ describe('TournamentDetail: Cancel tournament confirm dialog', () => {
     await waitFor(() => {
       expect(onCancelled).toHaveBeenCalledTimes(1)
     })
+  })
+})
+
+describe('TournamentDetail: Leave participant', () => {
+  it('shows an enabled Leave button for an active participant not on the Current match', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      makeParticipant('p1'),
+      makeParticipant('p2'),
+    ])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    const leaveButtons = await screen.findAllByRole('button', { name: 'Leave' })
+    expect(leaveButtons).toHaveLength(2)
+    expect(leaveButtons[0]).toBeEnabled()
+    expect(leaveButtons[1]).toBeEnabled()
+  })
+
+  it('disables the Leave button only for participants who are part of the queued Current match', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([
+      ...players,
+      { id: 'p3', name: 'Carol', gender: 'female', self_selected_level: 'beginner', created_at: '' },
+    ])
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      makeParticipant('p1'),
+      makeParticipant('p2'),
+      makeParticipant('p3'),
+    ])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([makeMatch('m1', 1, 'queued')])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([
+      { match_id: 'm1', player_id: 'p1', team: 1 },
+      { match_id: 'm1', player_id: 'p2', team: 2 },
+    ])
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    const leaveButtons = await screen.findAllByRole('button', { name: 'Leave' })
+    expect(leaveButtons).toHaveLength(3)
+    expect(leaveButtons[0]).toBeDisabled() // Alice (p1) -- in Current match
+    expect(leaveButtons[1]).toBeDisabled() // Bob (p2) -- in Current match
+    expect(leaveButtons[2]).toBeEnabled() // Carol (p3) -- not in Current match
+  })
+
+  it('hides the Leave button entirely for a non-active tournament', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([completedTournament])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([makeParticipant('p1')])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+
+    renderWithClient(<TournamentDetail tournamentId="t2" />)
+
+    await screen.findByText('Completed T')
+    expect(screen.queryByRole('button', { name: 'Leave' })).toBeNull()
+  })
+
+  it('renders a left participant greyed out with a Left badge and no Leave button', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      makeParticipant('p1'),
+      makeParticipant('p2', 'left'),
+    ])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    // Bob (left) also reappears as an Add-participant option (the rejoin surface) --
+    // scope to the participants list to avoid matching that <option>'s text too.
+    const list = await screen.findByRole('list')
+    const bobRow = within(list).getByText('Bob').closest('li')
+    expect(bobRow).not.toBeNull()
+    expect(bobRow).toHaveClass('participant-left')
+    expect(within(bobRow!).getByText('Left')).toBeInTheDocument()
+    expect(within(bobRow!).queryByRole('button', { name: 'Leave' })).toBeNull()
+
+    // Alice (still active) keeps her Leave button
+    expect(within(list).getByRole('button', { name: 'Leave' })).toBeInTheDocument()
+  })
+
+  it('opens a confirm dialog on Leave and only calls leaveParticipant on Confirm', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      makeParticipant('p1'),
+      makeParticipant('p2'),
+    ])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    vi.mocked(tournamentsApi.leaveParticipant).mockResolvedValue(makeParticipant('p2', 'left'))
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    const leaveButtons = await screen.findAllByRole('button', { name: 'Leave' })
+    await user.click(leaveButtons[1]) // Bob (p2)
+
+    expect(await screen.findByText('Remove Bob from this tournament?')).toBeInTheDocument()
+    expect(tournamentsApi.leaveParticipant).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Yes, remove' }))
+
+    await waitFor(() => {
+      expect(tournamentsApi.leaveParticipant).toHaveBeenCalledWith('t1', 'p2', 'test-passphrase')
+    })
+  })
+
+  it('clears the Next match draw when the left participant was part of it', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      makeParticipant('p1'),
+      makeParticipant('p2'),
+    ])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
+      ok: true,
+      participants: [
+        { playerId: 'p1', team: 1 },
+        { playerId: 'p2', team: 2 },
+      ],
+    })
+    vi.mocked(tournamentsApi.leaveParticipant).mockResolvedValue(makeParticipant('p2', 'left'))
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(await screen.findByRole('button', { name: 'Randomize' }))
+    await screen.findByText('Alice vs Bob')
+
+    const leaveButtons = screen.getAllByRole('button', { name: 'Leave' })
+    await user.click(leaveButtons[1]) // Bob, who is part of the Next match draw
+    await user.click(screen.getByRole('button', { name: 'Yes, remove' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Not picked yet')).toBeInTheDocument()
+    })
+  })
+
+  it('does not clear the Next match draw when the left participant was not part of it', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([
+      ...players,
+      { id: 'p3', name: 'Carol', gender: 'female', self_selected_level: 'beginner', created_at: '' },
+    ])
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      makeParticipant('p1'),
+      makeParticipant('p2'),
+      makeParticipant('p3'),
+    ])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
+      ok: true,
+      participants: [
+        { playerId: 'p1', team: 1 },
+        { playerId: 'p2', team: 2 },
+      ],
+    })
+    vi.mocked(tournamentsApi.leaveParticipant).mockResolvedValue(makeParticipant('p3', 'left'))
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(await screen.findByRole('button', { name: 'Randomize' }))
+    await screen.findByText('Alice vs Bob')
+
+    const leaveButtons = screen.getAllByRole('button', { name: 'Leave' })
+    await user.click(leaveButtons[2]) // Carol, who is not part of the Next match draw
+    await user.click(screen.getByRole('button', { name: 'Yes, remove' }))
+
+    await waitFor(() => {
+      expect(tournamentsApi.leaveParticipant).toHaveBeenCalledWith('t1', 'p3', 'test-passphrase')
+    })
+    expect(screen.getByText('Alice vs Bob')).toBeInTheDocument()
+    expect(screen.queryByText('Not picked yet')).toBeNull()
+  })
+})
+
+describe('TournamentDetail: Add participant', () => {
+  it('shows the picker and Add button for an active tournament', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([makeParticipant('p1', 'left')])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    expect(await screen.findByRole('combobox')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add' })).toBeInTheDocument()
+  })
+
+  it('hides the picker and Add button entirely for a non-active tournament', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([completedTournament])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([makeParticipant('p1')])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+
+    renderWithClient(<TournamentDetail tournamentId="t2" />)
+
+    await screen.findByText('Completed T')
+    expect(screen.queryByRole('combobox')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Add' })).toBeNull()
+  })
+
+  it('excludes active participants from the picker but includes a left participant, surfacing rejoin', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      makeParticipant('p1'),
+      makeParticipant('p2', 'left'),
+    ])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    const select = await screen.findByRole('combobox')
+    const optionNames = within(select)
+      .getAllByRole('option')
+      .map((o) => o.textContent)
+    expect(optionNames).not.toContain('Alice') // p1 is active -- excluded from the picker
+    expect(optionNames).toContain('Bob') // p2 left -- reappears, the only rejoin surface
+  })
+
+  it('selecting a player and clicking Add calls addParticipant directly, with no confirm dialog', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      makeParticipant('p1', 'left'),
+      makeParticipant('p2', 'left'),
+    ])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    vi.mocked(tournamentsApi.addParticipant).mockResolvedValue(makeParticipant('p1'))
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    const select = await screen.findByRole('combobox')
+    await user.selectOptions(select, 'p1')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    await waitFor(() => {
+      expect(tournamentsApi.addParticipant).toHaveBeenCalledWith('t1', 'p1', 'test-passphrase')
+    })
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('shows the empty-pool message instead of the picker when everyone is already active', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      makeParticipant('p1'),
+      makeParticipant('p2'),
+    ])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    expect(
+      await screen.findByText(
+        'Everyone in the member pool is already active in this tournament.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('combobox')).toBeNull()
+  })
+
+  it('shows an error message when addParticipant is rejected', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      makeParticipant('p1', 'left'),
+      makeParticipant('p2', 'left'),
+    ])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    vi.mocked(tournamentsApi.addParticipant).mockRejectedValue(new Error('boom'))
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    const select = await screen.findByRole('combobox')
+    await user.selectOptions(select, 'p1')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+
+    expect(
+      await screen.findByText("Couldn't add that participant. Please try again."),
+    ).toBeInTheDocument()
   })
 })

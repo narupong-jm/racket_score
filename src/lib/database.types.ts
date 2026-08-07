@@ -163,17 +163,23 @@ export type Database = {
       tournament_participants: {
         Row: {
           joined_at: string
+          match_count_offset: number
           player_id: string
+          status: string
           tournament_id: string
         }
         Insert: {
           joined_at?: string
+          match_count_offset?: number
           player_id: string
+          status?: string
           tournament_id: string
         }
         Update: {
           joined_at?: string
+          match_count_offset?: number
           player_id?: string
+          status?: string
           tournament_id?: string
         }
         Relationships: [
@@ -341,7 +347,9 @@ export type Database = {
         }
         Returns: {
           joined_at: string
+          match_count_offset: number
           player_id: string
+          status: string
           tournament_id: string
         }
         SetofOptions: {
@@ -466,6 +474,26 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "tournaments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      leave_participant: {
+        Args: {
+          p_passphrase: string
+          p_player_id: string
+          p_tournament_id: string
+        }
+        Returns: {
+          joined_at: string
+          match_count_offset: number
+          player_id: string
+          status: string
+          tournament_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tournament_participants"
           isOneToOne: true
           isSetofReturn: false
         }

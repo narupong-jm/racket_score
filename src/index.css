@@ -478,6 +478,10 @@ button.danger {
   gap: 10px;
 }
 
+.participant-left {
+  opacity: 0.5;
+}
+
 .checklist-row {
   display: flex;
   align-items: center;

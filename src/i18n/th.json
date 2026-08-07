@@ -189,7 +189,17 @@
     "cancelTournament": "ยกเลิกทัวร์นาเมนต์",
     "confirmCancelTitle": "ยกเลิกทัวร์นาเมนต์นี้หรือไม่?",
     "confirmCancelBody": "การกระทำนี้ย้อนกลับไม่ได้ แมตช์ที่จับคู่ไว้แต่ยังไม่ได้เล่นจะถูกยกเลิกไปด้วย",
-    "confirmCancelButton": "ใช่ ยกเลิกทัวร์นาเมนต์"
+    "confirmCancelButton": "ใช่ ยกเลิกทัวร์นาเมนต์",
+    "leave": "ออก",
+    "confirmLeaveTitle": "นำ {{name}} ออกจากทัวร์นาเมนต์นี้หรือไม่?",
+    "confirmLeaveBody": "จะไม่ถูกจับคู่ในแมตช์ถัดไปอีก แต่สามารถเพิ่มกลับเข้ามาได้ภายหลังจากรายการเดิมนี้",
+    "confirmLeaveButton": "ใช่ นำออก",
+    "leftBadge": "ออกแล้ว",
+    "addParticipant": "เพิ่มผู้เล่น",
+    "addParticipantPlaceholder": "เลือกผู้เล่น...",
+    "addParticipantButton": "เพิ่ม",
+    "noPlayersToAdd": "สมาชิกทั้งหมดอยู่ในทัวร์นาเมนต์นี้แล้ว",
+    "addParticipantFailed": "เพิ่มผู้เล่นไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"
   },
   "matches": {
     "draw": {
