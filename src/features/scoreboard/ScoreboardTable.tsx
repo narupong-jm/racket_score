@@ -81,7 +81,6 @@ export function ScoreboardTable({ rows }: ScoreboardTableProps) {
           })}
         </tbody>
       </table>
-      <div className="scoreboard-scroll-hint" aria-hidden="true" />
     </div>
   )
 }

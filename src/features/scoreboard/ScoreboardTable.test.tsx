@@ -150,12 +150,4 @@ describe('ScoreboardTable', () => {
     expect(deeRow).not.toHaveClass('scoreboard-medal-row')
     expect(deeRow?.textContent).toContain('4')
   })
-
-  it('renders a right-edge scroll hint, cueing that more columns are off-screen', () => {
-    const { container } = render(<ScoreboardTable rows={rows} />)
-
-    const hint = container.querySelector('.scoreboard-scroll-hint')
-    expect(hint).not.toBeNull()
-    expect(hint).toHaveAttribute('aria-hidden', 'true')
-  })
 })
