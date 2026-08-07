@@ -36,6 +36,11 @@ tournaments.
 - Manual override for a drawn-but-not-yet-started match — swap a player
   before the match starts, with a non-blocking warning if the edit breaks
   doubles' gender-balance rule; edited matches are flagged in History
+- Mid-tournament roster changes: a participant can leave (soft-removed,
+  reversible, immediately excluded from future draws) and the organizer
+  can add a late arrival or bring a left participant back — either way a
+  fairness offset keeps the equal-match-count invariant fair without
+  crediting them in History/Scoreboard for matches they didn't play
 - Cancel a tournament before its first match result is confirmed —
   replaces the End action during that window, permanent, shown as a
   "Cancelled" row in History
@@ -58,8 +63,11 @@ These are deliberate design choices, not missing features:
   and no admin override anywhere in the app. A drawn-but-not-yet-started
   match is different — the organizer can edit its lineup before it starts;
   it's the _result_, once confirmed, that can never be changed.
-- **Participants are chosen once, at tournament creation, from the player
-  pool.** There is no way to add a player to an in-progress tournament.
+- **The initial roster is chosen once, at tournament creation, from the
+  player pool.** Leave and Add participant (see Features above) are the
+  only two ways to change it afterward — both narrow, explicitly gated
+  actions, not a general "edit the roster" screen, and both are disabled
+  once the tournament has ended or been cancelled.
 - **Cancelling a tournament is permanent.** It's only available before the
   tournament's first match result is confirmed, and there's no path back
   to active once cancelled.
@@ -98,6 +106,10 @@ if too few other players remain).
 Random tie-breaking in step 5 never overrides a higher-priority criterion —
 it only chooses among players/pairings that are already equivalent on every
 criterion above it.
+
+A late-joining or rejoining participant (see Design decisions above) is
+folded into the equal-match-count invariant via a computed fairness
+offset, rather than being special-cased elsewhere in the algorithm.
 
 ## Tech stack
 
@@ -264,6 +276,7 @@ client-side routing.
 | [`docs/SPEC.md`](docs/SPEC.md)                 | Normative product requirements — source of truth for what to build                |
 | [`docs/IMPROVEMENT.md`](docs/IMPROVEMENT.md)   | UX rationale behind the 5-tab navigation rework                                   |
 | [`docs/IMPROVEMENT2.md`](docs/IMPROVEMENT2.md) | Post-launch patch: matchmaking corrections, manual draw editing, History collapse |
+| [`docs/IMPROVEMENT3.md`](docs/IMPROVEMENT3.md) | Post-launch patch: mid-tournament Leave / Add participant, fairness offset        |
 | [`docs/PLAN.md`](docs/PLAN.md)                 | Phased implementation plan and stack decisions                                    |
 | [`docs/RESEARCH.md`](docs/RESEARCH.md)         | Point-in-time snapshot of environment/account state at planning time              |
 | [`CLAUDE.md`](CLAUDE.md)                       | Instructions for AI coding agents working in this repo                            |
