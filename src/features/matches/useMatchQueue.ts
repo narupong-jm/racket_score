@@ -49,12 +49,21 @@ export function useStartNextMatch(tournamentId: string) {
   const { getPassphrase } = usePassphraseGate()
 
   return useMutation({
-    mutationFn: async ({ participants, manuallyAdjusted = false }: StartNextMatchInput) => {
+    mutationFn: async ({
+      participants,
+      manuallyAdjusted = false,
+    }: StartNextMatchInput) => {
       const passphrase = await getPassphrase()
       const matches = await listMatches(tournamentId)
       const nextSequenceNumber =
         matches.reduce((max, m) => Math.max(max, m.sequence_number), 0) + 1
-      return createMatch(tournamentId, nextSequenceNumber, participants, passphrase, manuallyAdjusted)
+      return createMatch(
+        tournamentId,
+        nextSequenceNumber,
+        participants,
+        passphrase,
+        manuallyAdjusted,
+      )
     },
     onSuccess: () => {
       // Must return this promise: React Query awaits a mutation-level
@@ -62,7 +71,9 @@ export function useStartNextMatch(tournamentId: string) {
       // refetched Current-match roster is in the cache before any caller
       // resets Next-match state (which would otherwise re-enable Randomize
       // against a stale/empty exclusion list).
-      return queryClient.invalidateQueries({ queryKey: ['matches', tournamentId] })
+      return queryClient.invalidateQueries({
+        queryKey: ['matches', tournamentId],
+      })
     },
   })
 }

@@ -21,7 +21,7 @@ no React/Supabase — keep it that way). Three specific behaviors need to change
 
 **Current behavior:** `selectCandidatePool.ts` builds the candidate pool by
 taking players with the fewest matches played first, expanding to the next
-tier only if the pool is still too small. This *tends toward* even match
+tier only if the pool is still too small. This _tends toward_ even match
 counts but is never checked as an explicit invariant — nothing currently
 verifies that, across a session, `max(matchesPlayed) - min(matchesPlayed) <= 1`
 holds for all participants.
@@ -42,7 +42,7 @@ participant must never exceed 1, at every point in the tournament (not just
 
 ### 1.2 Doubles must always be mixed when 2 male + 2 female are available
 
-**Current behavior:** gender balance is currently a *tiebreaker*, not a hard
+**Current behavior:** gender balance is currently a _tiebreaker_, not a hard
 rule, in two places:
 
 - `pickDoublesQuartet.ts` — picks the quartet with the smallest skill spread
@@ -51,7 +51,7 @@ rule, in two places:
   quartet if its skill spread happens to be smaller.
 - `splitIntoTeams.ts` — given a quartet, picks the split with the smallest
   skill-sum difference first, and only prefers mixed teams (`nonMixedTeamCount`)
-  as the *second* priority. This means a male/male vs. female/female split can
+  as the _second_ priority. This means a male/male vs. female/female split can
   currently be chosen over a mixed split if it has a smaller skill-sum
   difference — exactly the case flagged in testing.
 
@@ -128,8 +128,8 @@ can't see).
 Edit lets the organizer swap out one or more of the drawn players for someone
 else from the tournament's participant pool, before the match starts. Once a
 match is promoted to "Current match" and started, existing rules still apply
-(no edit after confirmation of a *result* — that's unrelated and stays
-locked, per `docs/SPEC.md`). Editing a *not-yet-started* draw is a new,
+(no edit after confirmation of a _result_ — that's unrelated and stays
+locked, per `docs/SPEC.md`). Editing a _not-yet-started_ draw is a new,
 narrower capability — the match hasn't happened yet, so there's no "result"
 to protect.
 

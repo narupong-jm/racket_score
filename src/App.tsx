@@ -16,7 +16,10 @@ function App() {
         <Route path="/create" element={<CreateTournamentPage />} />
         <Route path="/active" element={<ActivePage />} />
         <Route path="/tournaments/:id" element={<TournamentDetailRoute />} />
-        <Route path="/tournaments/:id/scoreboard" element={<TournamentScoreboardRoute />} />
+        <Route
+          path="/tournaments/:id/scoreboard"
+          element={<TournamentScoreboardRoute />}
+        />
         <Route path="/scoreboard" element={<OverallScoreboardPage />} />
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/member" element={<MemberPage />} />

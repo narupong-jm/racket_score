@@ -14,10 +14,19 @@ import { Avatar } from '../../components/Avatar'
 import { usePlayers } from '../players/usePlayers'
 import type { Player } from '../players/playersApi'
 import { useDrawInputs } from '../matches/useDrawInputs'
-import { useTournamentMatches, useStartNextMatch } from '../matches/useMatchQueue'
+import {
+  useTournamentMatches,
+  useStartNextMatch,
+} from '../matches/useMatchQueue'
 import { useRecordMatchResult } from '../matches/useRecordMatchResult'
-import { validateGameScore, type GameScoreRules } from '../matches/validateGameScore'
-import { validateMatchGames, type GameScore } from '../matches/validateMatchGames'
+import {
+  validateGameScore,
+  type GameScoreRules,
+} from '../matches/validateGameScore'
+import {
+  validateMatchGames,
+  type GameScore,
+} from '../matches/validateMatchGames'
 import { teamNames, summarizeGamesWon } from '../matches/matchFormatting'
 import {
   generateNextMatch,
@@ -25,7 +34,10 @@ import {
   type GeneratedMatchParticipant,
 } from '../matchmaking/generateNextMatch'
 import { isMixedDoublesRuleViolated } from '../matchmaking/isMixedDoublesRuleViolated'
-import { DrawSlotSelect, type RosterPlayer } from '../../components/DrawSlotSelect'
+import {
+  DrawSlotSelect,
+  type RosterPlayer,
+} from '../../components/DrawSlotSelect'
 import type { MatchType } from '../matchmaking/types'
 import type { Match, MatchGame, MatchHistoryEntry } from '../matches/matchesApi'
 
@@ -35,7 +47,11 @@ interface TournamentDetailProps {
   onCancelled?: () => void
 }
 
-export function TournamentDetail({ tournamentId, onEnded, onCancelled }: TournamentDetailProps) {
+export function TournamentDetail({
+  tournamentId,
+  onEnded,
+  onCancelled,
+}: TournamentDetailProps) {
   const { t, i18n } = useTranslation()
   const { data: tournaments } = useTournaments()
   const tournament = tournaments?.find((tour) => tour.id === tournamentId)
@@ -47,20 +63,26 @@ export function TournamentDetail({ tournamentId, onEnded, onCancelled }: Tournam
   const [endModalOpen, setEndModalOpen] = useState(false)
   const cancelTournament = useCancelTournament()
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
-  const [nextDraw, setNextDraw] = useState<GeneratedMatchParticipant[] | null>(null)
+  const [nextDraw, setNextDraw] = useState<GeneratedMatchParticipant[] | null>(
+    null,
+  )
 
   if (!tournament) return <p>{t('tournaments.detail.notFound')}</p>
 
   const isActive = tournament.status === 'active'
   const matchType = tournament.type as MatchType
-  const cap = tournament.point_cap ?? computePointCap(tournament.points_per_game)
+  const cap =
+    tournament.point_cap ?? computePointCap(tournament.points_per_game)
 
   const playerNameById = new Map((players ?? []).map((p) => [p.id, p.name]))
-  const rosterPlayers: RosterPlayer[] = (participants ?? []).flatMap((participant) => {
-    const player = players?.find((p) => p.id === participant.player_id)
-    if (!player || (player.gender !== 'male' && player.gender !== 'female')) return []
-    return [{ id: player.id, name: player.name, gender: player.gender }]
-  })
+  const rosterPlayers: RosterPlayer[] = (participants ?? []).flatMap(
+    (participant) => {
+      const player = players?.find((p) => p.id === participant.player_id)
+      if (!player || (player.gender !== 'male' && player.gender !== 'female'))
+        return []
+      return [{ id: player.id, name: player.name, gender: player.gender }]
+    },
+  )
   const matches = tournamentMatches?.matches ?? []
   const matchParticipants = tournamentMatches?.participants ?? []
   const games = tournamentMatches?.games ?? []
@@ -183,7 +205,11 @@ export function TournamentDetail({ tournamentId, onEnded, onCancelled }: Tournam
             <h3>{t('manage.confirmEndTitle')}</h3>
             <p>{t('manage.confirmEndBody')}</p>
             <div className="modal-actions">
-              <button type="button" className="secondary" onClick={() => setEndModalOpen(false)}>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setEndModalOpen(false)}
+              >
                 {t('manage.cancel')}
               </button>
               <button
@@ -209,7 +235,10 @@ export function TournamentDetail({ tournamentId, onEnded, onCancelled }: Tournam
           >
             {t('manage.cancelTournament')}
           </button>
-          <Modal open={cancelModalOpen} onClose={() => setCancelModalOpen(false)}>
+          <Modal
+            open={cancelModalOpen}
+            onClose={() => setCancelModalOpen(false)}
+          >
             <h3>{t('manage.confirmCancelTitle')}</h3>
             <p>{t('manage.confirmCancelBody')}</p>
             <div className="modal-actions">
@@ -272,7 +301,8 @@ function ParticipantsCard({
     leaveParticipant.mutate(playerId, {
       onSuccess: () => {
         setLeavingParticipant(null)
-        if (nextDraw?.some((p) => p.playerId === playerId)) onNextDrawChange(null)
+        if (nextDraw?.some((p) => p.playerId === playerId))
+          onNextDrawChange(null)
       },
     })
   }
@@ -285,9 +315,13 @@ function ParticipantsCard({
   }
 
   const activeParticipantIds = new Set(
-    (participants ?? []).filter((p) => p.status === 'active').map((p) => p.player_id),
+    (participants ?? [])
+      .filter((p) => p.status === 'active')
+      .map((p) => p.player_id),
   )
-  const availablePlayers = (players ?? []).filter((player) => !activeParticipantIds.has(player.id))
+  const availablePlayers = (players ?? []).filter(
+    (player) => !activeParticipantIds.has(player.id),
+  )
 
   return (
     <section className="card">
@@ -332,12 +366,17 @@ function ParticipantsCard({
       ) : (
         <ul className="avatar-list">
           {participants.map((participant) => {
-            const name = playerNameById.get(participant.player_id) ?? participant.player_id
+            const name =
+              playerNameById.get(participant.player_id) ?? participant.player_id
             const isLeft = participant.status === 'left'
             return (
               <li
                 key={participant.player_id}
-                className={isLeft ? 'avatar-list-item participant-left' : 'avatar-list-item'}
+                className={
+                  isLeft
+                    ? 'avatar-list-item participant-left'
+                    : 'avatar-list-item'
+                }
               >
                 <Avatar name={name} size={32} />
                 <span>{name}</span>
@@ -349,11 +388,15 @@ function ParticipantsCard({
                       type="button"
                       className="secondary"
                       onClick={() =>
-                        setLeavingParticipant({ playerId: participant.player_id, name })
+                        setLeavingParticipant({
+                          playerId: participant.player_id,
+                          name,
+                        })
                       }
                       disabled={
-                        currentMatchParticipantIds.includes(participant.player_id) ||
-                        leaveParticipant.isPending
+                        currentMatchParticipantIds.includes(
+                          participant.player_id,
+                        ) || leaveParticipant.isPending
                       }
                     >
                       {t('manage.leave')}
@@ -366,11 +409,22 @@ function ParticipantsCard({
         </ul>
       )}
 
-      <Modal open={leavingParticipant !== null} onClose={() => setLeavingParticipant(null)}>
-        <h3>{t('manage.confirmLeaveTitle', { name: leavingParticipant?.name ?? '' })}</h3>
+      <Modal
+        open={leavingParticipant !== null}
+        onClose={() => setLeavingParticipant(null)}
+      >
+        <h3>
+          {t('manage.confirmLeaveTitle', {
+            name: leavingParticipant?.name ?? '',
+          })}
+        </h3>
         <p>{t('manage.confirmLeaveBody')}</p>
         <div className="modal-actions">
-          <button type="button" className="secondary" onClick={() => setLeavingParticipant(null)}>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => setLeavingParticipant(null)}
+          >
             {t('manage.cancel')}
           </button>
           <button
@@ -486,7 +540,9 @@ function CurrentMatchForm({
   const recordResult = useRecordMatchResult(tournamentId)
 
   function updateRow(index: number, field: 'team1' | 'team2', value: string) {
-    setRows((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)))
+    setRows((prev) =>
+      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
+    )
   }
 
   const rules: GameScoreRules = { pointsPerGame, winBy, cap }
@@ -526,7 +582,9 @@ function CurrentMatchForm({
     }
 
     if (!validateGameScore(team1_score, team2_score, rules)) {
-      rowErrors.push(t('matches.result.ruleViolationError', { pointsPerGame, winBy, cap }))
+      rowErrors.push(
+        t('matches.result.ruleViolationError', { pointsPerGame, winBy, cap }),
+      )
       continue
     }
 
@@ -536,7 +594,9 @@ function CurrentMatchForm({
 
   const hasRowError = rowErrors.some((e) => e !== null)
   const matchLevelError =
-    !hasRowError && games.length > 0 && !validateMatchGames(games, gamesPerMatch)
+    !hasRowError &&
+    games.length > 0 &&
+    !validateMatchGames(games, gamesPerMatch)
       ? t('matches.result.notDecidedError')
       : null
 
@@ -572,7 +632,10 @@ function CurrentMatchForm({
             <input
               type="number"
               className="score-input"
-              aria-label={t('manage.gameTeamLabel', { team: team1Name, n: i + 1 })}
+              aria-label={t('manage.gameTeamLabel', {
+                team: team1Name,
+                n: i + 1,
+              })}
               value={row.team1}
               onChange={(event) => updateRow(i, 'team1', event.target.value)}
             />
@@ -582,7 +645,10 @@ function CurrentMatchForm({
             <input
               type="number"
               className="score-input"
-              aria-label={t('manage.gameTeamLabel', { team: team2Name, n: i + 1 })}
+              aria-label={t('manage.gameTeamLabel', {
+                team: team2Name,
+                n: i + 1,
+              })}
               value={row.team2}
               onChange={(event) => updateRow(i, 'team2', event.target.value)}
             />
@@ -631,10 +697,18 @@ function CurrentMatchForm({
           ))}
         </ul>
         <div className="modal-actions">
-          <button type="button" className="secondary" onClick={() => setConfirmOpen(false)}>
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => setConfirmOpen(false)}
+          >
             {t('manage.cancel')}
           </button>
-          <button type="button" onClick={handleConfirm} disabled={recordResult.isPending}>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={recordResult.isPending}
+          >
             {t('manage.confirmResultButton')}
           </button>
         </div>
@@ -670,13 +744,15 @@ function NextMatchCard({
   const { data: drawInputs } = useDrawInputs(tournamentId)
   const startNextMatch = useStartNextMatch(tournamentId)
   const [drawFailed, setDrawFailed] = useState(false)
-  const [usedCurrentMatchFallback, setUsedCurrentMatchFallback] = useState(false)
+  const [usedCurrentMatchFallback, setUsedCurrentMatchFallback] =
+    useState(false)
   const [editing, setEditing] = useState(false)
   const [manuallyAdjusted, setManuallyAdjusted] = useState(false)
 
   const neededCount = getNeededPlayerCount(matchType)
   const participantCount = drawInputs?.candidates.length ?? 0
-  const notEnoughPlayers = drawInputs !== undefined && participantCount < neededCount
+  const notEnoughPlayers =
+    drawInputs !== undefined && participantCount < neededCount
 
   function handleRandomize() {
     if (!drawInputs) return
@@ -686,7 +762,11 @@ function NextMatchCard({
     const usedFallback = excludingCurrent.length < neededCount
     const candidates = usedFallback ? drawInputs.candidates : excludingCurrent
 
-    const result = generateNextMatch(matchType, candidates, drawInputs.pairingHistory)
+    const result = generateNextMatch(
+      matchType,
+      candidates,
+      drawInputs.pairingHistory,
+    )
     if (result.ok) {
       onNextDrawChange(result.participants)
       setDrawFailed(false)
@@ -703,7 +783,9 @@ function NextMatchCard({
   function handleSwap(oldPlayerId: string, newPlayerId: string) {
     if (!nextDraw || oldPlayerId === newPlayerId) return
     onNextDrawChange(
-      nextDraw.map((p) => (p.playerId === oldPlayerId ? { ...p, playerId: newPlayerId } : p)),
+      nextDraw.map((p) =>
+        p.playerId === oldPlayerId ? { ...p, playerId: newPlayerId } : p,
+      ),
     )
     setManuallyAdjusted(true)
   }
@@ -712,7 +794,10 @@ function NextMatchCard({
     if (!nextDraw) return
     startNextMatch.mutate(
       {
-        participants: nextDraw.map((p) => ({ player_id: p.playerId, team: p.team })),
+        participants: nextDraw.map((p) => ({
+          player_id: p.playerId,
+          team: p.team,
+        })),
         manuallyAdjusted,
       },
       {
@@ -759,7 +844,9 @@ function NextMatchCard({
       <h3>{t('manage.nextMatchHeading')}</h3>
       {!nextDraw && <p className="empty-state">{t('manage.notPickedYet')}</p>}
       {nextDraw && !editing && (
-        <p className="matchup-line">{t('matches.draw.matchup', { team1, team2 })}</p>
+        <p className="matchup-line">
+          {t('matches.draw.matchup', { team1, team2 })}
+        </p>
       )}
       {nextDraw && editing && (
         <div className="draw-edit-teams">
@@ -833,8 +920,12 @@ function NextMatchCard({
           })}
         </p>
       )}
-      {drawFailed && <p className="field-error">{t('matches.draw.notEnoughPlayers')}</p>}
-      {startNextMatch.isError && <p className="field-error">{t('manage.drawFailed')}</p>}
+      {drawFailed && (
+        <p className="field-error">{t('matches.draw.notEnoughPlayers')}</p>
+      )}
+      {startNextMatch.isError && (
+        <p className="field-error">{t('manage.drawFailed')}</p>
+      )}
       {nextDraw && usedCurrentMatchFallback && (
         <p className="field-warning">{t('manage.currentMatchReusedWarning')}</p>
       )}
@@ -881,9 +972,13 @@ function RoundsPlayedList({
                   {t('manage.roundLabel', { n: match.sequence_number })}
                 </span>
                 <span className="round-matchup">
-                  <span className={team1Won ? 'round-winner' : undefined}>{team1Name}</span>{' '}
+                  <span className={team1Won ? 'round-winner' : undefined}>
+                    {team1Name}
+                  </span>{' '}
                   <span className="round-vs">vs</span>{' '}
-                  <span className={!team1Won ? 'round-winner' : undefined}>{team2Name}</span>
+                  <span className={!team1Won ? 'round-winner' : undefined}>
+                    {team2Name}
+                  </span>
                 </span>
                 <span className="round-score">
                   {t('manage.finalScore', { team1Games, team2Games })}

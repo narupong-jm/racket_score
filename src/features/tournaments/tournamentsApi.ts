@@ -66,7 +66,9 @@ export async function leaveParticipant(
   return data
 }
 
-export async function listParticipants(tournamentId: string): Promise<TournamentParticipant[]> {
+export async function listParticipants(
+  tournamentId: string,
+): Promise<TournamentParticipant[]> {
   const { data, error } = await supabase
     .from('tournament_participants')
     .select('*')
@@ -86,7 +88,10 @@ export async function getTournamentStandingsRanked(
   return data
 }
 
-export async function endTournament(tournamentId: string, passphrase: string): Promise<Tournament> {
+export async function endTournament(
+  tournamentId: string,
+  passphrase: string,
+): Promise<Tournament> {
   const { data, error } = await supabase.rpc('end_tournament', {
     p_tournament_id: tournamentId,
     p_passphrase: passphrase,

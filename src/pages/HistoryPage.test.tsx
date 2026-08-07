@@ -16,7 +16,10 @@ vi.mock('../features/players/playersApi', () => ({
 }))
 
 vi.mock('../features/tournaments/tournamentsApi', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../features/tournaments/tournamentsApi')>()
+  const actual =
+    await importOriginal<
+      typeof import('../features/tournaments/tournamentsApi')
+    >()
   return {
     ...actual,
     listTournaments: vi.fn(),
@@ -24,7 +27,8 @@ vi.mock('../features/tournaments/tournamentsApi', async (importOriginal) => {
 })
 
 vi.mock('../features/matches/matchesApi', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../features/matches/matchesApi')>()
+  const actual =
+    await importOriginal<typeof import('../features/matches/matchesApi')>()
   return {
     ...actual,
     listRecentCompletedMatches: vi.fn(),
@@ -32,7 +36,9 @@ vi.mock('../features/matches/matchesApi', async (importOriginal) => {
 })
 
 function renderPage() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
@@ -43,8 +49,20 @@ function renderPage() {
 }
 
 const players: Player[] = [
-  { id: 'p1', name: 'Alice', gender: 'female', self_selected_level: 'beginner', created_at: '' },
-  { id: 'p2', name: 'Bob', gender: 'male', self_selected_level: 'beginner', created_at: '' },
+  {
+    id: 'p1',
+    name: 'Alice',
+    gender: 'female',
+    self_selected_level: 'beginner',
+    created_at: '',
+  },
+  {
+    id: 'p2',
+    name: 'Bob',
+    gender: 'male',
+    self_selected_level: 'beginner',
+    created_at: '',
+  },
 ]
 
 const recentMatch: RecentCompletedMatch = {
@@ -98,14 +116,23 @@ const cancelledTournament: Tournament = {
 describe('HistoryPage', () => {
   it('renders both the By match and By tournament sections, each collapsed by default', async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
-    vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([recentMatch])
-    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament, completedTournament])
+    vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([
+      recentMatch,
+    ])
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+      completedTournament,
+    ])
 
     const user = userEvent.setup()
     renderPage()
 
-    expect(screen.getByRole('heading', { name: 'By match' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'By tournament' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'By match' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'By tournament' }),
+    ).toBeInTheDocument()
 
     // Collapsed by default: heading + toggle only, no item content yet.
     expect(screen.queryByText('Round 2')).toBeNull()
@@ -127,16 +154,24 @@ describe('HistoryPage', () => {
   it('links every By-tournament row to its scoreboard, regardless of status', async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
     vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([])
-    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament, completedTournament])
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+      completedTournament,
+    ])
 
     const user = userEvent.setup()
     renderPage()
 
-    const byTournamentHeading = await screen.findByRole('heading', { name: 'By tournament' })
-    const byTournamentToggle = byTournamentHeading.parentElement!.querySelector('button')!
+    const byTournamentHeading = await screen.findByRole('heading', {
+      name: 'By tournament',
+    })
+    const byTournamentToggle =
+      byTournamentHeading.parentElement!.querySelector('button')!
     await user.click(byTournamentToggle)
 
-    const activeLink = await screen.findByRole('link', { name: /sunday smash/i })
+    const activeLink = await screen.findByRole('link', {
+      name: /sunday smash/i,
+    })
     const completedLink = screen.getByRole('link', { name: /winter cup/i })
 
     expect(activeLink).toHaveAttribute('href', '/tournaments/t1/scoreboard')
@@ -146,27 +181,38 @@ describe('HistoryPage', () => {
   describe('collapsible sections', () => {
     it('shows only the heading and toggle when collapsed, with no item peek', async () => {
       vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
-      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([recentMatch])
-      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([
+        recentMatch,
+      ])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+        activeTournament,
+      ])
 
       renderPage()
 
       await screen.findByRole('heading', { name: 'By match' })
       expect(screen.queryByText('Round 2')).toBeNull()
       expect(screen.queryByText('Sunday Smash')).toBeNull()
-      expect(screen.getAllByRole('button', { name: 'Show more' })).toHaveLength(2)
+      expect(screen.getAllByRole('button', { name: 'Show more' })).toHaveLength(
+        2,
+      )
     })
 
     it('expands a section on toggle click and flips its label to Show less', async () => {
       vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
-      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([recentMatch])
-      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([
+        recentMatch,
+      ])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+        activeTournament,
+      ])
 
       const user = userEvent.setup()
       renderPage()
 
       const byMatchHeading = screen.getByRole('heading', { name: 'By match' })
-      const byMatchToggle = byMatchHeading.parentElement!.querySelector('button')!
+      const byMatchToggle =
+        byMatchHeading.parentElement!.querySelector('button')!
 
       await user.click(byMatchToggle)
 
@@ -176,14 +222,19 @@ describe('HistoryPage', () => {
 
     it('re-collapses a section on a second toggle click', async () => {
       vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
-      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([recentMatch])
-      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([
+        recentMatch,
+      ])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+        activeTournament,
+      ])
 
       const user = userEvent.setup()
       renderPage()
 
       const byMatchHeading = screen.getByRole('heading', { name: 'By match' })
-      const byMatchToggle = byMatchHeading.parentElement!.querySelector('button')!
+      const byMatchToggle =
+        byMatchHeading.parentElement!.querySelector('button')!
 
       await user.click(byMatchToggle)
       expect(await screen.findByText('Round 2')).toBeInTheDocument()
@@ -195,21 +246,29 @@ describe('HistoryPage', () => {
 
     it('toggles each section independently', async () => {
       vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
-      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([recentMatch])
-      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([
+        recentMatch,
+      ])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+        activeTournament,
+      ])
 
       const user = userEvent.setup()
       renderPage()
 
       const byMatchHeading = screen.getByRole('heading', { name: 'By match' })
-      const byMatchToggle = byMatchHeading.parentElement!.querySelector('button')!
+      const byMatchToggle =
+        byMatchHeading.parentElement!.querySelector('button')!
 
       await user.click(byMatchToggle)
       expect(await screen.findByText('Round 2')).toBeInTheDocument()
 
       // By tournament section is untouched -- still collapsed.
-      const byTournamentHeading = screen.getByRole('heading', { name: 'By tournament' })
-      const byTournamentToggle = byTournamentHeading.parentElement!.querySelector('button')!
+      const byTournamentHeading = screen.getByRole('heading', {
+        name: 'By tournament',
+      })
+      const byTournamentToggle =
+        byTournamentHeading.parentElement!.querySelector('button')!
       expect(byTournamentToggle).toHaveTextContent('Show more')
       expect(screen.queryByRole('link', { name: /sunday smash/i })).toBeNull()
     })
@@ -227,8 +286,11 @@ describe('HistoryPage', () => {
       const user = userEvent.setup()
       renderPage()
 
-      const byTournamentHeading = await screen.findByRole('heading', { name: 'By tournament' })
-      const byTournamentToggle = byTournamentHeading.parentElement!.querySelector('button')!
+      const byTournamentHeading = await screen.findByRole('heading', {
+        name: 'By tournament',
+      })
+      const byTournamentToggle =
+        byTournamentHeading.parentElement!.querySelector('button')!
       await user.click(byTournamentToggle)
 
       expect(await screen.findByText('Rained Out Cup')).toBeInTheDocument()
@@ -244,7 +306,9 @@ describe('HistoryPage', () => {
   describe('manually-adjusted badge', () => {
     it('does not show a badge for a match that was not manually adjusted', async () => {
       vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
-      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([recentMatch])
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([
+        recentMatch,
+      ])
       vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([])
 
       const user = userEvent.setup()
@@ -262,7 +326,9 @@ describe('HistoryPage', () => {
         match: { ...recentMatch.match, manually_adjusted: true },
       }
       vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
-      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([adjustedMatch])
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([
+        adjustedMatch,
+      ])
       vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([])
 
       const user = userEvent.setup()

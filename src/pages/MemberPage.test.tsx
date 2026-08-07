@@ -12,11 +12,15 @@ vi.mock('../features/players/playersApi', () => ({
 }))
 
 vi.mock('../features/passphrase/usePassphraseGate', () => ({
-  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+  usePassphraseGate: () => ({
+    getPassphrase: vi.fn().mockResolvedValue('test-passphrase'),
+  }),
 }))
 
 function renderWithClient() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   return render(
     <QueryClientProvider client={queryClient}>
       <MemberPage />
@@ -32,8 +36,12 @@ describe('MemberPage', () => {
     renderWithClient()
 
     expect(screen.getByRole('heading', { name: 'Member' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Add member' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /add member/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Add member' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: /add member/i }),
+    ).toBeInTheDocument()
     expect(await screen.findByText('No players yet.')).toBeInTheDocument()
   })
 })

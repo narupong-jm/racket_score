@@ -26,7 +26,10 @@ export function aggregateScoreboard(
     const playerRows = rowsByPlayer.get(player.id) ?? []
     const matchesPlayed = playerRows.length
     const matchesWon = playerRows.filter((row) => row.won).length
-    const totalPoints = playerRows.reduce((sum, row) => sum + (row.points_for ?? 0), 0)
+    const totalPoints = playerRows.reduce(
+      (sum, row) => sum + (row.points_for ?? 0),
+      0,
+    )
 
     return {
       player_id: player.id,

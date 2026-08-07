@@ -8,7 +8,13 @@ describe('PassphraseModal', () => {
     const onSubmit = vi.fn()
     const user = userEvent.setup()
     render(
-      <PassphraseModal open invalid={false} submitting={false} onSubmit={onSubmit} onCancel={() => {}} />,
+      <PassphraseModal
+        open
+        invalid={false}
+        submitting={false}
+        onSubmit={onSubmit}
+        onCancel={() => {}}
+      />,
     )
 
     await user.type(screen.getByLabelText('Passphrase'), 'secret')
@@ -19,10 +25,18 @@ describe('PassphraseModal', () => {
 
   it('shows the inline error and keeps the field visible when invalid', () => {
     render(
-      <PassphraseModal open invalid submitting={false} onSubmit={() => {}} onCancel={() => {}} />,
+      <PassphraseModal
+        open
+        invalid
+        submitting={false}
+        onSubmit={() => {}}
+        onCancel={() => {}}
+      />,
     )
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Incorrect passphrase. Try again.')
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Incorrect passphrase. Try again.',
+    )
     expect(screen.getByLabelText('Passphrase')).toBeInTheDocument()
   })
 
@@ -30,7 +44,13 @@ describe('PassphraseModal', () => {
     const onCancel = vi.fn()
     const user = userEvent.setup()
     render(
-      <PassphraseModal open invalid={false} submitting={false} onSubmit={() => {}} onCancel={onCancel} />,
+      <PassphraseModal
+        open
+        invalid={false}
+        submitting={false}
+        onSubmit={() => {}}
+        onCancel={onCancel}
+      />,
     )
 
     await user.click(screen.getByRole('button', { name: /close/i }))
@@ -42,7 +62,13 @@ describe('PassphraseModal', () => {
     const onCancel = vi.fn()
     const user = userEvent.setup()
     render(
-      <PassphraseModal open invalid={false} submitting={false} onSubmit={() => {}} onCancel={onCancel} />,
+      <PassphraseModal
+        open
+        invalid={false}
+        submitting={false}
+        onSubmit={() => {}}
+        onCancel={onCancel}
+      />,
     )
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
@@ -52,7 +78,13 @@ describe('PassphraseModal', () => {
 
   it('disables the submit button while submitting', () => {
     render(
-      <PassphraseModal open invalid={false} submitting onSubmit={() => {}} onCancel={() => {}} />,
+      <PassphraseModal
+        open
+        invalid={false}
+        submitting
+        onSubmit={() => {}}
+        onCancel={() => {}}
+      />,
     )
 
     expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled()
@@ -60,7 +92,13 @@ describe('PassphraseModal', () => {
 
   it('disables the submit button until something is typed', () => {
     render(
-      <PassphraseModal open invalid={false} submitting={false} onSubmit={() => {}} onCancel={() => {}} />,
+      <PassphraseModal
+        open
+        invalid={false}
+        submitting={false}
+        onSubmit={() => {}}
+        onCancel={() => {}}
+      />,
     )
 
     expect(screen.getByRole('button', { name: 'Submit' })).toBeDisabled()
@@ -68,7 +106,13 @@ describe('PassphraseModal', () => {
 
   it('renders nothing when not open', () => {
     render(
-      <PassphraseModal open={false} invalid={false} submitting={false} onSubmit={() => {}} onCancel={() => {}} />,
+      <PassphraseModal
+        open={false}
+        invalid={false}
+        submitting={false}
+        onSubmit={() => {}}
+        onCancel={() => {}}
+      />,
     )
 
     expect(screen.queryByLabelText('Passphrase')).not.toBeInTheDocument()

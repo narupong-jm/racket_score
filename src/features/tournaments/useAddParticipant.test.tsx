@@ -15,12 +15,16 @@ vi.mock('./tournamentsApi', async (importOriginal) => {
 })
 
 vi.mock('../passphrase/usePassphraseGate', () => ({
-  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+  usePassphraseGate: () => ({
+    getPassphrase: vi.fn().mockResolvedValue('test-passphrase'),
+  }),
 }))
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
   }
 }
 
@@ -40,7 +44,9 @@ describe('useAddParticipant', () => {
   it('calls addParticipant and invalidates the participants and drawInputs queries on success', async () => {
     vi.mocked(tournamentsApi.addParticipant).mockResolvedValue(addedParticipant)
 
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
 
     const { result } = renderHook(() => useAddParticipant('t1'), {
@@ -51,8 +57,16 @@ describe('useAddParticipant', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
-    expect(tournamentsApi.addParticipant).toHaveBeenCalledWith('t1', 'p1', 'test-passphrase')
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['tournamentParticipants', 't1'] })
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['drawInputs', 't1'] })
+    expect(tournamentsApi.addParticipant).toHaveBeenCalledWith(
+      't1',
+      'p1',
+      'test-passphrase',
+    )
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['tournamentParticipants', 't1'],
+    })
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['drawInputs', 't1'],
+    })
   })
 })

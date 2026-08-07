@@ -18,12 +18,16 @@ vi.mock('./matchesApi', async (importOriginal) => {
 })
 
 vi.mock('../passphrase/usePassphraseGate', () => ({
-  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+  usePassphraseGate: () => ({
+    getPassphrase: vi.fn().mockResolvedValue('test-passphrase'),
+  }),
 }))
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
   }
 }
 
@@ -51,7 +55,9 @@ describe('useStartNextMatch', () => {
     // TournamentDetail, re-enabling Randomize) run against a stale
     // ['matches', tournamentId] cache -- so a player who'd just been
     // promoted into Current wasn't excluded from the very next draw.
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
     const wrapper = createWrapper(queryClient)
 
     let listMatchesCallCount = 0
@@ -76,11 +82,16 @@ describe('useStartNextMatch', () => {
     vi.mocked(matchesApi.listGamesForMatches).mockResolvedValue([])
     vi.mocked(matchesApi.createMatch).mockResolvedValue(makeMatch('m-new', 1))
 
-    const { result: matchesResult } = renderHook(() => useTournamentMatches('t1'), { wrapper })
+    const { result: matchesResult } = renderHook(
+      () => useTournamentMatches('t1'),
+      { wrapper },
+    )
     await waitFor(() => expect(matchesResult.current.isSuccess).toBe(true))
     expect(matchesResult.current.data?.matches).toEqual([])
 
-    const { result: startResult } = renderHook(() => useStartNextMatch('t1'), { wrapper })
+    const { result: startResult } = renderHook(() => useStartNextMatch('t1'), {
+      wrapper,
+    })
 
     let refetchWasReleased = false
     let onSuccessSawReleasedRefetch = false
@@ -113,8 +124,9 @@ describe('useStartNextMatch', () => {
 
     await waitFor(() => expect(startResult.current.isSuccess).toBe(true))
     expect(onSuccessSawReleasedRefetch).toBe(true)
-    expect(queryClient.getQueryData<{ matches: Match[] }>(['matches', 't1'])?.matches).toEqual([
-      makeMatch('m-new', 1),
-    ])
+    expect(
+      queryClient.getQueryData<{ matches: Match[] }>(['matches', 't1'])
+        ?.matches,
+    ).toEqual([makeMatch('m-new', 1)])
   })
 })

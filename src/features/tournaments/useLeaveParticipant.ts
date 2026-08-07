@@ -11,7 +11,9 @@ export function useLeaveParticipant(tournamentId: string) {
       return leaveParticipant(tournamentId, playerId, passphrase)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tournamentParticipants', tournamentId] })
+      queryClient.invalidateQueries({
+        queryKey: ['tournamentParticipants', tournamentId],
+      })
       queryClient.invalidateQueries({ queryKey: ['drawInputs', tournamentId] })
     },
   })

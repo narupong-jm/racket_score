@@ -13,7 +13,10 @@ export function teamNames(
 }
 
 /** Tallies games won per side from a match's per-game scores. */
-export function summarizeGamesWon(games: MatchGame[]): { team1Games: number; team2Games: number } {
+export function summarizeGamesWon(games: MatchGame[]): {
+  team1Games: number
+  team2Games: number
+} {
   let team1Games = 0
   let team2Games = 0
   for (const g of games) {

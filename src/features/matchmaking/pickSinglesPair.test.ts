@@ -36,7 +36,11 @@ describe('pickSinglesPair', () => {
 
   it('tiebreaks toward a same-gender pairing over a mixed one at equal skill gap', () => {
     // a-b: |50-50|=0 (mixed). a-c: |50-50|=0 (same-gender, male).
-    const pool = [player('a', 50, 'female'), player('b', 50, 'male'), player('c', 50, 'female')]
+    const pool = [
+      player('a', 50, 'female'),
+      player('b', 50, 'male'),
+      player('c', 50, 'female'),
+    ]
 
     const pair = pickSinglesPair(pool, emptyHistory())
 
@@ -48,7 +52,10 @@ describe('pickSinglesPair', () => {
     // played, leaving a-c as the only non-repeat option.
     const pool = [player('a', 50), player('b', 50), player('c', 50)]
     const history: PairingHistory = {
-      opponentPairs: new Set([canonicalPairKey('a', 'b'), canonicalPairKey('b', 'c')]),
+      opponentPairs: new Set([
+        canonicalPairKey('a', 'b'),
+        canonicalPairKey('b', 'c'),
+      ]),
       teammatePairs: new Set(),
     }
 
@@ -70,7 +77,12 @@ describe('pickSinglesPair', () => {
   })
 
   it('picks randomly among fully tied candidates, honoring the whole tied set', () => {
-    const pool = [player('a', 50), player('b', 50), player('c', 50), player('d', 50)]
+    const pool = [
+      player('a', 50),
+      player('b', 50),
+      player('c', 50),
+      player('d', 50),
+    ]
     // All 6 pairs are tied: equal skill gap (0), all same-gender, none are repeats.
 
     vi.spyOn(Math, 'random').mockReturnValue(0)

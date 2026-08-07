@@ -10,7 +10,10 @@ import type { Tournament } from '../features/tournaments/tournamentsApi'
 import type { Match } from '../features/matches/matchesApi'
 
 vi.mock('../features/tournaments/tournamentsApi', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../features/tournaments/tournamentsApi')>()
+  const actual =
+    await importOriginal<
+      typeof import('../features/tournaments/tournamentsApi')
+    >()
   return {
     ...actual,
     listTournaments: vi.fn(),
@@ -18,7 +21,8 @@ vi.mock('../features/tournaments/tournamentsApi', async (importOriginal) => {
 })
 
 vi.mock('../features/matches/matchesApi', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../features/matches/matchesApi')>()
+  const actual =
+    await importOriginal<typeof import('../features/matches/matchesApi')>()
   return {
     ...actual,
     listMatches: vi.fn(),
@@ -26,13 +30,18 @@ vi.mock('../features/matches/matchesApi', async (importOriginal) => {
 })
 
 function renderApp() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/active']}>
         <Routes>
           <Route path="/active" element={<ActivePage />} />
-          <Route path="/tournaments/:id" element={<p>Manage tournament t1</p>} />
+          <Route
+            path="/tournaments/:id"
+            element={<p>Manage tournament t1</p>}
+          />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -74,7 +83,10 @@ afterEach(() => {
 describe('ActivePage', () => {
   it('navigates to the tournament on card tap', async () => {
     vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([tournament()])
-    vi.mocked(matchesApi.listMatches).mockResolvedValue([match('m1', 1), match('m2', 2)])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([
+      match('m1', 1),
+      match('m2', 2),
+    ])
 
     const user = userEvent.setup()
     renderApp()

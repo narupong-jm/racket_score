@@ -17,7 +17,8 @@ vi.mock('./tournamentsApi', async (importOriginal) => {
 })
 
 vi.mock('../scoreboard/scoreboardApi', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../scoreboard/scoreboardApi')>()
+  const actual =
+    await importOriginal<typeof import('../scoreboard/scoreboardApi')>()
   return {
     ...actual,
     listPlayerMatchHistory: vi.fn(),
@@ -25,12 +26,17 @@ vi.mock('../scoreboard/scoreboardApi', async (importOriginal) => {
 })
 
 function renderAt(path: string) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/tournaments/:id/scoreboard" element={<TournamentScoreboardRoute />} />
+          <Route
+            path="/tournaments/:id/scoreboard"
+            element={<TournamentScoreboardRoute />}
+          />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -55,7 +61,10 @@ function standing(
   }
 }
 
-function historyRow(player_id: string, points_for: number): PlayerMatchHistoryRow {
+function historyRow(
+  player_id: string,
+  points_for: number,
+): PlayerMatchHistoryRow {
   return {
     player_id,
     match_id: `m-${player_id}`,
@@ -85,13 +94,19 @@ describe('TournamentScoreboardRoute', () => {
     renderAt('/tournaments/t1/scoreboard')
 
     expect(await screen.findByText('b')).toBeInTheDocument()
-    expect(tournamentsApi.getTournamentStandingsRanked).toHaveBeenCalledWith('t1')
-    expect(scoreboardApi.listPlayerMatchHistory).toHaveBeenCalledWith({ tournamentId: 't1' })
+    expect(tournamentsApi.getTournamentStandingsRanked).toHaveBeenCalledWith(
+      't1',
+    )
+    expect(scoreboardApi.listPlayerMatchHistory).toHaveBeenCalledWith({
+      tournamentId: 't1',
+    })
 
     const rows = screen.getAllByRole('row').slice(1)
     expect(rows[0].textContent).toContain('b')
     expect(rows[1].textContent).toContain('a')
-    expect(screen.getByRole('columnheader', { name: 'Total Points' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('columnheader', { name: 'Total Points' }),
+    ).toBeInTheDocument()
     expect(rows[0].textContent).toContain('21')
     expect(rows[1].textContent).toContain('15')
   })

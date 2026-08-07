@@ -21,8 +21,12 @@ vi.mock('../features/scoreboard/useOverallScoreboard', async () => {
 })
 
 function renderWithClient(ui: ReactElement) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  )
 }
 
 const entries: PlayerScoreboardEntry[] = [
@@ -42,28 +46,33 @@ afterEach(() => {
 
 describe('OverallScoreboardPage', () => {
   it('calls useOverallScoreboard with the selected period/type filters', async () => {
-    vi.mocked(useOverallScoreboardModule.fetchOverallScoreboard).mockResolvedValue(entries)
+    vi.mocked(
+      useOverallScoreboardModule.fetchOverallScoreboard,
+    ).mockResolvedValue(entries)
 
     const user = userEvent.setup()
     renderWithClient(<OverallScoreboardPage />)
 
     await waitFor(() => {
-      expect(useOverallScoreboardModule.fetchOverallScoreboard).toHaveBeenCalledWith('all', 'all')
+      expect(
+        useOverallScoreboardModule.fetchOverallScoreboard,
+      ).toHaveBeenCalledWith('all', 'all')
     })
 
     await user.click(screen.getByRole('button', { name: 'This month' }))
     await user.click(screen.getByRole('button', { name: 'Singles' }))
 
     await waitFor(() => {
-      expect(useOverallScoreboardModule.fetchOverallScoreboard).toHaveBeenCalledWith(
-        'month',
-        'singles',
-      )
+      expect(
+        useOverallScoreboardModule.fetchOverallScoreboard,
+      ).toHaveBeenCalledWith('month', 'singles')
     })
   })
 
   it('shows an empty state when no matches match the filter', async () => {
-    vi.mocked(useOverallScoreboardModule.fetchOverallScoreboard).mockResolvedValue([])
+    vi.mocked(
+      useOverallScoreboardModule.fetchOverallScoreboard,
+    ).mockResolvedValue([])
 
     renderWithClient(<OverallScoreboardPage />)
 
@@ -72,11 +81,15 @@ describe('OverallScoreboardPage', () => {
   })
 
   it('renders the scoreboard table with the total points column when data is present', async () => {
-    vi.mocked(useOverallScoreboardModule.fetchOverallScoreboard).mockResolvedValue(entries)
+    vi.mocked(
+      useOverallScoreboardModule.fetchOverallScoreboard,
+    ).mockResolvedValue(entries)
 
     renderWithClient(<OverallScoreboardPage />)
 
     expect(await screen.findByText('Alice')).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'Total Points' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('columnheader', { name: 'Total Points' }),
+    ).toBeInTheDocument()
   })
 })

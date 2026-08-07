@@ -10,7 +10,13 @@ interface PassphraseModalProps {
   onCancel: () => void
 }
 
-export function PassphraseModal({ open, invalid, submitting, onSubmit, onCancel }: PassphraseModalProps) {
+export function PassphraseModal({
+  open,
+  invalid,
+  submitting,
+  onSubmit,
+  onCancel,
+}: PassphraseModalProps) {
   const { t } = useTranslation()
   const [value, setValue] = useState('')
 
@@ -41,7 +47,12 @@ export function PassphraseModal({ open, invalid, submitting, onSubmit, onCancel 
         </label>
         {invalid && <p role="alert">{t('passphrase.invalid')}</p>}
         <div className="modal-actions">
-          <button type="button" className="secondary" onClick={handleClose} disabled={submitting}>
+          <button
+            type="button"
+            className="secondary"
+            onClick={handleClose}
+            disabled={submitting}
+          >
             {t('passphrase.cancel')}
           </button>
           <button type="submit" disabled={submitting || value.length === 0}>

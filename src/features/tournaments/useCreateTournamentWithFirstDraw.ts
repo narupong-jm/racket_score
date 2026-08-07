@@ -1,4 +1,8 @@
-import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import {
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query'
 import {
   addParticipant,
   createTournament,
@@ -6,7 +10,10 @@ import {
   type Tournament,
 } from './tournamentsApi'
 import { assembleDrawInputs } from '../matches/useDrawInputs'
-import { generateNextMatch, type GeneratedMatchParticipant } from '../matchmaking/generateNextMatch'
+import {
+  generateNextMatch,
+  type GeneratedMatchParticipant,
+} from '../matchmaking/generateNextMatch'
 import { usePassphraseGate } from '../passphrase/usePassphraseGate'
 
 /**
@@ -19,7 +26,9 @@ export class PartialTournamentCreationError extends Error {
   tournament: Tournament
 
   constructor(tournament: Tournament, cause: unknown) {
-    super('Tournament was created, but adding a participant failed partway through.')
+    super(
+      'Tournament was created, but adding a participant failed partway through.',
+    )
     this.name = 'PartialTournamentCreationError'
     this.tournament = tournament
     this.cause = cause
@@ -45,7 +54,9 @@ export interface CreateTournamentWithFirstDrawResult {
 
 function invalidateAll(queryClient: QueryClient, tournamentId: string) {
   queryClient.invalidateQueries({ queryKey: ['tournaments'] })
-  queryClient.invalidateQueries({ queryKey: ['tournamentParticipants', tournamentId] })
+  queryClient.invalidateQueries({
+    queryKey: ['tournamentParticipants', tournamentId],
+  })
   queryClient.invalidateQueries({ queryKey: ['drawInputs', tournamentId] })
   queryClient.invalidateQueries({ queryKey: ['matches', tournamentId] })
 }

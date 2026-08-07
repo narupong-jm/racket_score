@@ -1,4 +1,10 @@
-import { useEffect, useRef, type MouseEvent, type ReactNode, type SyntheticEvent } from 'react'
+import {
+  useEffect,
+  useRef,
+  type MouseEvent,
+  type ReactNode,
+  type SyntheticEvent,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 
 interface ModalProps {
@@ -43,7 +49,12 @@ export function Modal({ open, onClose, children }: ModalProps) {
       onClose={onClose}
       onClick={handleBackdropClick}
     >
-      <button type="button" className="modal-close" onClick={onClose} aria-label={t('common.close')}>
+      <button
+        type="button"
+        className="modal-close"
+        onClick={onClose}
+        aria-label={t('common.close')}
+      >
         &times;
       </button>
       {children}

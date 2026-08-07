@@ -6,8 +6,14 @@ import { usePlayerStatsList } from '../features/players/usePlayerStatsList'
 import { useCreateTournamentWithFirstDraw } from '../features/tournaments/useCreateTournamentWithFirstDraw'
 import { FirstMatchDrawnPopup } from '../features/tournaments/FirstMatchDrawnPopup'
 import { computePointCap } from '../features/tournaments/computePointCap'
-import { TOURNAMENT_TYPES, type TournamentType } from '../features/tournaments/tournamentType'
-import { getNeededPlayerCount, type GeneratedMatchParticipant } from '../features/matchmaking/generateNextMatch'
+import {
+  TOURNAMENT_TYPES,
+  type TournamentType,
+} from '../features/tournaments/tournamentType'
+import {
+  getNeededPlayerCount,
+  type GeneratedMatchParticipant,
+} from '../features/matchmaking/generateNextMatch'
 import { useStartNextMatch } from '../features/matches/useMatchQueue'
 import { IconChoice } from '../components/IconChoice'
 import { Avatar } from '../components/Avatar'
@@ -30,26 +36,36 @@ export function CreateTournamentPage() {
   const [pointsPerGame, setPointsPerGame] = useState(21)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [submittedType, setSubmittedType] = useState<TournamentType>('singles')
-  const [submittedParticipantIds, setSubmittedParticipantIds] = useState<string[]>([])
+  const [submittedParticipantIds, setSubmittedParticipantIds] = useState<
+    string[]
+  >([])
 
   const { data: players } = usePlayers()
   const { data: statsList } = usePlayerStatsList()
   const { mutate, isPending, data: result } = useCreateTournamentWithFirstDraw()
   const startFirstMatch = useStartNextMatch(result?.tournament.id ?? '')
 
-  const statsByPlayerId = new Map((statsList ?? []).map((s) => [s.player_id, s]))
-  const rosterPlayers: RosterPlayer[] = submittedParticipantIds.flatMap((id) => {
-    const player = players?.find((p) => p.id === id)
-    if (!player || (player.gender !== 'male' && player.gender !== 'female')) return []
-    return [{ id: player.id, name: player.name, gender: player.gender }]
-  })
+  const statsByPlayerId = new Map(
+    (statsList ?? []).map((s) => [s.player_id, s]),
+  )
+  const rosterPlayers: RosterPlayer[] = submittedParticipantIds.flatMap(
+    (id) => {
+      const player = players?.find((p) => p.id === id)
+      if (!player || (player.gender !== 'male' && player.gender !== 'female'))
+        return []
+      return [{ id: player.id, name: player.name, gender: player.gender }]
+    },
+  )
 
   const trimmedName = name.trim()
   const cap = computePointCap(pointsPerGame)
   const neededCount = getNeededPlayerCount(type)
   const notEnoughSelected = selectedIds.size < neededCount
   const isValid =
-    trimmedName.length > 0 && gamesPerMatch > 0 && pointsPerGame > 0 && !notEnoughSelected
+    trimmedName.length > 0 &&
+    gamesPerMatch > 0 &&
+    pointsPerGame > 0 &&
+    !notEnoughSelected
 
   function toggleParticipant(id: string) {
     setSelectedIds((prev) => {
@@ -77,11 +93,17 @@ export function CreateTournamentPage() {
     })
   }
 
-  function handleConfirmFirstMatch(participants: GeneratedMatchParticipant[], manuallyAdjusted: boolean) {
+  function handleConfirmFirstMatch(
+    participants: GeneratedMatchParticipant[],
+    manuallyAdjusted: boolean,
+  ) {
     if (!result) return
     startFirstMatch.mutate(
       {
-        participants: participants.map((p) => ({ player_id: p.playerId, team: p.team })),
+        participants: participants.map((p) => ({
+          player_id: p.playerId,
+          team: p.team,
+        })),
         manuallyAdjusted,
       },
       { onSuccess: () => navigate(`/tournaments/${result.tournament.id}`) },
@@ -99,7 +121,11 @@ export function CreateTournamentPage() {
       <form className="card form-card" onSubmit={handleSubmit}>
         <label className="field">
           <span className="field-label">{t('tournaments.form.nameLabel')}</span>
-          <input type="text" value={name} onChange={(event) => setName(event.target.value)} />
+          <input
+            type="text"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
         </label>
 
         <IconChoice<TournamentType>
@@ -116,7 +142,9 @@ export function CreateTournamentPage() {
 
         <div className="field-row">
           <label className="field">
-            <span className="field-label">{t('tournaments.form.gamesPerMatchLabel')}</span>
+            <span className="field-label">
+              {t('tournaments.form.gamesPerMatchLabel')}
+            </span>
             <input
               type="number"
               min={1}
@@ -126,7 +154,9 @@ export function CreateTournamentPage() {
           </label>
 
           <label className="field">
-            <span className="field-label">{t('tournaments.form.pointsPerGameLabel')}</span>
+            <span className="field-label">
+              {t('tournaments.form.pointsPerGameLabel')}
+            </span>
             <input
               type="number"
               min={1}
@@ -155,7 +185,9 @@ export function CreateTournamentPage() {
                     />
                     <Avatar name={player.name} size={32} />
                     <span className="checklist-name">{player.name}</span>
-                    <span className="checklist-level">{t(`level.${level}`)}</span>
+                    <span className="checklist-level">
+                      {t(`level.${level}`)}
+                    </span>
                   </label>
                 </li>
               )

@@ -19,10 +19,16 @@ describe('player_stats is view-driven, not a batch job (real project, anon key)'
       const matchIds = (matches ?? []).map((m) => m.id)
       if (matchIds.length > 0) {
         await supabase.from('match_games').delete().in('match_id', matchIds)
-        await supabase.from('match_participants').delete().in('match_id', matchIds)
+        await supabase
+          .from('match_participants')
+          .delete()
+          .in('match_id', matchIds)
       }
       await supabase.from('matches').delete().eq('tournament_id', tournamentId)
-      await supabase.from('tournament_participants').delete().eq('tournament_id', tournamentId)
+      await supabase
+        .from('tournament_participants')
+        .delete()
+        .eq('tournament_id', tournamentId)
       await supabase.from('tournaments').delete().eq('id', tournamentId)
     }
     if (playerIds.length > 0) {

@@ -32,7 +32,9 @@ describe('FirstMatchDrawnPopup', () => {
     )
 
     expect(
-      screen.getByText((_, element) => element?.textContent === 'First match: Alice vs Bob'),
+      screen.getByText(
+        (_, element) => element?.textContent === 'First match: Alice vs Bob',
+      ),
     ).toBeInTheDocument()
     expect(screen.queryByText(/couldn't be drawn/i)).not.toBeInTheDocument()
   })
@@ -54,10 +56,14 @@ describe('FirstMatchDrawnPopup', () => {
     )
 
     expect(
-      screen.getByText("The first match couldn't be drawn automatically -- draw it from Manage Tournament."),
+      screen.getByText(
+        "The first match couldn't be drawn automatically -- draw it from Manage Tournament.",
+      ),
     ).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Go to Manage Tournament' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Go to Manage Tournament' }),
+    )
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
 
@@ -77,7 +83,9 @@ describe('FirstMatchDrawnPopup', () => {
       />,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Go to Manage Tournament' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Go to Manage Tournament' }),
+    )
 
     expect(onConfirm).toHaveBeenCalledWith(drawParticipants, false)
   })
@@ -99,8 +107,13 @@ describe('FirstMatchDrawnPopup', () => {
     )
 
     await user.click(screen.getByRole('button', { name: 'Edit' }))
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Team 1 player 1' }), 'p3')
-    await user.click(screen.getByRole('button', { name: 'Go to Manage Tournament' }))
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Team 1 player 1' }),
+      'p3',
+    )
+    await user.click(
+      screen.getByRole('button', { name: 'Go to Manage Tournament' }),
+    )
 
     expect(onConfirm).toHaveBeenCalledWith(
       [
@@ -125,7 +138,8 @@ describe('FirstMatchDrawnPopup', () => {
       { playerId: 'p3', team: 2 },
       { playerId: 'p4', team: 2 },
     ]
-    const warningText = "This lineup isn't gender-mixed, though a mixed pairing was possible."
+    const warningText =
+      "This lineup isn't gender-mixed, though a mixed pairing was possible."
     const user = userEvent.setup()
     render(
       <FirstMatchDrawnPopup
@@ -143,7 +157,10 @@ describe('FirstMatchDrawnPopup', () => {
     expect(screen.queryByText(warningText)).toBeNull()
 
     await user.click(screen.getByRole('button', { name: 'Edit' }))
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Team 1 player 2' }), 'p5')
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Team 1 player 2' }),
+      'p5',
+    )
 
     expect(await screen.findByText(warningText)).toBeInTheDocument()
   })
@@ -162,7 +179,9 @@ describe('FirstMatchDrawnPopup', () => {
       />,
     )
 
-    expect(screen.getByRole('button', { name: 'Go to Manage Tournament' })).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: 'Go to Manage Tournament' }),
+    ).toBeDisabled()
     expect(screen.getByText('Failed to draw a match.')).toBeInTheDocument()
   })
 })

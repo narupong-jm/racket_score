@@ -4,4 +4,5 @@ export interface PassphraseGateContextValue {
   getPassphrase: () => Promise<string>
 }
 
-export const PassphraseGateContext = createContext<PassphraseGateContextValue | null>(null)
+export const PassphraseGateContext =
+  createContext<PassphraseGateContextValue | null>(null)

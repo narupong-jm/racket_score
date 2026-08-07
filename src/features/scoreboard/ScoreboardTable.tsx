@@ -28,9 +28,15 @@ export function ScoreboardTable({ rows }: ScoreboardTableProps) {
       <table className="scoreboard-table">
         <thead>
           <tr>
-            <th className="rank-col sticky-col">{t('scoreboard.columnRank')}</th>
-            <th className="avatar-col sticky-col">{t('scoreboard.columnAvatar')}</th>
-            <th className="name-col sticky-col">{t('scoreboard.columnName')}</th>
+            <th className="rank-col sticky-col">
+              {t('scoreboard.columnRank')}
+            </th>
+            <th className="avatar-col sticky-col">
+              {t('scoreboard.columnAvatar')}
+            </th>
+            <th className="name-col sticky-col">
+              {t('scoreboard.columnName')}
+            </th>
             <th>{t('scoreboard.columnMatchesPlayed')}</th>
             <th>{t('scoreboard.columnMatchesWon')}</th>
             <th>{t('scoreboard.columnTotalPoints')}</th>
@@ -41,7 +47,10 @@ export function ScoreboardTable({ rows }: ScoreboardTableProps) {
           {rows.map((row) => {
             const medal = MEDAL_ICONS[row.rank - 1]
             return (
-              <tr key={row.playerId} className={row.rank <= 3 ? 'scoreboard-medal-row' : undefined}>
+              <tr
+                key={row.playerId}
+                className={row.rank <= 3 ? 'scoreboard-medal-row' : undefined}
+              >
                 <td className="rank-col sticky-col">
                   {medal ? (
                     <img

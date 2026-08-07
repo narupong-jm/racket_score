@@ -2,7 +2,10 @@ import { useQuery } from '@tanstack/react-query'
 import { listParticipants } from '../tournaments/tournamentsApi'
 import { listPlayerStats } from '../players/playersApi'
 import { getMatchHistory, type MatchHistoryEntry } from './matchesApi'
-import { resolveSkillValue, type SelfSelectedLevel } from '../matchmaking/resolveSkillValue'
+import {
+  resolveSkillValue,
+  type SelfSelectedLevel,
+} from '../matchmaking/resolveSkillValue'
 import { canonicalPairKey } from '../matchmaking/pairKey'
 import type { CandidatePlayer, PairingHistory } from '../matchmaking/types'
 
@@ -18,7 +21,9 @@ export function useDrawInputs(tournamentId: string) {
   })
 }
 
-export async function assembleDrawInputs(tournamentId: string): Promise<DrawInputs> {
+export async function assembleDrawInputs(
+  tournamentId: string,
+): Promise<DrawInputs> {
   const [participants, statsList, matchHistory] = await Promise.all([
     listParticipants(tournamentId),
     listPlayerStats(),
@@ -31,7 +36,10 @@ export async function assembleDrawInputs(tournamentId: string): Promise<DrawInpu
   const matchCountByPlayer = new Map<string, number>()
   for (const entries of entriesByMatchId.values()) {
     for (const playerId of new Set(entries.map((e) => e.player_id))) {
-      matchCountByPlayer.set(playerId, (matchCountByPlayer.get(playerId) ?? 0) + 1)
+      matchCountByPlayer.set(
+        playerId,
+        (matchCountByPlayer.get(playerId) ?? 0) + 1,
+      )
     }
   }
 
@@ -62,7 +70,9 @@ export async function assembleDrawInputs(tournamentId: string): Promise<DrawInpu
   return { candidates, pairingHistory }
 }
 
-function groupByMatchId(entries: MatchHistoryEntry[]): Map<string, MatchHistoryEntry[]> {
+function groupByMatchId(
+  entries: MatchHistoryEntry[],
+): Map<string, MatchHistoryEntry[]> {
   const map = new Map<string, MatchHistoryEntry[]>()
   for (const entry of entries) {
     const existing = map.get(entry.match_id)
@@ -72,7 +82,9 @@ function groupByMatchId(entries: MatchHistoryEntry[]): Map<string, MatchHistoryE
   return map
 }
 
-function buildPairingHistory(entriesByMatchId: Map<string, MatchHistoryEntry[]>): PairingHistory {
+function buildPairingHistory(
+  entriesByMatchId: Map<string, MatchHistoryEntry[]>,
+): PairingHistory {
   const opponentPairs = new Set<string>()
   const teammatePairs = new Set<string>()
 
@@ -80,8 +92,10 @@ function buildPairingHistory(entriesByMatchId: Map<string, MatchHistoryEntry[]>)
     const team1 = entries.filter((e) => e.team === 1).map((e) => e.player_id)
     const team2 = entries.filter((e) => e.team === 2).map((e) => e.player_id)
 
-    if (team1.length === 2) teammatePairs.add(canonicalPairKey(team1[0], team1[1]))
-    if (team2.length === 2) teammatePairs.add(canonicalPairKey(team2[0], team2[1]))
+    if (team1.length === 2)
+      teammatePairs.add(canonicalPairKey(team1[0], team1[1]))
+    if (team2.length === 2)
+      teammatePairs.add(canonicalPairKey(team2[0], team2[1]))
 
     for (const a of team1) {
       for (const b of team2) {

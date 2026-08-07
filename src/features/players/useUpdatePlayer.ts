@@ -7,7 +7,13 @@ export function useUpdatePlayer() {
   const queryClient = useQueryClient()
   const { getPassphrase } = usePassphraseGate()
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: TablesUpdate<'players'> }) => {
+    mutationFn: async ({
+      id,
+      updates,
+    }: {
+      id: string
+      updates: TablesUpdate<'players'>
+    }) => {
       const passphrase = await getPassphrase()
       return updatePlayer(id, updates, passphrase)
     },

@@ -3,7 +3,10 @@ import { supabase } from './supabaseClient'
 
 describe('supabaseClient (real project, anon key)', () => {
   it('reads rows, proving RLS permits anon read access from the client', async () => {
-    const { data: rows, error } = await supabase.from('players').select('id').limit(1)
+    const { data: rows, error } = await supabase
+      .from('players')
+      .select('id')
+      .limit(1)
 
     expect(error).toBeNull()
     expect(Array.isArray(rows)).toBe(true)
@@ -17,7 +20,11 @@ describe('supabaseClient (real project, anon key)', () => {
   it('rejects a direct insert, proving the anon table grant was revoked', async () => {
     const { error } = await supabase
       .from('players')
-      .insert({ name: 'Should Not Be Insertable', gender: 'male', self_selected_level: 'beginner' })
+      .insert({
+        name: 'Should Not Be Insertable',
+        gender: 'male',
+        self_selected_level: 'beginner',
+      })
       .select()
       .single()
 

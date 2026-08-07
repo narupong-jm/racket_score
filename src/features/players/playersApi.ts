@@ -1,11 +1,18 @@
 import { supabase } from '../../lib/supabaseClient'
-import type { Tables, TablesInsert, TablesUpdate } from '../../lib/database.types'
+import type {
+  Tables,
+  TablesInsert,
+  TablesUpdate,
+} from '../../lib/database.types'
 
 export type Player = Tables<'players'>
 export type PlayerStats = Tables<'player_stats'>
 
 export async function listPlayers(): Promise<Player[]> {
-  const { data, error } = await supabase.from('players').select('*').order('name')
+  const { data, error } = await supabase
+    .from('players')
+    .select('*')
+    .order('name')
   if (error) throw error
   return data
 }
@@ -40,7 +47,9 @@ export async function updatePlayer(
   return data
 }
 
-export async function getPlayerStats(playerId: string): Promise<PlayerStats | null> {
+export async function getPlayerStats(
+  playerId: string,
+): Promise<PlayerStats | null> {
   const { data, error } = await supabase
     .from('player_stats')
     .select('*')

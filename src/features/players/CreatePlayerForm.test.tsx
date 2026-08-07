@@ -11,12 +11,18 @@ vi.mock('./playersApi', () => ({
 }))
 
 vi.mock('../passphrase/usePassphraseGate', () => ({
-  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+  usePassphraseGate: () => ({
+    getPassphrase: vi.fn().mockResolvedValue('test-passphrase'),
+  }),
 }))
 
 function renderWithClient(ui: ReactElement) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  )
 }
 
 describe('CreatePlayerForm', () => {

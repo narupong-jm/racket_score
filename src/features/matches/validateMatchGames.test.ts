@@ -11,7 +11,9 @@ describe('validateMatchGames', () => {
   })
 
   it('accepts a match decided with the full game count (2-1 of a best-of-3)', () => {
-    expect(validateMatchGames([game(21, 15), game(18, 21), game(21, 19)], 3)).toBe(true)
+    expect(
+      validateMatchGames([game(21, 15), game(18, 21), game(21, 19)], 3),
+    ).toBe(true)
   })
 
   it('rejects an under-decided match (1-1 submitted as the whole match)', () => {
@@ -26,7 +28,10 @@ describe('validateMatchGames', () => {
 
   it('rejects more games than gamesPerMatch allows', () => {
     expect(
-      validateMatchGames([game(21, 15), game(15, 21), game(21, 15), game(15, 21)], 3),
+      validateMatchGames(
+        [game(21, 15), game(15, 21), game(21, 15), game(15, 21)],
+        3,
+      ),
     ).toBe(false)
   })
 

@@ -6,7 +6,13 @@ export function useRecordMatchResult(tournamentId: string) {
   const queryClient = useQueryClient()
   const { getPassphrase } = usePassphraseGate()
   return useMutation({
-    mutationFn: async ({ matchId, games }: { matchId: string; games: GameResultInput[] }) => {
+    mutationFn: async ({
+      matchId,
+      games,
+    }: {
+      matchId: string
+      games: GameResultInput[]
+    }) => {
       const passphrase = await getPassphrase()
       return recordMatchResult(matchId, games, passphrase)
     },
@@ -14,7 +20,9 @@ export function useRecordMatchResult(tournamentId: string) {
       queryClient.invalidateQueries({ queryKey: ['matches', tournamentId] })
       queryClient.invalidateQueries({ queryKey: ['drawInputs', tournamentId] })
       queryClient.invalidateQueries({ queryKey: ['playerStats'] })
-      queryClient.invalidateQueries({ queryKey: ['tournamentStandingsRanked', tournamentId] })
+      queryClient.invalidateQueries({
+        queryKey: ['tournamentStandingsRanked', tournamentId],
+      })
     },
   })
 }

@@ -11,9 +11,12 @@ export function PlayerList() {
 
   if (isLoading) return <p className="empty-state">{t('players.loading')}</p>
   if (isError) return <p className="field-error">{t('players.loadError')}</p>
-  if (!players || players.length === 0) return <p className="empty-state">{t('players.empty')}</p>
+  if (!players || players.length === 0)
+    return <p className="empty-state">{t('players.empty')}</p>
 
-  const statsByPlayerId = new Map((statsList ?? []).map((s) => [s.player_id, s]))
+  const statsByPlayerId = new Map(
+    (statsList ?? []).map((s) => [s.player_id, s]),
+  )
 
   return (
     <div className="scoreboard-table-wrap card">

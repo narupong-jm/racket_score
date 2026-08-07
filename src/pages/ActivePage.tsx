@@ -13,7 +13,9 @@ export function ActivePage() {
   if (isLoading) return <p className="empty-state">{t('active.loading')}</p>
   if (isError) return <p className="field-error">{t('active.loadError')}</p>
 
-  const active = (tournaments ?? []).filter((tournament) => tournament.status === 'active')
+  const active = (tournaments ?? []).filter(
+    (tournament) => tournament.status === 'active',
+  )
 
   return (
     <section className="page">
@@ -41,7 +43,10 @@ interface ActiveTournamentCardProps {
   onSelect: () => void
 }
 
-function ActiveTournamentCard({ tournament, onSelect }: ActiveTournamentCardProps) {
+function ActiveTournamentCard({
+  tournament,
+  onSelect,
+}: ActiveTournamentCardProps) {
   const { t } = useTranslation()
   const { data: matches } = useQuery({
     queryKey: ['matches', tournament.id],
@@ -51,7 +56,9 @@ function ActiveTournamentCard({ tournament, onSelect }: ActiveTournamentCardProp
   return (
     <button type="button" className="tournament-card" onClick={onSelect}>
       <span className="tournament-card-name">{tournament.name}</span>
-      <span className="tournament-card-type">{t(`tournamentType.${tournament.type}`)}</span>
+      <span className="tournament-card-type">
+        {t(`tournamentType.${tournament.type}`)}
+      </span>
       <span className="tournament-card-round">
         {t('active.roundLabel', { n: matches?.length ?? 0 })}
       </span>

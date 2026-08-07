@@ -13,7 +13,10 @@ export type GenerateNextMatchResult =
   | { ok: true; participants: GeneratedMatchParticipant[] }
   | { ok: false; error: 'not_enough_players' }
 
-const NOT_ENOUGH_PLAYERS: GenerateNextMatchResult = { ok: false, error: 'not_enough_players' }
+const NOT_ENOUGH_PLAYERS: GenerateNextMatchResult = {
+  ok: false,
+  error: 'not_enough_players',
+}
 
 /** Number of players a match of this type needs on the court. */
 export function getNeededPlayerCount(type: MatchType): number {
@@ -37,7 +40,11 @@ export function generateNextMatch(
   if (!poolResult.ok) return NOT_ENOUGH_PLAYERS
 
   if (type === 'singles') {
-    const pair = pickSinglesPair(poolResult.pool, pairingHistory, poolResult.mandatoryIds)
+    const pair = pickSinglesPair(
+      poolResult.pool,
+      pairingHistory,
+      poolResult.mandatoryIds,
+    )
     if (!pair) return NOT_ENOUGH_PLAYERS
 
     const [a, b] = pair

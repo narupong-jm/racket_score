@@ -14,12 +14,18 @@ vi.mock('./playersApi', () => ({
 }))
 
 vi.mock('../passphrase/usePassphraseGate', () => ({
-  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+  usePassphraseGate: () => ({
+    getPassphrase: vi.fn().mockResolvedValue('test-passphrase'),
+  }),
 }))
 
 function renderWithClient(ui: ReactElement) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>)
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+  )
 }
 
 const editablePlayer: Player = {
@@ -66,10 +72,14 @@ describe('PlayerList level editability', () => {
     renderWithClient(<PlayerList />)
 
     expect(
-      await screen.findByRole('combobox', { name: /level for editable player/i }),
+      await screen.findByRole('combobox', {
+        name: /level for editable player/i,
+      }),
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: 'Editable Player' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('img', { name: 'Editable Player' }),
+    ).toBeInTheDocument()
   })
 
   it('shows a read-only computed level for a player with 3 or more matches', async () => {
@@ -79,9 +89,13 @@ describe('PlayerList level editability', () => {
     renderWithClient(<PlayerList />)
 
     expect(await screen.findByText('Pro')).toBeInTheDocument()
-    expect(screen.queryByRole('combobox', { name: /level for locked player/i })).toBeNull()
+    expect(
+      screen.queryByRole('combobox', { name: /level for locked player/i }),
+    ).toBeNull()
     expect(screen.queryByRole('button', { name: /save/i })).toBeNull()
-    expect(screen.getByRole('img', { name: 'Locked Player' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('img', { name: 'Locked Player' }),
+    ).toBeInTheDocument()
   })
 
   it('saves a level change for an editable player', async () => {
@@ -95,7 +109,9 @@ describe('PlayerList level editability', () => {
     const user = userEvent.setup()
     renderWithClient(<PlayerList />)
 
-    const select = await screen.findByRole('combobox', { name: /level for editable player/i })
+    const select = await screen.findByRole('combobox', {
+      name: /level for editable player/i,
+    })
     await user.selectOptions(select, 'advanced')
     await user.click(screen.getByRole('button', { name: /save/i }))
 

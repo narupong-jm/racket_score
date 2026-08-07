@@ -11,7 +11,9 @@ export function useAddParticipant(tournamentId: string) {
       return addParticipant(tournamentId, playerId, passphrase)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tournamentParticipants', tournamentId] })
+      queryClient.invalidateQueries({
+        queryKey: ['tournamentParticipants', tournamentId],
+      })
       queryClient.invalidateQueries({ queryKey: ['drawInputs', tournamentId] })
     },
   })

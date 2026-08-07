@@ -10,7 +10,10 @@ export interface GameScore {
  * neither earlier (under-decided) nor later (extra games after the match
  * was already won).
  */
-export function validateMatchGames(games: GameScore[], gamesPerMatch: number): boolean {
+export function validateMatchGames(
+  games: GameScore[],
+  gamesPerMatch: number,
+): boolean {
   if (games.length === 0 || games.length > gamesPerMatch) return false
 
   const majority = Math.floor(gamesPerMatch / 2) + 1

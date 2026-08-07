@@ -22,13 +22,13 @@ component changes and the updated SPEC/PLAN structure, and wait for approval.
 
 Bottom tab bar, 5 tabs, in this order:
 
-| # | Tab | Icon idea | Purpose |
-|---|-----|-----------|---------|
-| 1 | Create | plus | Create a new tournament |
-| 2 | Active | list | Tournaments currently in progress |
-| 3 | Scoreboard | trophy | Overall ranking across all matches |
-| 4 | History | clock | Past matches and completed tournaments |
-| 5 | Member | people | Add new members + view member list |
+| #   | Tab        | Icon idea | Purpose                                |
+| --- | ---------- | --------- | -------------------------------------- |
+| 1   | Create     | plus      | Create a new tournament                |
+| 2   | Active     | list      | Tournaments currently in progress      |
+| 3   | Scoreboard | trophy    | Overall ranking across all matches     |
+| 4   | History    | clock     | Past matches and completed tournaments |
+| 5   | Member     | people    | Add new members + view member list     |
 
 A tournament's live scoreboard (scoped to one tournament) is **not** a tab — it's
 reached by drilling in from Active (mid-tournament) or History (after it ends).
@@ -38,6 +38,7 @@ reached by drilling in from Active (mid-tournament) or History (after it ends).
 ## 2. Page: Create tournament
 
 Fields:
+
 - **Name** (text)
 - **Type** — icon-toggle buttons, not a dropdown: Singles / Doubles
 - **Games per match** (number)
@@ -97,6 +98,7 @@ This is the core of the rework. Reached only from Active → tap a tournament.
 
 Clicking **Save result** must **not** save immediately. It opens a confirm
 dialog:
+
 - Shows the two side names and the entered score for review.
 - Copy: something like "Confirm this result? It can't be edited after."
 - Two actions: **Cancel** (closes dialog, no change) and **Confirm result**

@@ -22,10 +22,18 @@ interface DrawSlotSelectProps {
  * match, both in the Manage Tournament screen's Next match card and the
  * tournament-creation first-match popup.
  */
-export function DrawSlotSelect({ participant, index, draw, rosterPlayers, onSwap }: DrawSlotSelectProps) {
+export function DrawSlotSelect({
+  participant,
+  index,
+  draw,
+  rosterPlayers,
+  onSwap,
+}: DrawSlotSelectProps) {
   const { t } = useTranslation()
   const usedElsewhere = new Set(
-    draw.filter((p) => p.playerId !== participant.playerId).map((p) => p.playerId),
+    draw
+      .filter((p) => p.playerId !== participant.playerId)
+      .map((p) => p.playerId),
   )
   const options = rosterPlayers.filter(
     (r) => r.id === participant.playerId || !usedElsewhere.has(r.id),
@@ -34,7 +42,10 @@ export function DrawSlotSelect({ participant, index, draw, rosterPlayers, onSwap
   return (
     <select
       value={participant.playerId}
-      aria-label={t('manage.editDrawSlotLabel', { team: participant.team, n: index + 1 })}
+      aria-label={t('manage.editDrawSlotLabel', {
+        team: participant.team,
+        n: index + 1,
+      })}
       onChange={(event) => onSwap(participant.playerId, event.target.value)}
     >
       {options.map((r) => (

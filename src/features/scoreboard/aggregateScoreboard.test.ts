@@ -13,7 +13,9 @@ function makePlayer(id: string, name: string): Player {
   }
 }
 
-function makeRow(overrides: Partial<PlayerMatchHistoryRow>): PlayerMatchHistoryRow {
+function makeRow(
+  overrides: Partial<PlayerMatchHistoryRow>,
+): PlayerMatchHistoryRow {
   return {
     player_id: 'p1',
     match_id: 'm1',

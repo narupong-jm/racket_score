@@ -1,5 +1,10 @@
 import { afterAll, describe, expect, it } from 'vitest'
-import { createPlayer, getPlayerStats, listPlayers, updatePlayer } from './playersApi'
+import {
+  createPlayer,
+  getPlayerStats,
+  listPlayers,
+  updatePlayer,
+} from './playersApi'
 import { supabase } from '../../lib/supabaseClient'
 import { testWritePassphrase } from '../../test/testPassphrase'
 

@@ -3,10 +3,42 @@ import { describe, expect, it } from 'vitest'
 import { ScoreboardTable, type ScoreboardRow } from './ScoreboardTable'
 
 const rows: ScoreboardRow[] = [
-  { playerId: 'p1', name: 'Alice', matchesPlayed: 5, matchesWon: 4, winRate: 0.8, totalPoints: 120, rank: 1 },
-  { playerId: 'p2', name: 'Bob', matchesPlayed: 5, matchesWon: 3, winRate: 0.6, totalPoints: 100, rank: 2 },
-  { playerId: 'p3', name: 'Cara', matchesPlayed: 5, matchesWon: 2, winRate: 0.4, totalPoints: 90, rank: 3 },
-  { playerId: 'p4', name: 'Dee', matchesPlayed: 5, matchesWon: 1, winRate: 0.2, totalPoints: 80, rank: 4 },
+  {
+    playerId: 'p1',
+    name: 'Alice',
+    matchesPlayed: 5,
+    matchesWon: 4,
+    winRate: 0.8,
+    totalPoints: 120,
+    rank: 1,
+  },
+  {
+    playerId: 'p2',
+    name: 'Bob',
+    matchesPlayed: 5,
+    matchesWon: 3,
+    winRate: 0.6,
+    totalPoints: 100,
+    rank: 2,
+  },
+  {
+    playerId: 'p3',
+    name: 'Cara',
+    matchesPlayed: 5,
+    matchesWon: 2,
+    winRate: 0.4,
+    totalPoints: 90,
+    rank: 3,
+  },
+  {
+    playerId: 'p4',
+    name: 'Dee',
+    matchesPlayed: 5,
+    matchesWon: 1,
+    winRate: 0.2,
+    totalPoints: 80,
+    rank: 4,
+  },
 ]
 
 describe('ScoreboardTable', () => {
@@ -32,7 +64,9 @@ describe('ScoreboardTable', () => {
   it('shows the "Total Points" column values', () => {
     render(<ScoreboardTable rows={rows} />)
 
-    expect(screen.getByRole('columnheader', { name: 'Total Points' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('columnheader', { name: 'Total Points' }),
+    ).toBeInTheDocument()
     const aliceRow = screen.getByText('Alice').closest('tr')
     expect(aliceRow).not.toBeNull()
     expect(aliceRow?.textContent).toContain('120')
@@ -41,7 +75,15 @@ describe('ScoreboardTable', () => {
 
   it('renders a placeholder for a null win rate', () => {
     const zeroRows: ScoreboardRow[] = [
-      { playerId: 'p1', name: 'Alice', matchesPlayed: 0, matchesWon: 0, winRate: null, totalPoints: 0, rank: 1 },
+      {
+        playerId: 'p1',
+        name: 'Alice',
+        matchesPlayed: 0,
+        matchesWon: 0,
+        winRate: null,
+        totalPoints: 0,
+        rank: 1,
+      },
     ]
     render(<ScoreboardTable rows={zeroRows} />)
 
@@ -51,10 +93,42 @@ describe('ScoreboardTable', () => {
 
   it('gives tied ranks the same medal and highlight, per standard competition ranking (1, 1, 3, 4)', () => {
     const tiedRows: ScoreboardRow[] = [
-      { playerId: 'p1', name: 'Alice', matchesPlayed: 3, matchesWon: 2, winRate: 2 / 3, totalPoints: 15, rank: 1 },
-      { playerId: 'p2', name: 'Bob', matchesPlayed: 3, matchesWon: 2, winRate: 2 / 3, totalPoints: 15, rank: 1 },
-      { playerId: 'p3', name: 'Cara', matchesPlayed: 3, matchesWon: 1, winRate: 1 / 3, totalPoints: 10, rank: 3 },
-      { playerId: 'p4', name: 'Dee', matchesPlayed: 3, matchesWon: 0, winRate: 0, totalPoints: 5, rank: 4 },
+      {
+        playerId: 'p1',
+        name: 'Alice',
+        matchesPlayed: 3,
+        matchesWon: 2,
+        winRate: 2 / 3,
+        totalPoints: 15,
+        rank: 1,
+      },
+      {
+        playerId: 'p2',
+        name: 'Bob',
+        matchesPlayed: 3,
+        matchesWon: 2,
+        winRate: 2 / 3,
+        totalPoints: 15,
+        rank: 1,
+      },
+      {
+        playerId: 'p3',
+        name: 'Cara',
+        matchesPlayed: 3,
+        matchesWon: 1,
+        winRate: 1 / 3,
+        totalPoints: 10,
+        rank: 3,
+      },
+      {
+        playerId: 'p4',
+        name: 'Dee',
+        matchesPlayed: 3,
+        matchesWon: 0,
+        winRate: 0,
+        totalPoints: 5,
+        rank: 4,
+      },
     ]
     render(<ScoreboardTable rows={tiedRows} />)
 
@@ -66,8 +140,12 @@ describe('ScoreboardTable', () => {
     expect(screen.getByRole('img', { name: 'Rank 3' })).toBeInTheDocument()
     expect(screen.queryByRole('img', { name: 'Rank 4' })).toBeNull()
 
-    expect(screen.getByText('Bob').closest('tr')).toHaveClass('scoreboard-medal-row')
-    expect(screen.getByText('Cara').closest('tr')).toHaveClass('scoreboard-medal-row')
+    expect(screen.getByText('Bob').closest('tr')).toHaveClass(
+      'scoreboard-medal-row',
+    )
+    expect(screen.getByText('Cara').closest('tr')).toHaveClass(
+      'scoreboard-medal-row',
+    )
     const deeRow = screen.getByText('Dee').closest('tr')
     expect(deeRow).not.toHaveClass('scoreboard-medal-row')
     expect(deeRow?.textContent).toContain('4')

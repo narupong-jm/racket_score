@@ -8,10 +8,10 @@ new capabilities on the Manage Tournament screen's existing Participants
 section (`TournamentDetail.tsx`, ~line 156-173).
 
 **This patch explicitly reverses a prior deliberate decision.** `docs/SPEC.md`
-§4 states: *"Participants are chosen once, at tournament-creation time, from
+§4 states: _"Participants are chosen once, at tournament-creation time, from
 the member pool — never after... There is no way to add a player to an
 in-progress tournament... which allowed late joins — the organizer now
-finalizes the roster [at creation]."* §2 of this document (late join)
+finalizes the roster [at creation]."_ §2 of this document (late join)
 un-deletes that feature, with different fairness semantics than the old one
 had. Treat this as a conscious reversal to record in `SPEC.md`, not an
 oversight.
@@ -32,7 +32,7 @@ this patch's two features can be built without adding columns:
   `'active' | 'left'`) to support §1 (soft-remove, reversible, per decision
   below).
 - A **fairness offset** column (e.g. `match_count_offset integer not null
-  default 0`) to support §2's "count as if already played N matches" rule.
+default 0`) to support §2's "count as if already played N matches" rule.
 
 Both need a migration plus a `database.types.ts` regeneration
 (`generate_typescript_types`). RLS policies on `tournament_participants`
@@ -73,19 +73,19 @@ never show up for.
   `'active'`), backfill existing rows.
 - New mutation (mirroring `useAddParticipant`'s passphrase-gated pattern):
   `useLeaveTournament` / `leaveParticipant(tournamentId, playerId,
-  passphrase)` → `UPDATE tournament_participants SET status = 'left' WHERE
-  ...`.
+passphrase)` → `UPDATE tournament_participants SET status = 'left' WHERE
+...`.
 - `listParticipants()` / `useDrawInputs.ts`: filter candidates to active
   participants only. Decide whether `listParticipants()` itself filters, or
   returns all rows and callers filter — the Participants section in
   `TournamentDetail.tsx` likely still wants to show "left" participants
   (e.g. greyed out) rather than hide them entirely, so filtering probably
-  belongs in the *draw* path (`useDrawInputs.ts`), not the roster-display path.
+  belongs in the _draw_ path (`useDrawInputs.ts`), not the roster-display path.
 - UI: add a "Leave" button per row in the existing Participants list
   (`TournamentDetail.tsx` ~line 162-170). Disabled state when
   `participant.player_id` is one of `currentMatch`'s participants. Add a
   confirm step (this is a write action, so it goes through the passphrase
-  gate already — decide if an *additional* "are you sure" dialog is needed
+  gate already — decide if an _additional_ "are you sure" dialog is needed
   on top, consistent with how `Cancel Tournament` and `endTournament` already
   confirm before the passphrase prompt).
 - i18n keys for the button, disabled-state tooltip/reason, and any confirm
@@ -105,13 +105,13 @@ to join — they're not in the original roster picked at creation time.
 
 - Reuses `useAddParticipant` (already exists, already passphrase-gated,
   already invalidates `drawInputs`) as the entry point — this patch adds a
-  UI affordance to call it *after* creation, not just from
+  UI affordance to call it _after_ creation, not just from
   `CreateTournamentForm`, plus the offset logic below.
 - **Fairness offset, not real match count.** On add, compute `offset =
-  min(matchesPlayedInTournament)` across all currently **active**
+min(matchesPlayedInTournament)` across all currently **active**
   participants at that moment, and store it as
   `tournament_participants.match_count_offset` for the new participant. This
-  uses the *minimum*, matching the existing hard "gap ≤ 1" invariant from
+  uses the _minimum_, matching the existing hard "gap ≤ 1" invariant from
   `IMPROVEMENT2.md` §1.1 — a late joiner starts level with whoever's
   currently furthest behind, not the average or the leader.
 - **Offset only affects the draw.** `useDrawInputs.ts`'s
@@ -119,13 +119,13 @@ to join — they're not in the original roster picked at creation time.
   from completed-match history (`matchCountByPlayer`). For candidates with a
   nonzero `match_count_offset`, the value fed into
   `CandidatePlayer.matchesPlayedInTournament` (matchmaking's fairness input)
-  must be `realCompletedCount + offset`. The *display* value (UI counters,
+  must be `realCompletedCount + offset`. The _display_ value (UI counters,
   Scoreboard, win rate) must stay the real completed count — offset is
   invisible outside the draw algorithm's internal calculation, per the
   explicit instruction that a late joiner "should not get credit for games
   they didn't actually play" in win-rate/scoreboard terms.
 - No retroactive fairness attempt — the offset does not try to make the late
-  joiner "catch up" faster; it just prevents the algorithm from *also*
+  joiner "catch up" faster; it just prevents the algorithm from _also_
   penalizing them for arriving late by comparing raw match counts.
 
 **Action items:**

@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { pickDoublesQuartet } from './pickDoublesQuartet'
 import type { CandidatePlayer } from './types'
 
-function player(id: string, skillValue: number, gender: 'male' | 'female'): CandidatePlayer {
+function player(
+  id: string,
+  skillValue: number,
+  gender: 'male' | 'female',
+): CandidatePlayer {
   return { id, gender, skillValue, matchesPlayedInTournament: 0 }
 }
 
@@ -81,7 +85,9 @@ describe('pickDoublesQuartet', () => {
 
     expect(first).not.toBeNull()
     expect(last).not.toBeNull()
-    expect(first?.map((p) => p.id).sort()).not.toEqual(last?.map((p) => p.id).sort())
+    expect(first?.map((p) => p.id).sort()).not.toEqual(
+      last?.map((p) => p.id).sort(),
+    )
   })
 
   it('returns null instead of throwing when there are fewer than 4 players', () => {

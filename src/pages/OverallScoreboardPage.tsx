@@ -5,7 +5,10 @@ import {
   type ScoreboardPeriod,
   type ScoreboardTypeFilter,
 } from '../features/scoreboard/useOverallScoreboard'
-import { ScoreboardTable, type ScoreboardRow } from '../features/scoreboard/ScoreboardTable'
+import {
+  ScoreboardTable,
+  type ScoreboardRow,
+} from '../features/scoreboard/ScoreboardTable'
 import type { PlayerScoreboardEntry } from '../features/scoreboard/aggregateScoreboard'
 import { rankScoreboard } from '../features/scoreboard/rankScoreboard'
 
@@ -24,7 +27,11 @@ export function OverallScoreboardPage() {
     <section className="page">
       <h1>{t('nav.scoreboard')}</h1>
 
-      <div className="filter-group" role="group" aria-label={t('scoreboard.periodGroupLabel')}>
+      <div
+        className="filter-group"
+        role="group"
+        aria-label={t('scoreboard.periodGroupLabel')}
+      >
         {PERIODS.map((p) => (
           <button
             key={p}
@@ -33,12 +40,20 @@ export function OverallScoreboardPage() {
             aria-pressed={period === p}
             onClick={() => setPeriod(p)}
           >
-            {t(p === 'all' ? 'scoreboard.periodAllTime' : 'scoreboard.periodThisMonth')}
+            {t(
+              p === 'all'
+                ? 'scoreboard.periodAllTime'
+                : 'scoreboard.periodThisMonth',
+            )}
           </button>
         ))}
       </div>
 
-      <div className="filter-group" role="group" aria-label={t('scoreboard.typeGroupLabel')}>
+      <div
+        className="filter-group"
+        role="group"
+        aria-label={t('scoreboard.typeGroupLabel')}
+      >
         {TYPES.map((ty) => (
           <button
             key={ty}
@@ -57,7 +72,9 @@ export function OverallScoreboardPage() {
       {!isLoading && !isError && rows.length === 0 && (
         <p className="empty-state">{t('scoreboard.empty')}</p>
       )}
-      {!isLoading && !isError && rows.length > 0 && <ScoreboardTable rows={rows} />}
+      {!isLoading && !isError && rows.length > 0 && (
+        <ScoreboardTable rows={rows} />
+      )}
     </section>
   )
 }

@@ -54,7 +54,9 @@ export interface MatchHistoryEntry {
   team: number
 }
 
-export async function getMatchHistory(tournamentId: string): Promise<MatchHistoryEntry[]> {
+export async function getMatchHistory(
+  tournamentId: string,
+): Promise<MatchHistoryEntry[]> {
   const { data, error } = await supabase
     .from('match_participants')
     .select('match_id, player_id, team, matches!inner(tournament_id, status)')
@@ -68,7 +70,9 @@ export async function getMatchHistory(tournamentId: string): Promise<MatchHistor
   }))
 }
 
-export async function getParticipantsForMatches(matchIds: string[]): Promise<MatchHistoryEntry[]> {
+export async function getParticipantsForMatches(
+  matchIds: string[],
+): Promise<MatchHistoryEntry[]> {
   if (matchIds.length === 0) return []
   const { data, error } = await supabase
     .from('match_participants')
@@ -88,7 +92,9 @@ export async function listMatches(tournamentId: string): Promise<Match[]> {
   return data
 }
 
-export async function listGamesForMatches(matchIds: string[]): Promise<MatchGame[]> {
+export async function listGamesForMatches(
+  matchIds: string[],
+): Promise<MatchGame[]> {
   if (matchIds.length === 0) return []
   const { data, error } = await supabase
     .from('match_games')
@@ -106,7 +112,9 @@ export interface RecentCompletedMatch {
   games: MatchGame[]
 }
 
-export async function listRecentCompletedMatches(): Promise<RecentCompletedMatch[]> {
+export async function listRecentCompletedMatches(): Promise<
+  RecentCompletedMatch[]
+> {
   const { data, error } = await supabase
     .from('matches')
     .select('*, tournaments(name)')

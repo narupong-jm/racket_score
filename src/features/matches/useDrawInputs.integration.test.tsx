@@ -4,16 +4,24 @@ import type { ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useDrawInputs } from './useDrawInputs'
 import { createMatch, recordMatchResult } from './matchesApi'
-import { createTournament, addParticipant, leaveParticipant } from '../tournaments/tournamentsApi'
+import {
+  createTournament,
+  addParticipant,
+  leaveParticipant,
+} from '../tournaments/tournamentsApi'
 import { createPlayer } from '../players/playersApi'
 import { canonicalPairKey } from '../matchmaking/pairKey'
 import { supabase } from '../../lib/supabaseClient'
 import { testWritePassphrase } from '../../test/testPassphrase'
 
 function createWrapper() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   return function Wrapper({ children }: { children: ReactNode }) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
   }
 }
 
@@ -31,10 +39,16 @@ describe('useDrawInputs (real project, anon key)', () => {
       const matchIds = (matches ?? []).map((m) => m.id)
       if (matchIds.length > 0) {
         await supabase.from('match_games').delete().in('match_id', matchIds)
-        await supabase.from('match_participants').delete().in('match_id', matchIds)
+        await supabase
+          .from('match_participants')
+          .delete()
+          .in('match_id', matchIds)
       }
       await supabase.from('matches').delete().eq('tournament_id', tournamentId)
-      await supabase.from('tournament_participants').delete().eq('tournament_id', tournamentId)
+      await supabase
+        .from('tournament_participants')
+        .delete()
+        .eq('tournament_id', tournamentId)
       await supabase.from('tournaments').delete().eq('id', tournamentId)
     }
     const ids = Object.values(playerIds)
@@ -57,7 +71,12 @@ describe('useDrawInputs (real project, anon key)', () => {
     )
     tournamentId = tournament.id
 
-    const levels = { A: 'beginner', B: 'intermediate', C: 'advanced', D: 'pro' } as const
+    const levels = {
+      A: 'beginner',
+      B: 'intermediate',
+      C: 'advanced',
+      D: 'pro',
+    } as const
     const genders = { A: 'male', B: 'female', C: 'male', D: 'female' } as const
     for (const label of ['A', 'B', 'C', 'D'] as const) {
       const player = await createPlayer(
@@ -76,7 +95,11 @@ describe('useDrawInputs (real project, anon key)', () => {
     // E joins then immediately leaves -- must be excluded from candidates entirely,
     // with no reuse fallback (unlike the Current-match exclusion).
     const playerE = await createPlayer(
-      { name: `Draw Inputs Test E ${runId}`, gender: 'male', self_selected_level: 'beginner' },
+      {
+        name: `Draw Inputs Test E ${runId}`,
+        gender: 'male',
+        self_selected_level: 'beginner',
+      },
       testWritePassphrase,
     )
     playerIds.E = playerE.id
@@ -85,7 +108,11 @@ describe('useDrawInputs (real project, anon key)', () => {
 
     // F is created now but only added mid-tournament, after match 1
     const playerF = await createPlayer(
-      { name: `Draw Inputs Test F ${runId}`, gender: 'female', self_selected_level: 'beginner' },
+      {
+        name: `Draw Inputs Test F ${runId}`,
+        gender: 'female',
+        self_selected_level: 'beginner',
+      },
       testWritePassphrase,
     )
     playerIds.F = playerF.id
@@ -168,7 +195,9 @@ describe('useDrawInputs (real project, anon key)', () => {
 
     // F has 0 real completed matches but joined with a fairness offset of 2 (the
     // active minimum at join time), so their draw-facing count is real + offset = 2
-    expect(byId.get(playerIds.F)).toMatchObject({ matchesPlayedInTournament: 2 })
+    expect(byId.get(playerIds.F)).toMatchObject({
+      matchesPlayedInTournament: 2,
+    })
 
     expect(pairingHistory.teammatePairs).toEqual(
       new Set([

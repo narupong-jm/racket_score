@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Modal } from '../../components/Modal'
-import { DrawSlotSelect, type RosterPlayer } from '../../components/DrawSlotSelect'
+import {
+  DrawSlotSelect,
+  type RosterPlayer,
+} from '../../components/DrawSlotSelect'
 import { isMixedDoublesRuleViolated } from '../matchmaking/isMixedDoublesRuleViolated'
 import type { GeneratedMatchParticipant } from '../matchmaking/generateNextMatch'
 import type { MatchType } from '../matchmaking/types'
@@ -11,7 +14,10 @@ interface FirstMatchDrawnPopupProps {
   drawParticipants: GeneratedMatchParticipant[] | null
   matchType: MatchType
   rosterPlayers: RosterPlayer[]
-  onConfirm: (participants: GeneratedMatchParticipant[], manuallyAdjusted: boolean) => void
+  onConfirm: (
+    participants: GeneratedMatchParticipant[],
+    manuallyAdjusted: boolean,
+  ) => void
   onDismiss: () => void
   isConfirming: boolean
   confirmError: boolean
@@ -36,7 +42,11 @@ export function FirstMatchDrawnPopup({
 
   function handleSwap(oldPlayerId: string, newPlayerId: string) {
     if (!draft || oldPlayerId === newPlayerId) return
-    setDraft(draft.map((p) => (p.playerId === oldPlayerId ? { ...p, playerId: newPlayerId } : p)))
+    setDraft(
+      draft.map((p) =>
+        p.playerId === oldPlayerId ? { ...p, playerId: newPlayerId } : p,
+      ),
+    )
     setManuallyAdjusted(true)
   }
 
@@ -114,12 +124,22 @@ export function FirstMatchDrawnPopup({
           {manuallyAdjusted && mixedDoublesViolation && (
             <p className="field-warning">{t('manage.mixedDoublesWarning')}</p>
           )}
-          {confirmError && <p className="field-error">{t('manage.drawFailed')}</p>}
+          {confirmError && (
+            <p className="field-error">{t('manage.drawFailed')}</p>
+          )}
           <div className="modal-actions">
-            <button type="button" className="secondary" onClick={() => setEditing((e) => !e)}>
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => setEditing((e) => !e)}
+            >
               {editing ? t('manage.doneEditingDraw') : t('manage.editDraw')}
             </button>
-            <button type="button" onClick={handleConfirmClick} disabled={isConfirming}>
+            <button
+              type="button"
+              onClick={handleConfirmClick}
+              disabled={isConfirming}
+            >
               {t('tournaments.firstMatchPopup.confirm')}
             </button>
           </div>

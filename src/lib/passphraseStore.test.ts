@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { clearCachedPassphrase, getCachedPassphrase, setCachedPassphrase } from './passphraseStore'
+import {
+  clearCachedPassphrase,
+  getCachedPassphrase,
+  setCachedPassphrase,
+} from './passphraseStore'
 
 describe('passphraseStore', () => {
   beforeEach(() => {

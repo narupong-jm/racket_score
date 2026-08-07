@@ -53,10 +53,15 @@ export function TournamentList({ selectedId, onSelect }: TournamentListProps) {
 
   if (isLoading) return <p>{t('tournaments.list.loading')}</p>
   if (isError) return <p>{t('tournaments.list.loadError')}</p>
-  if (!tournaments || tournaments.length === 0) return <p>{t('tournaments.list.empty')}</p>
+  if (!tournaments || tournaments.length === 0)
+    return <p>{t('tournaments.list.empty')}</p>
 
-  const active = tournaments.filter((tournament) => tournament.status === 'active')
-  const completed = tournaments.filter((tournament) => tournament.status === 'completed')
+  const active = tournaments.filter(
+    (tournament) => tournament.status === 'active',
+  )
+  const completed = tournaments.filter(
+    (tournament) => tournament.status === 'completed',
+  )
 
   return (
     <div>

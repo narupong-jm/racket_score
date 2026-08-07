@@ -66,10 +66,16 @@ describe('matchesApi: manually_adjusted flag (real project, anon key)', () => {
         .eq('tournament_id', tournament.id)
       const matchIds = (matches ?? []).map((m) => m.id)
       if (matchIds.length > 0) {
-        await supabase.from('match_participants').delete().in('match_id', matchIds)
+        await supabase
+          .from('match_participants')
+          .delete()
+          .in('match_id', matchIds)
         await supabase.from('matches').delete().in('id', matchIds)
       }
-      await supabase.from('tournament_participants').delete().eq('tournament_id', tournament.id)
+      await supabase
+        .from('tournament_participants')
+        .delete()
+        .eq('tournament_id', tournament.id)
       await supabase.from('tournaments').delete().eq('id', tournament.id)
       await supabase.from('players').delete().in('id', [playerA.id, playerB.id])
     }
@@ -84,10 +90,19 @@ describe('matchesApi (real project, anon key)', () => {
 
   afterAll(async () => {
     if (tournamentId) {
-      await supabase.from('match_games').delete().in('match_id', matchId ? [matchId] : [])
-      await supabase.from('match_participants').delete().in('match_id', matchId ? [matchId] : [])
+      await supabase
+        .from('match_games')
+        .delete()
+        .in('match_id', matchId ? [matchId] : [])
+      await supabase
+        .from('match_participants')
+        .delete()
+        .in('match_id', matchId ? [matchId] : [])
       await supabase.from('matches').delete().eq('tournament_id', tournamentId)
-      await supabase.from('tournament_participants').delete().eq('tournament_id', tournamentId)
+      await supabase
+        .from('tournament_participants')
+        .delete()
+        .eq('tournament_id', tournamentId)
       await supabase.from('tournaments').delete().eq('id', tournamentId)
     }
     if (playerIds.length > 0) {
@@ -193,6 +208,8 @@ describe('matchesApi (real project, anon key)', () => {
     // now that the match is completed, it must show up in match history
     const history = await getMatchHistory(tournamentId)
     expect(history).toHaveLength(4)
-    expect(history.filter((h) => h.match_id === matchId && h.team === 1)).toHaveLength(2)
+    expect(
+      history.filter((h) => h.match_id === matchId && h.team === 1),
+    ).toHaveLength(2)
   })
 })

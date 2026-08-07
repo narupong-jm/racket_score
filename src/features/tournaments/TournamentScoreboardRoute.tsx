@@ -4,7 +4,10 @@ import { useTranslation } from 'react-i18next'
 import { getTournamentStandingsRanked } from './tournamentsApi'
 import { listPlayerMatchHistory } from '../scoreboard/scoreboardApi'
 import { rankScoreboard } from '../scoreboard/rankScoreboard'
-import { ScoreboardTable, type ScoreboardRow } from '../scoreboard/ScoreboardTable'
+import {
+  ScoreboardTable,
+  type ScoreboardRow,
+} from '../scoreboard/ScoreboardTable'
 
 export function TournamentScoreboardRoute() {
   const { id } = useParams<{ id: string }>()

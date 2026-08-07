@@ -1,13 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
 import { listPlayers } from '../players/playersApi'
 import { listPlayerMatchHistory } from './scoreboardApi'
-import { aggregateScoreboard, type PlayerScoreboardEntry } from './aggregateScoreboard'
+import {
+  aggregateScoreboard,
+  type PlayerScoreboardEntry,
+} from './aggregateScoreboard'
 import type { TournamentType } from '../tournaments/tournamentType'
 
 export type ScoreboardPeriod = 'all' | 'month'
 export type ScoreboardTypeFilter = 'all' | TournamentType
 
-export function useOverallScoreboard(period: ScoreboardPeriod, type: ScoreboardTypeFilter) {
+export function useOverallScoreboard(
+  period: ScoreboardPeriod,
+  type: ScoreboardTypeFilter,
+) {
   return useQuery<PlayerScoreboardEntry[]>({
     queryKey: ['overallScoreboard', period, type],
     queryFn: () => fetchOverallScoreboard(period, type),

@@ -30,7 +30,12 @@ describe('selectCandidatePool', () => {
   })
 
   it('returns the whole lowest tier even if larger than neededCount (no partial trimming)', () => {
-    const players = [player('a', 0), player('b', 0), player('c', 0), player('d', 1)]
+    const players = [
+      player('a', 0),
+      player('b', 0),
+      player('c', 0),
+      player('d', 1),
+    ]
 
     const result = selectCandidatePool(players, 2)
 
@@ -77,7 +82,15 @@ describe('selectCandidatePool', () => {
 
     expect(result.ok).toBe(true)
     if (result.ok) {
-      expect(result.pool.map((p) => p.id).sort()).toEqual(['a', 'b', 'c', 'd', 'e', 'f', 'g'])
+      expect(result.pool.map((p) => p.id).sort()).toEqual([
+        'a',
+        'b',
+        'c',
+        'd',
+        'e',
+        'f',
+        'g',
+      ])
       expect(result.mandatoryIds).toEqual(new Set(['a', 'b']))
     }
   })

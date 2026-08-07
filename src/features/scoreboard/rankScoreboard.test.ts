@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { rankScoreboard, type RankableEntry } from './rankScoreboard'
 
-function entry(playerId: string, winRate: number | null, totalPoints: number): RankableEntry {
+function entry(
+  playerId: string,
+  winRate: number | null,
+  totalPoints: number,
+): RankableEntry {
   return { playerId, winRate, totalPoints }
 }
 

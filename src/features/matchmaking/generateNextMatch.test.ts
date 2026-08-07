@@ -21,13 +21,20 @@ function teamIds(
   team: 1 | 2,
 ): string[] {
   if (!result.ok) return []
-  return result.participants.filter((p) => p.team === team).map((p) => p.playerId)
+  return result.participants
+    .filter((p) => p.team === team)
+    .map((p) => p.playerId)
 }
 
 describe('generateNextMatch', () => {
   describe('singles', () => {
     it('fresh tournament first draw: everyone at 0 matches produces a valid 1v1', () => {
-      const players = [player('a', 50), player('b', 51), player('c', 49), player('d', 52)]
+      const players = [
+        player('a', 50),
+        player('b', 51),
+        player('c', 49),
+        player('d', 52),
+      ]
 
       const result = generateNextMatch('singles', players, emptyHistory())
 
@@ -87,7 +94,10 @@ describe('generateNextMatch', () => {
 
       expect(result.ok).toBe(true)
       if (!result.ok) return
-      expect(result.participants.map((p) => p.playerId).sort()).toEqual(['a', 'b'])
+      expect(result.participants.map((p) => p.playerId).sort()).toEqual([
+        'a',
+        'b',
+      ])
     })
 
     it('not enough players: returns an explicit error instead of throwing', () => {
@@ -101,7 +111,12 @@ describe('generateNextMatch', () => {
 
   describe('doubles', () => {
     it('fresh tournament first draw: everyone at 0 matches produces a valid 2v2', () => {
-      const players = [player('a', 50), player('b', 51), player('c', 49), player('d', 52)]
+      const players = [
+        player('a', 50),
+        player('b', 51),
+        player('c', 49),
+        player('d', 52),
+      ]
 
       const result = generateNextMatch('doubles', players, emptyHistory())
 

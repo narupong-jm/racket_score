@@ -15,8 +15,10 @@ export async function listPlayerMatchHistory(
 ): Promise<PlayerMatchHistoryRow[]> {
   let query = supabase.from('player_match_history').select('*')
   if (filters.since) query = query.gte('completed_at', filters.since)
-  if (filters.tournamentType) query = query.eq('tournament_type', filters.tournamentType)
-  if (filters.tournamentId) query = query.eq('tournament_id', filters.tournamentId)
+  if (filters.tournamentType)
+    query = query.eq('tournament_type', filters.tournamentType)
+  if (filters.tournamentId)
+    query = query.eq('tournament_id', filters.tournamentId)
   const { data, error } = await query
   if (error) throw error
   return data

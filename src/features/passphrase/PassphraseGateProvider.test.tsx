@@ -23,7 +23,9 @@ function TestConsumer() {
 
   return (
     <div>
-      <button onClick={() => getPassphrase().then(setResult)}>Trigger write</button>
+      <button onClick={() => getPassphrase().then(setResult)}>
+        Trigger write
+      </button>
       <p>result: {result ?? 'none'}</p>
     </div>
   )
@@ -36,7 +38,9 @@ describe('PassphraseGateProvider', () => {
   })
 
   it('resolves immediately with a cached passphrase, without opening the modal', async () => {
-    vi.mocked(passphraseStore.getCachedPassphrase).mockReturnValue('cached-secret')
+    vi.mocked(passphraseStore.getCachedPassphrase).mockReturnValue(
+      'cached-secret',
+    )
     const user = userEvent.setup()
 
     render(
@@ -47,7 +51,9 @@ describe('PassphraseGateProvider', () => {
 
     await user.click(screen.getByRole('button', { name: 'Trigger write' }))
 
-    await waitFor(() => expect(screen.getByText('result: cached-secret')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByText('result: cached-secret')).toBeInTheDocument(),
+    )
     expect(screen.queryByLabelText('Passphrase')).not.toBeInTheDocument()
     expect(passphraseApi.verifyWritePassphrase).not.toHaveBeenCalled()
   })
@@ -68,14 +74,22 @@ describe('PassphraseGateProvider', () => {
     await user.type(input, 'right-secret')
     await user.click(screen.getByRole('button', { name: 'Submit' }))
 
-    await waitFor(() => expect(screen.getByText('result: right-secret')).toBeInTheDocument())
-    expect(passphraseApi.verifyWritePassphrase).toHaveBeenCalledWith('right-secret')
-    expect(passphraseStore.setCachedPassphrase).toHaveBeenCalledWith('right-secret')
+    await waitFor(() =>
+      expect(screen.getByText('result: right-secret')).toBeInTheDocument(),
+    )
+    expect(passphraseApi.verifyWritePassphrase).toHaveBeenCalledWith(
+      'right-secret',
+    )
+    expect(passphraseStore.setCachedPassphrase).toHaveBeenCalledWith(
+      'right-secret',
+    )
     expect(screen.queryByLabelText('Passphrase')).not.toBeInTheDocument()
   })
 
   it('shows an inline error and keeps the modal open on a failed verify call', async () => {
-    vi.mocked(passphraseApi.verifyWritePassphrase).mockRejectedValueOnce(new Error('invalid_passphrase'))
+    vi.mocked(passphraseApi.verifyWritePassphrase).mockRejectedValueOnce(
+      new Error('invalid_passphrase'),
+    )
     const user = userEvent.setup()
 
     render(

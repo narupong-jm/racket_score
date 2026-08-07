@@ -33,17 +33,24 @@ vi.mock('../matches/matchesApi', async (importOriginal) => {
 })
 
 vi.mock('../passphrase/usePassphraseGate', () => ({
-  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+  usePassphraseGate: () => ({
+    getPassphrase: vi.fn().mockResolvedValue('test-passphrase'),
+  }),
 }))
 
 function renderAt(path: string) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/tournaments/:id" element={<TournamentDetailRoute />} />
-          <Route path="/tournaments/:id/scoreboard" element={<p>Scoreboard for t1</p>} />
+          <Route
+            path="/tournaments/:id/scoreboard"
+            element={<p>Scoreboard for t1</p>}
+          />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -72,7 +79,9 @@ const activeTournament: Tournament = {
 
 describe('TournamentDetailRoute', () => {
   it('redirects to the scoreboard route when the tournament is already completed', async () => {
-    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([completedTournament])
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      completedTournament,
+    ])
 
     renderAt('/tournaments/t1')
 
@@ -80,7 +89,9 @@ describe('TournamentDetailRoute', () => {
   })
 
   it('renders the Manage Tournament screen (no redirect) for an active tournament', async () => {
-    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([activeTournament])
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+    ])
     vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([])
     vi.mocked(playersApi.listPlayers).mockResolvedValue([])
     vi.mocked(playersApi.listPlayerStats).mockResolvedValue([])
@@ -90,7 +101,9 @@ describe('TournamentDetailRoute', () => {
 
     renderAt('/tournaments/t1')
 
-    expect(await screen.findByText('Active T', { exact: false })).toBeInTheDocument()
+    expect(
+      await screen.findByText('Active T', { exact: false }),
+    ).toBeInTheDocument()
     expect(screen.queryByText('Scoreboard for t1')).toBeNull()
   })
 })

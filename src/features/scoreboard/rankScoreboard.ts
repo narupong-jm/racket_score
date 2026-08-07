@@ -13,7 +13,9 @@ export interface RankableEntry {
  * next distinct entry's rank equals its 1-based position, not a dense
  * count. Used identically by the per-tournament and Overall scoreboards.
  */
-export function rankScoreboard<T extends RankableEntry>(entries: T[]): (T & { rank: number })[] {
+export function rankScoreboard<T extends RankableEntry>(
+  entries: T[],
+): (T & { rank: number })[] {
   const sorted = [...entries].sort((a, b) => {
     const rateDiff = (b.winRate ?? -1) - (a.winRate ?? -1)
     if (rateDiff !== 0) return rateDiff
@@ -31,7 +33,10 @@ export function rankScoreboard<T extends RankableEntry>(entries: T[]): (T & { ra
       previous !== undefined &&
       (previous.winRate ?? -1) === (entry.winRate ?? -1) &&
       previous.totalPoints === entry.totalPoints
-    ranked.push({ ...entry, rank: tiedWithPrevious ? previous.rank : index + 1 })
+    ranked.push({
+      ...entry,
+      rank: tiedWithPrevious ? previous.rank : index + 1,
+    })
   })
   return ranked
 }

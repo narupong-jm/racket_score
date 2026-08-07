@@ -1,6 +1,9 @@
 import { useCallback, useRef, useState, type ReactNode } from 'react'
 import { PassphraseModal } from '../../components/PassphraseModal'
-import { getCachedPassphrase, setCachedPassphrase } from '../../lib/passphraseStore'
+import {
+  getCachedPassphrase,
+  setCachedPassphrase,
+} from '../../lib/passphraseStore'
 import { PassphraseGateContext } from './PassphraseGateContext'
 import { verifyWritePassphrase } from './passphraseApi'
 

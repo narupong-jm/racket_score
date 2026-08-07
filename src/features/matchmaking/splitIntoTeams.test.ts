@@ -3,7 +3,11 @@ import { splitIntoTeams, type DoublesTeams } from './splitIntoTeams'
 import { canonicalPairKey } from './pairKey'
 import type { CandidatePlayer, PairingHistory } from './types'
 
-function player(id: string, skillValue: number, gender: 'male' | 'female'): CandidatePlayer {
+function player(
+  id: string,
+  skillValue: number,
+  gender: 'male' | 'female',
+): CandidatePlayer {
   return { id, gender, skillValue, matchesPlayedInTournament: 0 }
 }
 
@@ -88,7 +92,10 @@ describe('splitIntoTeams', () => {
     const p3 = player('p3', 50, 'female')
     const history: PairingHistory = {
       opponentPairs: new Set(),
-      teammatePairs: new Set([canonicalPairKey('p0', 'p1'), canonicalPairKey('p0', 'p3')]),
+      teammatePairs: new Set([
+        canonicalPairKey('p0', 'p1'),
+        canonicalPairKey('p0', 'p3'),
+      ]),
     }
 
     const result = splitIntoTeams([p0, p1, p2, p3], history)

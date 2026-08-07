@@ -31,7 +31,9 @@ export function selectCandidatePool(
   let lastTierPlayers: CandidatePlayer[] = []
   for (const count of matchCounts) {
     if (pool.length >= neededCount) break
-    lastTierPlayers = players.filter((p) => p.matchesPlayedInTournament === count)
+    lastTierPlayers = players.filter(
+      (p) => p.matchesPlayedInTournament === count,
+    )
     pool.push(...lastTierPlayers)
   }
 

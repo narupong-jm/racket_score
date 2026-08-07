@@ -1,7 +1,12 @@
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useCreatePlayer } from './useCreatePlayer'
-import { GENDERS, PLAYER_LEVELS, type Gender, type PlayerLevel } from './playerLevels'
+import {
+  GENDERS,
+  PLAYER_LEVELS,
+  type Gender,
+  type PlayerLevel,
+} from './playerLevels'
 import { IconChoice } from '../../components/IconChoice'
 import maleIcon from '../../assets/icons/male.png'
 import femaleIcon from '../../assets/icons/female.png'
@@ -41,18 +46,29 @@ export function CreatePlayerForm() {
     <form onSubmit={handleSubmit}>
       <label className="field">
         <span className="field-label">{t('players.form.nameLabel')}</span>
-        <input type="text" value={name} onChange={(event) => setName(event.target.value)} />
+        <input
+          type="text"
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
       </label>
       <IconChoice<Gender>
         legend={t('players.form.genderLabel')}
         name="gender"
-        options={GENDERS.map((g) => ({ value: g, label: t(`gender.${g}`), icon: GENDER_ICONS[g] }))}
+        options={GENDERS.map((g) => ({
+          value: g,
+          label: t(`gender.${g}`),
+          icon: GENDER_ICONS[g],
+        }))}
         value={gender}
         onChange={setGender}
       />
       <label className="field">
         <span className="field-label">{t('players.form.levelLabel')}</span>
-        <select value={level} onChange={(event) => setLevel(event.target.value as PlayerLevel)}>
+        <select
+          value={level}
+          onChange={(event) => setLevel(event.target.value as PlayerLevel)}
+        >
           {PLAYER_LEVELS.map((l) => (
             <option key={l} value={l}>
               {t(`level.${l}`)}

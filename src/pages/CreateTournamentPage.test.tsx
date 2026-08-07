@@ -19,7 +19,10 @@ vi.mock('../features/players/playersApi', () => ({
 }))
 
 vi.mock('../features/tournaments/tournamentsApi', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../features/tournaments/tournamentsApi')>()
+  const actual =
+    await importOriginal<
+      typeof import('../features/tournaments/tournamentsApi')
+    >()
   return {
     ...actual,
     createTournament: vi.fn(),
@@ -32,7 +35,8 @@ vi.mock('../features/matches/useDrawInputs', () => ({
 }))
 
 vi.mock('../features/matches/matchesApi', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../features/matches/matchesApi')>()
+  const actual =
+    await importOriginal<typeof import('../features/matches/matchesApi')>()
   return {
     ...actual,
     createMatch: vi.fn(),
@@ -41,7 +45,10 @@ vi.mock('../features/matches/matchesApi', async (importOriginal) => {
 })
 
 vi.mock('../features/matchmaking/generateNextMatch', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../features/matchmaking/generateNextMatch')>()
+  const actual =
+    await importOriginal<
+      typeof import('../features/matchmaking/generateNextMatch')
+    >()
   return {
     ...actual,
     generateNextMatch: vi.fn(),
@@ -49,17 +56,24 @@ vi.mock('../features/matchmaking/generateNextMatch', async (importOriginal) => {
 })
 
 vi.mock('../features/passphrase/usePassphraseGate', () => ({
-  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+  usePassphraseGate: () => ({
+    getPassphrase: vi.fn().mockResolvedValue('test-passphrase'),
+  }),
 }))
 
 function renderPage() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/create']}>
         <Routes>
           <Route path="/create" element={<CreateTournamentPage />} />
-          <Route path="/tournaments/:id" element={<p>Manage tournament t1</p>} />
+          <Route
+            path="/tournaments/:id"
+            element={<p>Manage tournament t1</p>}
+          />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -67,7 +81,13 @@ function renderPage() {
 }
 
 function makePlayer(id: string, name: string): Player {
-  return { id, name, gender: 'male', self_selected_level: 'beginner', created_at: '' }
+  return {
+    id,
+    name,
+    gender: 'male',
+    self_selected_level: 'beginner',
+    created_at: '',
+  }
 }
 
 function makeStats(playerId: string): PlayerStats {
@@ -120,7 +140,9 @@ afterEach(() => {
 describe('CreateTournamentPage', () => {
   it('blocks submit and shows an inline error with 2 selected for Doubles (needs 4)', async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
-    vi.mocked(playersApi.listPlayerStats).mockResolvedValue(players.map((p) => makeStats(p.id)))
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue(
+      players.map((p) => makeStats(p.id)),
+    )
 
     const user = userEvent.setup()
     renderPage()
@@ -133,13 +155,17 @@ describe('CreateTournamentPage', () => {
       screen.getByText('Select at least 4 players (2 selected).'),
     ).toBeInTheDocument()
     await user.type(screen.getByLabelText(/name/i), 'Sunday Smash')
-    expect(screen.getByRole('button', { name: /create tournament/i })).toBeDisabled()
+    expect(
+      screen.getByRole('button', { name: /create tournament/i }),
+    ).toBeDisabled()
     expect(tournamentsApi.createTournament).not.toHaveBeenCalled()
   })
 
   it('succeeds with 4 selected for Doubles: shows the popup with the correct matchup, defers persistence until Confirm, and navigates after', async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
-    vi.mocked(playersApi.listPlayerStats).mockResolvedValue(players.map((p) => makeStats(p.id)))
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue(
+      players.map((p) => makeStats(p.id)),
+    )
     vi.mocked(tournamentsApi.createTournament).mockResolvedValue(tournament)
     vi.mocked(tournamentsApi.addParticipant).mockResolvedValue({
       tournament_id: 't1',
@@ -174,7 +200,9 @@ describe('CreateTournamentPage', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Carol' }))
     await user.click(screen.getByRole('checkbox', { name: 'Dave' }))
 
-    const submitButton = screen.getByRole('button', { name: /create tournament/i })
+    const submitButton = screen.getByRole('button', {
+      name: /create tournament/i,
+    })
     expect(submitButton).toBeEnabled()
     await user.click(submitButton)
 
@@ -192,13 +220,16 @@ describe('CreateTournamentPage', () => {
 
     expect(
       await screen.findByText(
-        (_, element) => element?.textContent === 'First match: Alice & Bob vs Carol & Dave',
+        (_, element) =>
+          element?.textContent === 'First match: Alice & Bob vs Carol & Dave',
       ),
     ).toBeInTheDocument()
     // Not persisted yet -- the popup shows a computed draft until Confirm is clicked.
     expect(matchesApi.createMatch).not.toHaveBeenCalled()
 
-    await user.click(screen.getByRole('button', { name: 'Go to Manage Tournament' }))
+    await user.click(
+      screen.getByRole('button', { name: 'Go to Manage Tournament' }),
+    )
 
     await waitFor(() => {
       expect(matchesApi.createMatch).toHaveBeenCalledWith(
@@ -261,12 +292,18 @@ describe('CreateTournamentPage', () => {
     await user.click(screen.getByRole('button', { name: /create tournament/i }))
 
     await screen.findByText(
-      (_, element) => element?.textContent === 'First match: Alice & Bob vs Carol & Dave',
+      (_, element) =>
+        element?.textContent === 'First match: Alice & Bob vs Carol & Dave',
     )
 
     await user.click(screen.getByRole('button', { name: 'Edit' }))
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Team 1 player 1' }), 'p5')
-    await user.click(screen.getByRole('button', { name: 'Go to Manage Tournament' }))
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Team 1 player 1' }),
+      'p5',
+    )
+    await user.click(
+      screen.getByRole('button', { name: 'Go to Manage Tournament' }),
+    )
 
     await waitFor(() => {
       expect(matchesApi.createMatch).toHaveBeenCalledWith(

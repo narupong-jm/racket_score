@@ -10,7 +10,8 @@ import * as matchesApi from './features/matches/matchesApi'
 import * as scoreboardApi from './features/scoreboard/scoreboardApi'
 
 vi.mock('./features/players/playersApi', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./features/players/playersApi')>()
+  const actual =
+    await importOriginal<typeof import('./features/players/playersApi')>()
   return {
     ...actual,
     listPlayers: vi.fn(),
@@ -19,7 +20,10 @@ vi.mock('./features/players/playersApi', async (importOriginal) => {
 })
 
 vi.mock('./features/tournaments/tournamentsApi', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./features/tournaments/tournamentsApi')>()
+  const actual =
+    await importOriginal<
+      typeof import('./features/tournaments/tournamentsApi')
+    >()
   return {
     ...actual,
     listTournaments: vi.fn(),
@@ -27,7 +31,8 @@ vi.mock('./features/tournaments/tournamentsApi', async (importOriginal) => {
 })
 
 vi.mock('./features/matches/matchesApi', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./features/matches/matchesApi')>()
+  const actual =
+    await importOriginal<typeof import('./features/matches/matchesApi')>()
   return {
     ...actual,
     listRecentCompletedMatches: vi.fn(),
@@ -35,7 +40,8 @@ vi.mock('./features/matches/matchesApi', async (importOriginal) => {
 })
 
 vi.mock('./features/scoreboard/scoreboardApi', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./features/scoreboard/scoreboardApi')>()
+  const actual =
+    await importOriginal<typeof import('./features/scoreboard/scoreboardApi')>()
   return {
     ...actual,
     listPlayerMatchHistory: vi.fn(),
@@ -43,7 +49,9 @@ vi.mock('./features/scoreboard/scoreboardApi', async (importOriginal) => {
 })
 
 vi.mock('./features/passphrase/usePassphraseGate', () => ({
-  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+  usePassphraseGate: () => ({
+    getPassphrase: vi.fn().mockResolvedValue('test-passphrase'),
+  }),
 }))
 
 function renderApp(initialPath = '/') {
@@ -53,7 +61,9 @@ function renderApp(initialPath = '/') {
   vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([])
   vi.mocked(scoreboardApi.listPlayerMatchHistory).mockResolvedValue([])
 
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialPath]}>
@@ -83,31 +93,49 @@ describe('App', () => {
   it('redirects the index route ("/") to the Create tab', async () => {
     renderApp('/')
 
-    expect(await screen.findByRole('heading', { name: 'Create' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Create' }),
+    ).toBeInTheDocument()
   })
 
   it('navigates to each tab and renders its page', async () => {
     const user = userEvent.setup()
     renderApp('/create')
 
-    expect(await screen.findByRole('heading', { name: 'Create' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Create' }),
+    ).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: 'Active' }))
-    expect(await screen.findByRole('heading', { name: 'Active' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Active' }),
+    ).toBeInTheDocument()
     expect(await screen.findByText('No active tournaments')).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: 'Scoreboard' }))
-    expect(await screen.findByRole('heading', { name: 'Scoreboard' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Scoreboard' }),
+    ).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: 'History' }))
-    expect(await screen.findByRole('heading', { name: 'History' })).toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: 'By match' })).toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: 'By tournament' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'History' }),
+    ).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'By match' }),
+    ).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'By tournament' }),
+    ).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: 'Member' }))
-    expect(await screen.findByRole('heading', { name: 'Member' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Member' }),
+    ).toBeInTheDocument()
 
     await user.click(screen.getByRole('link', { name: 'Create' }))
-    expect(await screen.findByRole('heading', { name: 'Create' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Create' }),
+    ).toBeInTheDocument()
   })
 })

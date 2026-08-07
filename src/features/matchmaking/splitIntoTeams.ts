@@ -21,7 +21,8 @@ function makeSplits([p0, p1, p2, p3]: CandidatePlayer[]): DoublesTeams[] {
 }
 
 function skillSumDiff([team1, team2]: DoublesTeams): number {
-  const sum = (team: CandidatePlayer[]) => team.reduce((s, p) => s + p.skillValue, 0)
+  const sum = (team: CandidatePlayer[]) =>
+    team.reduce((s, p) => s + p.skillValue, 0)
   return Math.abs(sum(team1) - sum(team2))
 }
 
@@ -30,14 +31,18 @@ export function nonMixedTeamCount([team1, team2]: DoublesTeams): number {
   return (isMixed(team1) ? 0 : 1) + (isMixed(team2) ? 0 : 1)
 }
 
-function repeatCount([team1, team2]: DoublesTeams, history: PairingHistory): number {
+function repeatCount(
+  [team1, team2]: DoublesTeams,
+  history: PairingHistory,
+): number {
   const teammateRepeat = (team: CandidatePlayer[]) =>
     history.teammatePairs.has(canonicalPairKey(team[0].id, team[1].id)) ? 1 : 0
 
   let opponentRepeats = 0
   for (const a of team1) {
     for (const b of team2) {
-      if (history.opponentPairs.has(canonicalPairKey(a.id, b.id))) opponentRepeats++
+      if (history.opponentPairs.has(canonicalPairKey(a.id, b.id)))
+        opponentRepeats++
     }
   }
 
@@ -63,13 +68,21 @@ export function splitIntoTeams(
   let candidates = makeSplits(quartet)
 
   const minNonMixed = Math.min(...candidates.map(nonMixedTeamCount))
-  candidates = candidates.filter((split) => nonMixedTeamCount(split) === minNonMixed)
+  candidates = candidates.filter(
+    (split) => nonMixedTeamCount(split) === minNonMixed,
+  )
 
   const minSkillDiff = Math.min(...candidates.map(skillSumDiff))
-  candidates = candidates.filter((split) => skillSumDiff(split) === minSkillDiff)
+  candidates = candidates.filter(
+    (split) => skillSumDiff(split) === minSkillDiff,
+  )
 
-  const minRepeats = Math.min(...candidates.map((split) => repeatCount(split, pairingHistory)))
-  candidates = candidates.filter((split) => repeatCount(split, pairingHistory) === minRepeats)
+  const minRepeats = Math.min(
+    ...candidates.map((split) => repeatCount(split, pairingHistory)),
+  )
+  candidates = candidates.filter(
+    (split) => repeatCount(split, pairingHistory) === minRepeats,
+  )
 
   return candidates[Math.floor(Math.random() * candidates.length)]
 }

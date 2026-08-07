@@ -4,7 +4,10 @@ import { Link } from 'react-router-dom'
 import { usePlayers } from '../features/players/usePlayers'
 import { useTournaments } from '../features/tournaments/useTournaments'
 import { useRecentCompletedMatches } from '../features/matches/useRecentCompletedMatches'
-import { teamNames, summarizeGamesWon } from '../features/matches/matchFormatting'
+import {
+  teamNames,
+  summarizeGamesWon,
+} from '../features/matches/matchFormatting'
 
 function SectionToggle({
   collapsed,
@@ -35,7 +38,11 @@ export function HistoryPage() {
   )
 }
 
-function ByMatchSection({ playerNameById }: { playerNameById: Map<string, string> }) {
+function ByMatchSection({
+  playerNameById,
+}: {
+  playerNameById: Map<string, string>
+}) {
   const { t } = useTranslation()
   const { data: matches, isLoading, isError } = useRecentCompletedMatches()
   const [collapsed, setCollapsed] = useState(true)
@@ -44,12 +51,19 @@ function ByMatchSection({ playerNameById }: { playerNameById: Map<string, string
     <section className="card">
       <div className="section-heading-row">
         <h2>{t('history.byMatchHeading')}</h2>
-        <SectionToggle collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
+        <SectionToggle
+          collapsed={collapsed}
+          onToggle={() => setCollapsed((c) => !c)}
+        />
       </div>
       {!collapsed && (
         <>
-          {isLoading && <p className="empty-state">{t('history.loadingMatches')}</p>}
-          {isError && <p className="field-error">{t('history.loadMatchesError')}</p>}
+          {isLoading && (
+            <p className="empty-state">{t('history.loadingMatches')}</p>
+          )}
+          {isError && (
+            <p className="field-error">{t('history.loadMatchesError')}</p>
+          )}
           {!isLoading && !isError && (!matches || matches.length === 0) && (
             <p className="empty-state">{t('history.noRecentMatches')}</p>
           )}
@@ -65,15 +79,23 @@ function ByMatchSection({ playerNameById }: { playerNameById: Map<string, string
                   <li key={match.id} className="round-row">
                     <span className="round-label">
                       <span className="round-tournament">{tournamentName}</span>{' '}
-                      <span>{t('manage.roundLabel', { n: match.sequence_number })}</span>
+                      <span>
+                        {t('manage.roundLabel', { n: match.sequence_number })}
+                      </span>
                       {match.manually_adjusted && (
-                        <span className="badge">{t('history.manuallyAdjustedBadge')}</span>
+                        <span className="badge">
+                          {t('history.manuallyAdjustedBadge')}
+                        </span>
                       )}
                     </span>
                     <span className="round-matchup">
-                      <span className={team1Won ? 'round-winner' : undefined}>{team1Name}</span>{' '}
+                      <span className={team1Won ? 'round-winner' : undefined}>
+                        {team1Name}
+                      </span>{' '}
                       <span className="round-vs">vs</span>{' '}
-                      <span className={!team1Won ? 'round-winner' : undefined}>{team2Name}</span>
+                      <span className={!team1Won ? 'round-winner' : undefined}>
+                        {team2Name}
+                      </span>
                     </span>
                     <span className="round-score">
                       {t('manage.finalScore', { team1Games, team2Games })}
@@ -98,15 +120,24 @@ function ByTournamentSection() {
     <section className="card">
       <div className="section-heading-row">
         <h2>{t('history.byTournamentHeading')}</h2>
-        <SectionToggle collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
+        <SectionToggle
+          collapsed={collapsed}
+          onToggle={() => setCollapsed((c) => !c)}
+        />
       </div>
       {!collapsed && (
         <>
-          {isLoading && <p className="empty-state">{t('history.loadingTournaments')}</p>}
-          {isError && <p className="field-error">{t('history.loadTournamentsError')}</p>}
-          {!isLoading && !isError && (!tournaments || tournaments.length === 0) && (
-            <p className="empty-state">{t('history.noTournaments')}</p>
+          {isLoading && (
+            <p className="empty-state">{t('history.loadingTournaments')}</p>
           )}
+          {isError && (
+            <p className="field-error">{t('history.loadTournamentsError')}</p>
+          )}
+          {!isLoading &&
+            !isError &&
+            (!tournaments || tournaments.length === 0) && (
+              <p className="empty-state">{t('history.noTournaments')}</p>
+            )}
           {!isLoading && !isError && tournaments && tournaments.length > 0 && (
             <ul className="link-list">
               {tournaments.map((tournament) =>
@@ -114,7 +145,9 @@ function ByTournamentSection() {
                   <li key={tournament.id}>
                     <span className="link-list-row">
                       <span>{tournament.name}</span>
-                      <span className="badge">{t('tournamentStatus.cancelled')}</span>
+                      <span className="badge">
+                        {t('tournamentStatus.cancelled')}
+                      </span>
                     </span>
                   </li>
                 ) : (

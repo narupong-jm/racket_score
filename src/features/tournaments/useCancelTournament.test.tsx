@@ -15,12 +15,16 @@ vi.mock('./tournamentsApi', async (importOriginal) => {
 })
 
 vi.mock('../passphrase/usePassphraseGate', () => ({
-  usePassphraseGate: () => ({ getPassphrase: vi.fn().mockResolvedValue('test-passphrase') }),
+  usePassphraseGate: () => ({
+    getPassphrase: vi.fn().mockResolvedValue('test-passphrase'),
+  }),
 }))
 
 function createWrapper(queryClient: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
   }
 }
 
@@ -42,10 +46,14 @@ afterEach(() => {
 })
 
 describe('useCancelTournament', () => {
-  it('calls cancelTournament and invalidates both the tournaments list and this tournament\'s matches query on success', async () => {
-    vi.mocked(tournamentsApi.cancelTournament).mockResolvedValue(cancelledTournament)
+  it("calls cancelTournament and invalidates both the tournaments list and this tournament's matches query on success", async () => {
+    vi.mocked(tournamentsApi.cancelTournament).mockResolvedValue(
+      cancelledTournament,
+    )
 
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries')
 
     const { result } = renderHook(() => useCancelTournament(), {
@@ -56,7 +64,10 @@ describe('useCancelTournament', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
-    expect(tournamentsApi.cancelTournament).toHaveBeenCalledWith('t1', 'test-passphrase')
+    expect(tournamentsApi.cancelTournament).toHaveBeenCalledWith(
+      't1',
+      'test-passphrase',
+    )
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['tournaments'] })
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['matches', 't1'] })
   })

@@ -15,7 +15,9 @@ function createWrapper() {
     defaultOptions: { queries: { retry: false } },
   })
   return function Wrapper({ children }: { children: ReactNode }) {
-    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    )
   }
 }
 
@@ -32,7 +34,9 @@ describe('usePlayers', () => {
     ]
     vi.mocked(playersApi.listPlayers).mockResolvedValue(mockPlayers)
 
-    const { result } = renderHook(() => usePlayers(), { wrapper: createWrapper() })
+    const { result } = renderHook(() => usePlayers(), {
+      wrapper: createWrapper(),
+    })
 
     expect(result.current.isLoading).toBe(true)
 

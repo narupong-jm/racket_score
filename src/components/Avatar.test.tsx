@@ -6,7 +6,9 @@ describe('Avatar', () => {
   it('renders the initials of the first two words of the name', () => {
     render(<Avatar name="Somchai Jaidee" size={40} />)
 
-    expect(screen.getByRole('img', { name: 'Somchai Jaidee' })).toHaveTextContent('SJ')
+    expect(
+      screen.getByRole('img', { name: 'Somchai Jaidee' }),
+    ).toHaveTextContent('SJ')
   })
 
   it('renders a single initial for a one-word name', () => {
@@ -18,6 +20,8 @@ describe('Avatar', () => {
   it('ignores extra words beyond the first two', () => {
     render(<Avatar name="Somchai Jaidee Suksan" size={40} />)
 
-    expect(screen.getByRole('img', { name: 'Somchai Jaidee Suksan' })).toHaveTextContent('SJ')
+    expect(
+      screen.getByRole('img', { name: 'Somchai Jaidee Suksan' }),
+    ).toHaveTextContent('SJ')
   })
 })
