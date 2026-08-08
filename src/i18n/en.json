@@ -23,7 +23,13 @@
   },
   "member": {
     "heading": "Member",
-    "addHeading": "Add member"
+    "addHeading": "Add member",
+    "remove": "Remove",
+    "removeDisabledHint": "This member has already played matches and can't be removed.",
+    "confirmRemoveTitle": "Remove {{name}} from the member pool?",
+    "confirmRemoveBody": "This permanently deletes them. This can't be undone.",
+    "confirmRemoveButton": "Yes, remove",
+    "removeFailed": "Couldn't remove that member. They may already be in a match or an active tournament."
   },
   "active": {
     "loading": "Loading tournaments...",
@@ -84,7 +90,14 @@
     "editableLevel": {
       "ariaLabel": "Level for {{name}}",
       "save": "Save"
-    }
+    },
+    "editableName": {
+      "edit": "Edit",
+      "editAriaLabel": "Edit name for {{name}}",
+      "inputAriaLabel": "New name for {{name}}",
+      "save": "Save"
+    },
+    "columnActions": "Actions"
   },
   "tournaments": {
     "form": {

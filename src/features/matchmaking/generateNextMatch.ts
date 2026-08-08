@@ -57,7 +57,11 @@ export function generateNextMatch(
     }
   }
 
-  const quartet = pickDoublesQuartet(poolResult.pool, poolResult.mandatoryIds)
+  const quartet = pickDoublesQuartet(
+    poolResult.pool,
+    poolResult.mandatoryIds,
+    pairingHistory,
+  )
   if (!quartet) return NOT_ENOUGH_PLAYERS
 
   const teams = splitIntoTeams(quartet, pairingHistory)

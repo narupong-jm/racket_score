@@ -457,6 +457,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      delete_player: {
+        Args: { p_id: string; p_passphrase: string }
+        Returns: undefined
+      }
       end_tournament: {
         Args: { p_passphrase: string; p_tournament_id: string }
         Returns: {

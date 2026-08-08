@@ -1,4 +1,5 @@
-import type { CandidatePlayer } from './types'
+import type { CandidatePlayer, PairingHistory } from './types'
+import { canonicalPairKey } from './pairKey'
 
 function combinationsOf4(pool: CandidatePlayer[]): CandidatePlayer[][] {
   const result: CandidatePlayer[][] = []
@@ -27,6 +28,30 @@ export function genderImbalance(quartet: CandidatePlayer[]): number {
 }
 
 /**
+ * Scores how much prior pairing history a quartet's 4 members carry with
+ * each other, summed over all C(4,2)=6 internal pairs. At quartet-selection
+ * time teams haven't been assigned yet, so a pair counts if it's ever been
+ * either opponents or teammates — this can't distinguish the two the way
+ * splitIntoTeams's repeatCount does once teams are fixed, but it matches
+ * SPEC's "opponents/teams who have not yet played each other" wording, which
+ * names both dimensions.
+ */
+function quartetRepeatExposure(
+  quartet: CandidatePlayer[],
+  history: PairingHistory,
+): number {
+  let exposure = 0
+  for (let i = 0; i < quartet.length; i++) {
+    for (let j = i + 1; j < quartet.length; j++) {
+      const key = canonicalPairKey(quartet[i].id, quartet[j].id)
+      if (history.opponentPairs.has(key)) exposure++
+      if (history.teammatePairs.has(key)) exposure++
+    }
+  }
+  return exposure
+}
+
+/**
  * Picks the best 4 players for a doubles match from a candidate pool, in
  * strict priority order:
  * 1. Any player in `mandatoryIds` must be included (equal-match-count
@@ -35,11 +60,15 @@ export function genderImbalance(quartet: CandidatePlayer[]): number {
  *    not a tiebreak: a 2-male/2-female quartet is always preferred over an
  *    unbalanced one, regardless of skill spread.
  * 3. Among those, the smallest skill spread (max - min skill value).
- * 4. Random choice among whatever is still tied.
+ * 4. Among those, the quartet whose 4 members carry the least combined prior
+ *    pairing history (opponent or teammate) with each other — falls back to
+ *    a repeat only when every remaining option has one.
+ * 5. Random choice among whatever is still tied.
  */
 export function pickDoublesQuartet(
   pool: CandidatePlayer[],
   mandatoryIds: Set<string> = new Set(),
+  pairingHistory: PairingHistory,
 ): CandidatePlayer[] | null {
   if (pool.length < 4) return null
 
@@ -56,6 +85,13 @@ export function pickDoublesQuartet(
 
   const minSpread = Math.min(...candidates.map(skillSpread))
   candidates = candidates.filter((q) => skillSpread(q) === minSpread)
+
+  const minExposure = Math.min(
+    ...candidates.map((q) => quartetRepeatExposure(q, pairingHistory)),
+  )
+  candidates = candidates.filter(
+    (q) => quartetRepeatExposure(q, pairingHistory) === minExposure,
+  )
 
   return candidates[Math.floor(Math.random() * candidates.length)]
 }

@@ -23,7 +23,13 @@
   },
   "member": {
     "heading": "สมาชิก",
-    "addHeading": "เพิ่มสมาชิก"
+    "addHeading": "เพิ่มสมาชิก",
+    "remove": "ลบ",
+    "removeDisabledHint": "สมาชิกคนนี้เคยลงแข่งแล้ว จึงไม่สามารถลบได้",
+    "confirmRemoveTitle": "ลบ {{name}} ออกจากรายชื่อสมาชิกหรือไม่?",
+    "confirmRemoveBody": "การลบนี้จะลบสมาชิกออกอย่างถาวรและไม่สามารถย้อนกลับได้",
+    "confirmRemoveButton": "ใช่ ลบ",
+    "removeFailed": "ไม่สามารถลบสมาชิกคนนี้ได้ อาจเนื่องจากเคยลงแข่งแล้วหรืออยู่ในทัวร์นาเมนต์ที่กำลังดำเนินอยู่"
   },
   "active": {
     "loading": "กำลังโหลดทัวร์นาเมนต์...",
@@ -84,7 +90,14 @@
     "editableLevel": {
       "ariaLabel": "ระดับของ {{name}}",
       "save": "บันทึก"
-    }
+    },
+    "editableName": {
+      "edit": "แก้ไข",
+      "editAriaLabel": "แก้ไขชื่อของ {{name}}",
+      "inputAriaLabel": "ชื่อใหม่ของ {{name}}",
+      "save": "บันทึก"
+    },
+    "columnActions": "การจัดการ"
   },
   "tournaments": {
     "form": {

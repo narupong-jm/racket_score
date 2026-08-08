@@ -47,6 +47,17 @@ export async function updatePlayer(
   return data
 }
 
+export async function deletePlayer(
+  id: string,
+  passphrase: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('delete_player', {
+    p_id: id,
+    p_passphrase: passphrase,
+  })
+  if (error) throw error
+}
+
 export async function getPlayerStats(
   playerId: string,
 ): Promise<PlayerStats | null> {

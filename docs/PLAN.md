@@ -1947,3 +1947,220 @@ equal-match-count invariant only ever compares relative values (min/max grouping
 rather than clamping or indexing on the count, so it should be unaffected, but this
 phase should add an explicit negative-count fixture to that layer's existing test suite
 rather than assume it, since it's genuinely never-before-exercised input.
+
+---
+
+## Phase 19 — Remove/Rename Member, Doubles Repeat-Pairing Fix
+
+Driven by post-launch hands-on testing (not a SPEC/IMPROVEMENT-doc-driven phase like
+13/17/18): the organizer has no way to fix a mistakenly-added Member, and manual
+testing of a doubles tournament found the Next-match draw sometimes redrew the same
+4 players / same pairing back to back (observed around Round 12-13 and 14-15).
+Root cause for the second issue: `pickSinglesPair.ts` already filters out repeat
+opponents via `pairingHistory.opponentPairs` as a final tiebreak, but
+`pickDoublesQuartet.ts` never accepted `PairingHistory` at all — its pipeline went
+straight from the skill-spread filter to a uniform random pick, so once
+equal-match-count + gender-balance narrowed the field to a small tied group, the
+same quartet could be redrawn with nothing discouraging it.
+
+**Confirmed decisions (this session, before implementation):**
+- Remove-member blocking rule: hard-delete is blocked if the player has **any**
+  `match_participants` row (any status), **or** an **active** `tournament_participants`
+  row (any tournament roster they're currently entered in, matches played or not). A
+  player whose only tournament involvement is a past **Leave** (`status = 'left'`)
+  does **not** block deletion — Leave is treated as already having removed them from
+  that roster.
+- The blocking rule is enforced **server-side** in the new `delete_player` RPC
+  (source of truth), with a fast client-side pre-check in the UI
+  (`total_matches === 0`) that's necessarily imperfect (can't see pending/in-progress
+  matches or roster-only entries) — the RPC's rejection is what's actually
+  authoritative, surfaced via a generic i18n error message rather than failing silently.
+- Rename UI uses an edit-toggle (small edit affordance → input + Save/Cancel), not an
+  always-visible input, since the Member table row is getting crowded with the new
+  Remove button too.
+- Doubles quartet repeat-avoidance scores a candidate quartet by **combined
+  opponent+teammate pairing history among all 6 internal pairs** (not just opponent
+  pairs), since at quartet-selection time it isn't yet known who'll be teamed with
+  whom, and SPEC's wording ("opponents/teams who have not yet played each other")
+  names both dimensions.
+
+1. [x] **`pickDoublesQuartet.ts`: add `pairingHistory` param + repeat-exposure filter
+   stage.** New signature `pickDoublesQuartet(pool, mandatoryIds = new Set(),
+   pairingHistory)` — added as a required 3rd param (not inserted before
+   `mandatoryIds`, unlike `pickSinglesPair`'s ordering) to keep the two existing
+   positional args stable for the one real call site. New helper
+   `quartetRepeatExposure(quartet, history)` sums, over all C(4,2)=6 pairs in the
+   quartet, +1 if the pair is in `opponentPairs`, +1 if in `teammatePairs`. Insert a
+   new `minExposure`/filter stage after the skill-spread filter, before the random
+   pick (same min-then-filter shape as `splitIntoTeams.ts`'s `repeatCount`). Update
+   `generateNextMatch.ts`'s call site to pass the already-in-scope `pairingHistory`.
+   _Test:_ `npx tsc -b` — the only resulting errors should be in
+   `pickDoublesQuartet.test.ts`, confirming the signature change propagated correctly.
+
+2. [x] **Update existing `pickDoublesQuartet.test.ts` call sites.** Add an
+   `emptyHistory()` helper (cloned from `splitIntoTeams.test.ts`), pass it as the 3rd
+   arg in all existing test cases.
+   _Test:_ `npx tsc -b` clean; `npx vitest run
+   src/features/matchmaking/pickDoublesQuartet.test.ts` — all pre-existing tests
+   still pass unchanged.
+
+3. [x] **Add two new repeat-avoidance tests**, mirroring `splitIntoTeams.test.ts`'s
+   template: (a) prefers the lower-repeat-exposure quartet when candidates tie on
+   gender-balance/skill-spread; (b) falls back to a repeat-containing quartet when
+   every remaining option has one.
+   _Test:_ `npx vitest run src/features/matchmaking/pickDoublesQuartet.test.ts`.
+
+4. [x] **Full matchmaking regression + build.**
+   _Test:_ `npx vitest run src/features/matchmaking`; `npm run build`; `npm run lint`.
+   All 53 tests pass (51 pre-existing + 2 new), `tsc -b` and `vite build` clean,
+   `eslint .` clean.
+
+5. [x] **Manual spot-check via dev server.** Ran a small doubles roster through
+   enough draws to reach a tied scenario, confirm the Next Match draw avoids
+   repeating the same quartet when a non-repeat option exists. In practice
+   (see combined manual-verification note after step 15) the specific live
+   scenario reached was a genuine full tie (every candidate quartet had
+   identical repeat-exposure, since round 1 fully connected its 4 players),
+   so the live run confirmed the new code path executes correctly end-to-end
+   without demonstrating discrimination on its own -- the discriminating
+   behavior itself is what the new unit tests (steps 2-3) pin down
+   deterministically.
+
+6. [x] **New `EditablePlayerName.tsx`**, sibling of `EditablePlayerLevel.tsx`:
+   edit-toggle (`isEditing` state) rather than always-visible input; not-editing
+   shows name text + small edit button; editing shows a text input + Save (disabled
+   while pending, unchanged, or empty-after-trim) + Cancel. Reuses
+   `useUpdatePlayer()` unmodified (its RPC already accepts optional `p_name`, no
+   schema change needed). Wire into `PlayerList.tsx` in place of the current plain
+   name cell. Add `players.editableName.*` i18n keys to both `en.json`/`th.json`.
+   _Test:_ `npx tsc -b`; `npm run lint`; extend `PlayerList.test.tsx` — name shows as
+   text + edit affordance by default, clicking reveals a pre-filled input, saving a
+   new value calls mocked `updatePlayer` with `{name: <trimmed>}`.
+
+7. [x] **Manual browser verification of rename.** Renamed a disposable test member
+   on the Member tab via dev server (Thai locale, the app's current default),
+   confirmed the new name persisted after a full page reload, confirmed a
+   direct Supabase query reflected it.
+
+8. [x] **Migration: new `delete_player(p_id, p_passphrase)` RPC** via Supabase MCP
+   `apply_migration` (no local migration files exist in this repo — all DDL is
+   applied live per this project's established convention), mirroring
+   `update_player`'s structure (`security definer`, `check_write_passphrase` first).
+   Body: raise `player_has_matches` if any `match_participants` row exists for the
+   player; raise `player_in_tournament` if any `tournament_participants` row exists
+   with `status <> 'left'`; otherwise delete. Grant execute to `anon`.
+   _Test:_ via `execute_sql` against disposable fixture rows (cleaned up after): (a)
+   wrong passphrase → rejects; (b) player with zero history → deletes successfully;
+   (c) player with only a `status = 'left'` tournament row and no matches → deletes
+   successfully; (d) player with an active tournament roster row, no matches →
+   rejects with `player_in_tournament`; (e) player with a `match_participants` row
+   (pending match is enough) → rejects with `player_has_matches`. Then
+   `get_advisors` (security) — expect exactly one new anon-executable `SECURITY
+   DEFINER` advisory, consistent with every other write RPC.
+
+9. [x] **Regenerate `database.types.ts`** via Supabase MCP `generate_typescript_types`.
+   _Test:_ `npx tsc -b` — zero new errors (nothing calls it yet).
+
+10. [x] **Data layer: `deletePlayer(id, passphrase)`** in `playersApi.ts`, following
+    `createPlayer`/`updatePlayer`'s exact shape.
+    _Test:_ `npx tsc -b`; new `deletePlayer.integration.test.ts` (mirroring
+    `playerStatsLiveness.integration.test.ts`'s real-anon-key fixture convention):
+    deletes a disposable no-history player and confirms it's gone from
+    `listPlayers()`; creates a disposable player + match and confirms `deletePlayer`
+    rejects (with manual fixture cleanup in `afterAll` since the delete itself
+    correctly refused).
+
+11. [x] **Hook layer: `useDeletePlayer.ts`**, mirroring `useUpdatePlayer.ts` —
+    passphrase gate, then `deletePlayer`, `onSuccess` invalidates
+    `['players']`/`['playerStats']`.
+    _Test:_ `npx tsc -b` (verified indirectly via the component tests in steps 12/13,
+    matching how `useCreatePlayer`/`useUpdatePlayer` have no standalone hook test today).
+
+12. [x] **UI: Remove button with client-side pre-check.** New actions column in
+    `PlayerList.tsx`; button `disabled` when `(stats?.total_matches ?? 0) > 0`, with
+    a `title` explaining why when disabled; code comment noting this pre-check can't
+    see pending matches or active-roster-only cases — the RPC is the real authority.
+    _Test:_ extend `PlayerList.test.tsx` — player with matches renders disabled
+    button; player with none renders enabled button.
+
+13. [x] **UI: confirm dialog + delete flow + graceful error surfacing.** Clone
+    `TournamentDetail.tsx`'s "Leave participant" pattern exactly: local
+    pending-target state, `Modal` component, `.danger` confirm button,
+    `member.confirmRemove*` i18n keys (both locales) reusing `manage.cancel` for
+    Cancel. On mutation error, render a canned `member.removeFailed` i18n string —
+    matches this app's existing convention of never surfacing raw RPC error text
+    anywhere.
+    _Test:_ extend `PlayerList.test.tsx` — clicking Remove opens the modal with the
+    name interpolated; Cancel closes with no mutation call; Confirm calls mocked
+    `deletePlayer` and closes on success; a mocked-rejection case shows the generic
+    error message and leaves the modal open.
+
+14. [x] **Full regression + build.** `npm run build`; `npm run lint`; `npx vitest
+    run` (whole suite). All 236 tests pass, `tsc -b` and `vite build` clean,
+    `eslint .` clean. (Two live-integration tests timed out once when the
+    whole suite ran under network contention against the real Supabase
+    project, and passed cleanly on re-run in isolation and on a full re-run —
+    pre-existing flakiness unrelated to this phase's changes.)
+
+15. [x] **Manual verification via dev server / Playwright MCP.** (a) removed a
+    disposable no-history member (created via the live Add-member form), confirmed
+    it disappeared from the Member tab immediately and from a direct Supabase query
+    afterward; (b) confirmed a member with real completed-match history (an
+    existing `player_stats`-liveness fixture) rendered a disabled Remove button;
+    (c) exercised the pre-check blind spot organically -- a leftover fixture player
+    from this phase's own integration test had a *pending* (never completed) match,
+    so `total_matches` read 0 and the Remove button was enabled client-side exactly
+    as documented; clicking it through to Confirm correctly hit the RPC's
+    server-side `player_has_matches` guard and the UI rendered the graceful
+    `member.removeFailed` message with the modal staying open (no crash, no
+    silent no-op) -- this is the real scenario item (c) called for, encountered
+    naturally rather than needing a purpose-built fixture.
+
+    A combined pass also covered doubles matchmaking (Feature C step 5): created 6
+    disposable players (3M/3F) and a doubles tournament, played round 1, drew
+    round 2's Next match under Phase 18's current-match-exclusion (confirmed the
+    "reuses someone currently playing" warning fires correctly when only 2 of 6
+    are free), and confirmed the new repeat-exposure stage in `pickDoublesQuartet`
+    executes without error and returns a valid quartet on a live draw. All fixture
+    players/tournaments created during this pass were deleted afterward via
+    `execute_sql` (tournament delete cascades matches/participants per the
+    `ON DELETE CASCADE` FKs discovered in step 8; players deleted directly since
+    this was done via the Supabase service-role connection, not the app's anon
+    client).
+
+**Flagged, not in scope for this phase:** three integration test files
+(`playersApi.integration.test.ts`, `playerStatsLiveness.integration.test.ts`,
+`playerLevelCutover.integration.test.ts`) call `supabase.from('players').delete()`
+directly in their `afterAll` cleanup, but `anon` lost `DELETE` privilege on
+`players` back in Phase 16 — these cleanups likely fail silently, leaving orphan
+rows. Once `deletePlayer()` exists it could fix these, but that's a separate,
+opportunistic cleanup to confirm with the user afterward — not silently bundled into
+this phase.
+
+**Known risks:** `delete_player`'s two `EXISTS` checks (`match_participants`,
+active `tournament_participants`) are the *only* thing standing between a delete
+call and real data loss — during implementation it was discovered that
+`match_participants_player_id_fkey` and `tournament_participants_player_id_fkey`
+are both `ON DELETE CASCADE` on the live schema (not the `RESTRICT`/`NO ACTION`
+originally assumed during planning), so a hypothetical future edit to this RPC
+that removed or loosened either `EXISTS` guard would silently cascade-delete a
+player's match history rather than fail loudly at the database level. Any future
+change to `delete_player` should re-verify this against the live schema (e.g.
+`select confdeltype from pg_constraint where confrelid = 'players'::regclass`)
+before assuming a foreign key will catch a mistake. Separately, the client-side
+Remove-button pre-check (`total_matches === 0`) is a genuinely incomplete signal,
+not just defensively worded: it only counts *completed* matches and only reads
+`player_stats`, so a player with a queued-but-unplayed match or an active
+tournament-roster-only entry shows an enabled button — this was exercised live
+(step 15c) and worked as designed (graceful rejection), but a future UI pass
+could tighten the pre-check by also querying `match_participants`/
+`tournament_participants` existence directly if the current UX (enabled button,
+then a rejection message) proves confusing in practice. Finally,
+`pickDoublesQuartet`'s new `quartetRepeatExposure` score can't distinguish
+"these two would be teammates" from "these two would be opponents" the way
+`splitIntoTeams`'s `repeatCount` can (team assignment hasn't happened yet at
+quartet-selection time) — this is a deliberate, documented simplification (see
+step 1's design justification), not an oversight, but it means a repeat *teammate*
+pairing and a repeat *opponent* pairing are weighted identically at this stage,
+which could theoretically be revisited if real usage shows one matters more than
+the other.
