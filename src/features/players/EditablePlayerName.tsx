@@ -15,8 +15,8 @@ export function EditablePlayerName({ player }: EditablePlayerNameProps) {
 
   if (!isEditing) {
     return (
-      <span>
-        {player.name}{' '}
+      <span className="editable-name">
+        <span className="editable-name-text">{player.name}</span>
         <button
           type="button"
           aria-label={t('players.editableName.editAriaLabel', {
@@ -36,9 +36,10 @@ export function EditablePlayerName({ player }: EditablePlayerNameProps) {
   const trimmed = name.trim()
 
   return (
-    <span>
+    <span className="editable-name">
       <input
         type="text"
+        className="editable-name-text"
         aria-label={t('players.editableName.inputAriaLabel', {
           name: player.name,
         })}

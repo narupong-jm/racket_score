@@ -697,6 +697,19 @@ button.danger {
   left: 120px;
 }
 
+/* Name + inline edit control (member list): flex row so the edit
+   button lands at the same right-hand offset regardless of how long
+   the player's name is. */
+.editable-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editable-name-text {
+  flex: 1;
+}
+
 .scoreboard-medal-row {
   background: var(--accent-bg);
 }
