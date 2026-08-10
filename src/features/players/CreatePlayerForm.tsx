@@ -8,6 +8,7 @@ import {
   type PlayerLevel,
 } from './playerLevels'
 import { IconChoice } from '../../components/IconChoice'
+import { useSport } from '../sport/useSport'
 import maleIcon from '../../assets/icons/male.png'
 import femaleIcon from '../../assets/icons/female.png'
 
@@ -18,6 +19,7 @@ const GENDER_ICONS: Record<Gender, string> = {
 
 export function CreatePlayerForm() {
   const { t } = useTranslation()
+  const { sport } = useSport()
   const [name, setName] = useState('')
   const [gender, setGender] = useState<Gender>('male')
   const [level, setLevel] = useState<PlayerLevel>('beginner')
@@ -28,10 +30,10 @@ export function CreatePlayerForm() {
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    if (!isValid) return
+    if (!isValid || !sport) return
 
     mutate(
-      { name: trimmedName, gender, self_selected_level: level },
+      { name: trimmedName, gender, sport, self_selected_level: level },
       {
         onSuccess: () => {
           setName('')

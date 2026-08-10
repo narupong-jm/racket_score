@@ -70,6 +70,7 @@ function historyRow(
     match_id: `m-${player_id}`,
     tournament_id: 't1',
     tournament_type: 'singles',
+    sport: 'badminton',
     completed_at: '2026-01-01T00:00:00Z',
     won: true,
     points_for,

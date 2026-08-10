@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { updatePlayer } from './playersApi'
-import type { TablesUpdate } from '../../lib/database.types'
+import { updatePlayer, type UpdatePlayerInput } from './playersApi'
 import { usePassphraseGate } from '../passphrase/usePassphraseGate'
 
 export function useUpdatePlayer() {
@@ -12,7 +11,7 @@ export function useUpdatePlayer() {
       updates,
     }: {
       id: string
-      updates: TablesUpdate<'players'>
+      updates: UpdatePlayerInput
     }) => {
       const passphrase = await getPassphrase()
       return updatePlayer(id, updates, passphrase)

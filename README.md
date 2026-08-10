@@ -1,8 +1,10 @@
 # Racket Score
 
-A badminton club-night app for organizing pickup tournaments with _balanced
-random matchmaking_, built around a persistent player pool shared across
-tournaments.
+A club-night app for organizing pickup **badminton or tennis** tournaments
+with _balanced random matchmaking_, built around a persistent player pool
+shared across tournaments. Pick a sport on the Home screen, switch anytime
+from the header — everything else (matchmaking, scoring, both scoreboards)
+works identically per sport.
 
 ## Screenshots
 
@@ -20,10 +22,21 @@ tournaments.
 
 ## Features
 
+- **Badminton or Tennis**, chosen on a Home screen at app entry and
+  switchable anytime from a header control; the choice persists across
+  browser restarts. Every tab (Create/Active/Scoreboard/History/Member)
+  scopes to whichever sport is currently active. Tennis reuses the same
+  configurable scoring engine as badminton (see [Design
+  decisions](#design-decisions--intentional-limitations)) — the two sports
+  never share match history or stats for the same person.
 - Central, persistent player pool with generated placeholder avatars
   (initials + name-derived color)
 - Self-selected skill level until 3 matches are played, then an
-  automatically computed win-rate-derived effective level
+  automatically computed win-rate-derived effective level — tracked
+  **independently per sport**, so a player's Badminton and Tennis levels
+  never affect each other. A member with no level yet in the active sport
+  can't be selected as a tournament participant until one is set on the
+  Member tab.
 - Balanced random matchmaking (not round-robin) — see [Matchmaking
   algorithm](#matchmaking-algorithm) below
 - Singles **or** doubles per tournament, with configurable games-per-match
@@ -53,6 +66,10 @@ tournaments.
 
 These are deliberate design choices, not missing features:
 
+- **Tennis uses the same rally-point scoring engine as badminton**, not
+  real tennis rules — no sets, no 40-40/advantage deuce, no tie-break at 6
+  games. Organizers configure games-per-match/points-per-game/deuce-cap the
+  same way for either sport.
 - **No user accounts.** Anyone with the link can browse all data — this is
   meant for private, trusted club use. Writes (creating/editing/recording
   anything) require a single shared passphrase, prompted for once per browser
@@ -171,11 +188,14 @@ revoked, and every write goes through a passphrase-checked RPC instead — see
 Computed stats are served by SQL views, so every read is automatically
 current rather than relying on batch recomputation:
 
-- `player_stats` — per-player win rate and effective skill level
+- `player_stats` — win rate and effective skill level, **scoped per sport**
+  (one row per player per sport, so a player's Badminton and Tennis stats
+  never mix)
 - `tournament_standings` — per-tournament match win rate and win-rate
-  tiebreak stats
+  tiebreak stats (a tournament belongs to exactly one sport, so no
+  additional scoping is needed here)
 - `player_match_history` — cross-tournament match history for the Overall
-  Scoreboard
+  Scoreboard, tagged with `sport`
 
 This repository does not include a `migrations/` or `supabase/` folder —
 schema and views were applied directly to the live Supabase project. To
@@ -233,7 +253,8 @@ src/
     matchmaking/      # pure-TS matchmaking algorithm (no React/Supabase)
     scoreboard/      # per-tournament and overall scoreboard data layer
     passphrase/      # write-access passphrase gate (context, provider, API)
-  pages/             # the 5 tab routes (Create/Active/Scoreboard/History/Member)
+    sport/           # sport-workspace context/provider/hook (Badminton/Tennis)
+  pages/             # Home (sport picker) + the 5 tab routes (Create/Active/Scoreboard/History/Member)
   components/        # shared UI components
   lib/               # Supabase client, generated DB types, shared utilities
   i18n/               # en.json / th.json locale files
@@ -277,6 +298,7 @@ client-side routing.
 | [`docs/IMPROVEMENT.md`](docs/IMPROVEMENT.md)   | UX rationale behind the 5-tab navigation rework                                   |
 | [`docs/IMPROVEMENT2.md`](docs/IMPROVEMENT2.md) | Post-launch patch: matchmaking corrections, manual draw editing, History collapse |
 | [`docs/IMPROVEMENT3.md`](docs/IMPROVEMENT3.md) | Post-launch patch: mid-tournament Leave / Add participant, fairness offset        |
+| [`docs/IMPROVEMENT4.md`](docs/IMPROVEMENT4.md) | Multi-sport support (Badminton + Tennis): schema, sport workspace, per-sport level |
 | [`docs/PLAN.md`](docs/PLAN.md)                 | Phased implementation plan and stack decisions                                    |
 | [`docs/RESEARCH.md`](docs/RESEARCH.md)         | Point-in-time snapshot of environment/account state at planning time              |
 | [`CLAUDE.md`](CLAUDE.md)                       | Instructions for AI coding agents working in this repo                            |

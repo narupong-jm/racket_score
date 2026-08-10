@@ -28,7 +28,8 @@ describe('usePlayers', () => {
         id: '1',
         name: 'Mock Player',
         gender: 'male',
-        self_selected_level: 'beginner',
+        badminton_self_selected_level: 'beginner',
+        tennis_self_selected_level: null,
         created_at: '2026-01-01T00:00:00Z',
       },
     ]

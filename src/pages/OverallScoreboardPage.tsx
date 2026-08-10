@@ -11,16 +11,22 @@ import {
 } from '../features/scoreboard/ScoreboardTable'
 import type { PlayerScoreboardEntry } from '../features/scoreboard/aggregateScoreboard'
 import { rankScoreboard } from '../features/scoreboard/rankScoreboard'
+import { useSport } from '../features/sport/useSport'
 
 const PERIODS: ScoreboardPeriod[] = ['all', 'month']
 const TYPES: ScoreboardTypeFilter[] = ['all', 'singles', 'doubles']
 
 export function OverallScoreboardPage() {
   const { t } = useTranslation()
+  const { sport } = useSport()
   const [period, setPeriod] = useState<ScoreboardPeriod>('all')
   const [type, setType] = useState<ScoreboardTypeFilter>('all')
 
-  const { data, isLoading, isError } = useOverallScoreboard(period, type)
+  const { data, isLoading, isError } = useOverallScoreboard(
+    period,
+    type,
+    sport!,
+  )
   const rows = toScoreboardRows(data ?? [])
 
   return (

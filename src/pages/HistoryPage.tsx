@@ -8,6 +8,8 @@ import {
   teamNames,
   summarizeGamesWon,
 } from '../features/matches/matchFormatting'
+import { useSport } from '../features/sport/useSport'
+import type { Sport } from '../features/sport/sportTypes'
 
 function SectionToggle({
   collapsed,
@@ -26,25 +28,28 @@ function SectionToggle({
 
 export function HistoryPage() {
   const { t } = useTranslation()
+  const { sport } = useSport()
   const { data: players } = usePlayers()
   const playerNameById = new Map((players ?? []).map((p) => [p.id, p.name]))
 
   return (
     <section className="page">
       <h1>{t('nav.history')}</h1>
-      <ByMatchSection playerNameById={playerNameById} />
-      <ByTournamentSection />
+      <ByMatchSection playerNameById={playerNameById} sport={sport!} />
+      <ByTournamentSection sport={sport!} />
     </section>
   )
 }
 
 function ByMatchSection({
   playerNameById,
+  sport,
 }: {
   playerNameById: Map<string, string>
+  sport: Sport
 }) {
   const { t } = useTranslation()
-  const { data: matches, isLoading, isError } = useRecentCompletedMatches()
+  const { data: matches, isLoading, isError } = useRecentCompletedMatches(sport)
   const [collapsed, setCollapsed] = useState(true)
 
   return (
@@ -111,9 +116,9 @@ function ByMatchSection({
   )
 }
 
-function ByTournamentSection() {
+function ByTournamentSection({ sport }: { sport: Sport }) {
   const { t } = useTranslation()
-  const { data: tournaments, isLoading, isError } = useTournaments()
+  const { data: tournaments, isLoading, isError } = useTournaments(sport)
   const [collapsed, setCollapsed] = useState(true)
 
   return (

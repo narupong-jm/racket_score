@@ -84,7 +84,10 @@ export function useCreateTournamentWithFirstDraw() {
         }
       }
 
-      const drawInputs = await assembleDrawInputs(tournament.id)
+      const drawInputs = await assembleDrawInputs(
+        tournament.id,
+        tournamentInput.sport,
+      )
       const drawResult = generateNextMatch(
         tournamentInput.type,
         drawInputs.candidates,

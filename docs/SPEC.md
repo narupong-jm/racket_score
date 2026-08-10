@@ -38,14 +38,28 @@ blocked once the tournament has ended or been cancelled. This is a
 **deliberate reversal** of §4's earlier "participants are chosen once, at
 creation time, and never after" rule — see §4 for the reversal note. Not
 yet implemented as of this note.
+Updated: 2026-08-10 — adds **multi-sport support** (§1, §3, §4, §9), based
+on `docs/IMPROVEMENT4.md`: the app now supports **Tennis** alongside
+Badminton, chosen at app entry via a new **Home** screen and switchable at
+any time. A player's skill level (both self-selected and win-rate-derived)
+is now tracked **independently per sport** — the two sports never share
+match history, stats, or level for the same person. Every existing screen
+and rule (scoring engine, Match Generator, both scoreboards, mid-tournament
+roster changes) is reused unchanged per sport; only the player-level and
+navigation model changes. Not yet implemented as of this note — see
+`docs/IMPROVEMENT4.md` for the full schema/file-level plan.
 
 ## 1. Overview
 
-A web app for running badminton "battle" sessions using **balanced random
-matchmaking** — not a fixed round-robin bracket where every pair must meet
-exactly once, but a generator that draws one match at a time based on
-fairness rules. Includes a central player pool with cross-tournament
-history/stats and standings within each tournament.
+A web app for running racket-sport "battle" sessions — currently
+**Badminton and Tennis** — using **balanced random matchmaking** — not a
+fixed round-robin bracket where every pair must meet exactly once, but a
+generator that draws one match at a time based on fairness rules. Includes
+a central player pool, shared across both sports, with cross-tournament
+history/stats and standings within each tournament. The organizer chooses
+which sport's "workspace" to work in (§9); every tournament belongs to
+exactly one sport, and a player's stats/level are tracked separately per
+sport (§3).
 
 ## 2. Technology & Hosting
 
@@ -88,27 +102,56 @@ history/stats and standings within each tournament.
 
 ## 3. Player Pool (central, persistent)
 
-- Players are created once in a shared pool and reused across tournaments.
-  Cross-tournament history/stats are tracked per player.
-- Fields: **name, gender, skill level**. A photo is displayed everywhere a
-  player/member is listed (member list, tournament participant checklist,
-  scoreboards), but for now this is always a **generated placeholder
-  avatar** (initials + a color derived from the name) — there is no photo
-  upload capability or `photo`/`avatar_url` column in this phase. Real
-  upload (Supabase Storage) is explicitly deferred (see Out of scope).
-- **Skill level:**
-  - New players (fewer than 3 recorded matches, tournament or otherwise)
-    self-select an initial level: `Beginner / Intermediate / Advanced / Pro`.
-  - Once a player has **3 or more** recorded matches, their level is
-    computed automatically from their **win rate** and displayed instead
-    of the self-selected value, using fixed win-rate bands (app-defined
-    defaults) mapped to the same four categories.
+- Players are created once in a shared pool and reused across
+  tournaments **and across both sports** — the same person is the same
+  member record whether they're playing Badminton or Tennis. Only their
+  skill level and stats are tracked separately per sport (below);
+  everything else about a member (name, gender, avatar) is shared.
+- Fields: **name, gender, skill level (per sport)**. A photo is displayed
+  everywhere a player/member is listed (member list, tournament
+  participant checklist, scoreboards), but for now this is always a
+  **generated placeholder avatar** (initials + a color derived from the
+  name) — there is no photo upload capability or `photo`/`avatar_url`
+  column in this phase. Real upload (Supabase Storage) is explicitly
+  deferred (see Out of scope).
+- **Skill level — tracked independently per sport.** A player has a
+  separate Badminton level and Tennis level; playing one sport never
+  affects the other's level or match count.
+  - New to a sport (fewer than 3 recorded matches **in that sport**)
+    means the player self-selects an initial level for it: `Beginner /
+    Intermediate / Advanced / Pro`. This is set from whichever sport's
+    workspace (§9) is active at the time — creating/editing a member
+    while in the Tennis workspace only sets their Tennis level, leaving
+    Badminton untouched (and vice versa).
+  - Once a player has **3 or more** recorded matches **in that sport**,
+    their level for that sport is computed automatically from their
+    **win rate in that sport** and displayed instead of the
+    self-selected value, using the same fixed win-rate bands as before,
+    applied per sport.
+  - A member who has never played (or been given a self-selected level
+    for) one of the two sports has **no level in that sport** until an
+    organizer sets one from the Member tab (§9). Such a member cannot be
+    selected as a participant in that sport's tournaments until a level
+    is set.
 - **Doubles pairs are never persisted as a standing entity.** Every
   tournament re-pairs players from the individual pool; there is no
   reusable "team" object.
 
 ## 4. Tournaments
 
+- A tournament belongs to **exactly one sport** (Badminton or Tennis),
+  fixed to whichever sport's workspace (§9) was active when it was
+  created — there is no way to change a tournament's sport after
+  creation, and no cross-sport tournament. This determines which of a
+  participant's two independent skill-level/stat identities (§3) the
+  Match Generator (§5) and both scoreboards (§7, §8) read for that
+  tournament — never a mix of both.
+- **Tennis reuses Badminton's scoring engine exactly** — the same
+  games-per-match / points-per-game / win-by / BWF-ratio deuce-cap system
+  described below applies to both sports identically. This is a
+  deliberate simplification: Tennis tournaments do **not** use real
+  tennis scoring (no sets, no 40-40/advantage deuce, no tie-break at 6
+  games).
 - A tournament is **one match type only**: singles OR doubles, chosen at
   creation. Running both requires two separate tournaments.
 - Per-tournament scoring configuration (set at creation):
@@ -354,13 +397,29 @@ for the active period × type combination, not just the win-rate sort.
 
 ## 9. Application Flow (Navigation & Pages)
 
-The app uses a 5-tab bottom navigation bar, always visible, present at
-every screen size (not a responsive top-nav on wider viewports):
+**0. Home (sport selection).** Before anything else, the organizer picks a
+**sport workspace** — Badminton or Tennis — via an icon picker. This is a
+full-screen gate with no bottom nav: the very first time the app is ever
+opened, Home is the only thing shown; once a sport is picked, that choice
+is remembered (persists across app restarts, not just the browser session)
+and later visits skip straight into that sport's tab flow below. A
+**persistent switcher control**, always present in the app header
+alongside the language toggle, returns to Home at any time to change the
+active sport. **Every tab below is scoped to whichever sport is currently
+active** — Create/Active/Scoreboard/History/Member all show only that
+sport's tournaments, matches, and stats; there is no combined or
+"both sports" view anywhere.
+
+The app then uses a 5-tab bottom navigation bar, always visible, present
+at every screen size (not a responsive top-nav on wider viewports):
 
 1. **Create** — create a new tournament: name, type (§4), games per
    match, points per game, and a checklist of all members to select as
-   participants (each row shows photo/avatar, name, level — this is the
-   **only** place participants are ever chosen, per §4). On submit: the
+   participants (each row shows photo/avatar, name, level for the active
+   sport — this is the **only** place participants are ever chosen, per
+   §4). A member with **no level yet in the active sport** (§3) appears
+   disabled in this checklist, with an explanation that they need a level
+   set on the Member tab first before they can be selected. On submit: the
    tournament and its participants are created, the first match is drawn
    immediately per the Match Generator (§5) and shown in a confirmation
    popup, and the organizer is taken directly into that tournament's
@@ -429,11 +488,16 @@ every screen size (not a responsive top-nav on wider viewports):
    **collapsed** (heading only — no peek of items) so the organizer
    opts in to scrolling through history rather than it being forced on
    page load.
-5. **Member** — the central player pool: an "add member" form (name,
-   gender as an icon-toggle, level as a dropdown, no photo upload per
-   §3) above a list of all current members (photo/avatar, name, level).
-   This tab is **only** for managing the member pool — it has no
-   tournament-participation controls (see §4's create-time-only rule).
+5. **Member** — the central player pool, shared across both sports (§3):
+   an "add member" form (name, gender as an icon-toggle, level as a
+   dropdown **for the active sport only**, no photo upload per §3) above
+   a list of **all** current members regardless of sport (photo/avatar,
+   name, level for the active sport). A member with no level yet in the
+   active sport shows a distinct "not set" state with the same dropdown
+   used to set one for the first time — this is how a member becomes
+   eligible for that sport's tournaments (§4/tab 1, above). This tab is
+   **only** for managing the member pool — it has no tournament-
+   participation controls (see §4's create-time-only rule).
 
 ## Out of scope / explicitly deferred
 

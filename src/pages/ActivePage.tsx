@@ -4,11 +4,13 @@ import { useQuery } from '@tanstack/react-query'
 import { useTournaments } from '../features/tournaments/useTournaments'
 import { listMatches } from '../features/matches/matchesApi'
 import type { Tournament } from '../features/tournaments/tournamentsApi'
+import { useSport } from '../features/sport/useSport'
 
 export function ActivePage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { data: tournaments, isLoading, isError } = useTournaments()
+  const { sport } = useSport()
+  const { data: tournaments, isLoading, isError } = useTournaments(sport!)
 
   if (isLoading) return <p className="empty-state">{t('active.loading')}</p>
   if (isError) return <p className="field-error">{t('active.loadError')}</p>

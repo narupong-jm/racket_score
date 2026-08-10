@@ -6,6 +6,7 @@ import {
   type PlayerScoreboardEntry,
 } from './aggregateScoreboard'
 import type { TournamentType } from '../tournaments/tournamentType'
+import type { Sport } from '../sport/sportTypes'
 
 export type ScoreboardPeriod = 'all' | 'month'
 export type ScoreboardTypeFilter = 'all' | TournamentType
@@ -13,22 +14,24 @@ export type ScoreboardTypeFilter = 'all' | TournamentType
 export function useOverallScoreboard(
   period: ScoreboardPeriod,
   type: ScoreboardTypeFilter,
+  sport: Sport,
 ) {
   return useQuery<PlayerScoreboardEntry[]>({
-    queryKey: ['overallScoreboard', period, type],
-    queryFn: () => fetchOverallScoreboard(period, type),
+    queryKey: ['overallScoreboard', period, type, sport],
+    queryFn: () => fetchOverallScoreboard(period, type, sport),
   })
 }
 
 export async function fetchOverallScoreboard(
   period: ScoreboardPeriod,
   type: ScoreboardTypeFilter,
+  sport: Sport,
 ): Promise<PlayerScoreboardEntry[]> {
   const since = period === 'month' ? startOfCurrentMonthIso() : undefined
   const tournamentType = type === 'all' ? undefined : type
 
   const [rows, players] = await Promise.all([
-    listPlayerMatchHistory({ since, tournamentType }),
+    listPlayerMatchHistory({ since, tournamentType, sport }),
     listPlayers(),
   ])
 

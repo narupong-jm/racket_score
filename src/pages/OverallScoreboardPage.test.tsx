@@ -12,13 +12,17 @@ vi.mock('../features/scoreboard/useOverallScoreboard', async () => {
   const fetchOverallScoreboard = vi.fn()
   return {
     fetchOverallScoreboard,
-    useOverallScoreboard: (period: string, type: string) =>
+    useOverallScoreboard: (period: string, type: string, sport: string) =>
       useQuery({
-        queryKey: ['overallScoreboard', period, type],
-        queryFn: () => fetchOverallScoreboard(period, type),
+        queryKey: ['overallScoreboard', period, type, sport],
+        queryFn: () => fetchOverallScoreboard(period, type, sport),
       }),
   }
 })
+
+vi.mock('../features/sport/useSport', () => ({
+  useSport: () => ({ sport: 'badminton', setSport: vi.fn() }),
+}))
 
 function renderWithClient(ui: ReactElement) {
   const queryClient = new QueryClient({
@@ -56,7 +60,7 @@ describe('OverallScoreboardPage', () => {
     await waitFor(() => {
       expect(
         useOverallScoreboardModule.fetchOverallScoreboard,
-      ).toHaveBeenCalledWith('all', 'all')
+      ).toHaveBeenCalledWith('all', 'all', 'badminton')
     })
 
     await user.click(screen.getByRole('button', { name: 'This month' }))
@@ -65,7 +69,7 @@ describe('OverallScoreboardPage', () => {
     await waitFor(() => {
       expect(
         useOverallScoreboardModule.fetchOverallScoreboard,
-      ).toHaveBeenCalledWith('month', 'singles')
+      ).toHaveBeenCalledWith('month', 'singles', 'badminton')
     })
   })
 

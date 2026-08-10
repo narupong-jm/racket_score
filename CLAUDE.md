@@ -4,29 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Phases 1-12 of `docs/PLAN.md` are complete: the app is built, deployed to Vercel, and was functioning
-as a single-scroll page (all Players/Tournaments content on one screen, no router). Phase 13 is a
-**navigation and flow overhaul** — currently unimplemented (all steps unchecked) — replacing that
-single page with a 5-tab bottom-navigation structure (Create / Active / Scoreboard / History /
-Member), per `docs/IMPROVEMENT.md` (a user-authored concept doc; read it for the full rationale/mockup
-references behind Phase 13's design — `docs/SPEC.md` §3-§9 were rewritten to match it and are the
-normative version, but `docs/IMPROVEMENT.md` explains *why*). Phase 13 went through two earlier,
-narrower drafts (3-page, then 4-page) before this one — if you see references to those in old
-conversation history, they're superseded; `docs/PLAN.md`'s current Phase 13 section is the only one
-that matters. Before assuming any Phase-13-era tooling exists (`react-router-dom`, the icon-picker
-component, the scoreboard views), check `package.json`/`src/` rather than assuming from `docs/PLAN.md`
-alone — none of it exists yet as of this note.
+Phases 1-20 of `docs/PLAN.md` are complete and shipped, including Phase 13's 5-tab bottom-nav
+overhaul (Create / Active / Scoreboard / History / Member) and every IMPROVEMENT-doc-driven patch
+since (`docs/IMPROVEMENT.md` through `docs/IMPROVEMENT4.md`). Do not assume from old conversation
+history or partial doc reads that any of this is still in flight — check `docs/PLAN.md`'s phase
+checkboxes (all `[x]`) and `src/` directly if in doubt.
 
-**Post-Phase-13 patch in flight:** as of 2026-07-31, Phase 13 has shipped (the 5-tab
-bottom-nav app described below is live). `docs/IMPROVEMENT2.md` is the next unit of work — a
-narrower patch based on post-launch hands-on testing, **not** another nav/flow overhaul. It
-covers three matchmaking corrections (equal match count as a hard invariant, mixed-doubles
-gender balance as a hard filter instead of a tiebreak, and excluding in-progress Current-match
-players from the Next-match draw), a new inline manual-edit capability for a drawn-but-not-yet-
-started match, and collapsible (default-collapsed) sections on the History tab. `docs/SPEC.md`
-§5/§6/§9 have already been revised to describe the corrected target behavior, but **none of it
-is implemented yet** as of this note — check `src/features/matchmaking/`, `src/features/matches/`,
-and `src/pages/HistoryPage.tsx` rather than assuming the SPEC's description is live.
+**Most recent phase — Phase 20, multi-sport support (Badminton + Tennis):** driven by
+`docs/IMPROVEMENT4.md`. The app now gates entry behind a **Home** screen (sport icon picker,
+persisted to `localStorage`, switchable anytime via a header control), and every tab
+(Create/Active/Scoreboard/History/Member) scopes its data to the active sport workspace. A
+player's skill level — both self-selected and win-rate-derived `effective_level` — is now tracked
+**independently per sport**: `players.self_selected_level` was split into
+`badminton_self_selected_level`/`tennis_self_selected_level`, and `player_stats` is now a
+sport-scoped view (2 rows per player, one per sport) rather than one row per player. Tennis reuses
+the badminton scoring engine and matchmaking algorithm byte-for-byte — there is no real-tennis
+scoring (sets/deuce-advantage/tie-break), only a `tournaments.sport` tag. `docs/SPEC.md` §1/§3/§4/§9
+describe this as the current target state and are accurate as of this note.
 
 **Node version note:** the local Node is v20.13.1, below what several current package majors
 require (`vite@8`+/rolldown, `eslint@10`'s dependency chain declares `^20.19`, `jsdom@30`+). Where
@@ -60,8 +54,8 @@ Read these files first, in this order, before doing any implementation work:
 - Playwright MCP for browser-driven UI/E2E verification (dev server, later the deployed URL)
 - `react-i18next` for the Thai/English toggle — **installed** (Phase 11)
 - TanStack Query on top of the Supabase JS client — **installed** (Phase 3)
-- `react-router-dom` (`^7.x`) — **not yet installed**; needed starting Phase 13 step 1 for the
-  5-tab bottom-navigation structure. No routing exists in the app before this.
+- `react-router-dom` (`^7.x`) — **installed** (Phase 13); drives the 5-tab bottom-navigation
+  structure plus the Phase 20 `/home` sport-picker route.
 - Tailwind CSS — **never adopted**; the app uses plain CSS (`src/index.css`, custom properties for
   light/dark theming) instead. Don't assume Tailwind classes work.
 - Supabase (project `racket-score`, separate from the unrelated inactive project in the account),
@@ -106,8 +100,12 @@ surfaced real pre-existing errors once actually run.
 ## Architecture (target shape, per docs/PLAN.md)
 
 - `src/lib/` — Supabase client, generated DB types (`database.types.ts`), shared utilities
-- `src/features/{players,tournaments,matches,matchmaking,scoreboard}/` — feature-oriented modules
-  (`scoreboard/` is new as of Phase 13, for the cross-tournament Overall Scoreboard's data layer)
+- `src/features/{players,tournaments,matches,matchmaking,scoreboard,sport}/` — feature-oriented
+  modules (`scoreboard/` is new as of Phase 13, for the cross-tournament Overall Scoreboard's data
+  layer; `sport/` is new as of Phase 20 — `SportContext`/`SportProvider`/`useSport`, mirroring the
+  `features/passphrase/` context/provider/hook shape, backed by `src/lib/sportStore.ts`
+  (`localStorage`, unlike the passphrase gate's `sessionStorage`, since the chosen sport persists
+  across restarts))
 - `src/features/matchmaking/` — **the core algorithm, framework- and DB-free (pure TypeScript)**.
   This is explicitly the highest-risk, most heavily tested part of the codebase; its test suite
   (`generateNextMatch` and helpers) is called out in the plan as "the most important test asset in
@@ -126,11 +124,15 @@ surfaced real pre-existing errors once actually run.
 
 ### Domain model essentials (see docs/SPEC.md / docs/PLAN.md for full detail)
 
-- Central, persistent **player pool** shared across tournaments (name, gender [male/female only],
-  self-selected level until 3 matches played, then win-rate-derived effective level). Displayed
-  everywhere with a **generated placeholder avatar** (initials + name-derived color) — there is no
-  photo upload or `players.photo`/`avatar_url` column; don't add one without the user explicitly
-  asking, per `docs/SPEC.md` §3's deferral.
+- Central, persistent **player pool** shared across tournaments **and across both sports** (name,
+  gender [male/female only], self-selected level until 3 matches played, then win-rate-derived
+  effective level). As of Phase 20, level and stats are tracked **independently per sport** —
+  `players.badminton_self_selected_level`/`tennis_self_selected_level` are separate nullable
+  columns (there is no single `self_selected_level` column anymore), and `player_stats` is a
+  sport-scoped view (2 rows per player: `sport` is part of its key, along with `player_id`).
+  Displayed everywhere with a **generated placeholder avatar** (initials + name-derived color) —
+  there is no photo upload or `players.photo`/`avatar_url` column; don't add one without the user
+  explicitly asking, per `docs/SPEC.md` §3's deferral.
 - **Doubles pairs/teams are never persisted** — every tournament re-pairs individuals from the pool.
 - **Participants are chosen once, at tournament-creation time, from the member pool — never
   after.** There is deliberately no "add a late player to an in-progress tournament" feature (it

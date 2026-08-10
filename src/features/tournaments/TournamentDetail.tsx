@@ -12,7 +12,9 @@ import { formatDate } from '../../i18n/formatDate'
 import { Modal } from '../../components/Modal'
 import { Avatar } from '../../components/Avatar'
 import { usePlayers } from '../players/usePlayers'
+import { usePlayerStatsList } from '../players/usePlayerStatsList'
 import type { Player } from '../players/playersApi'
+import type { Sport } from '../sport/sportTypes'
 import { useDrawInputs } from '../matches/useDrawInputs'
 import {
   useTournamentMatches,
@@ -71,6 +73,7 @@ export function TournamentDetail({
 
   const isActive = tournament.status === 'active'
   const matchType = tournament.type as MatchType
+  const sport = tournament.sport as Sport
   const cap =
     tournament.point_cap ?? computePointCap(tournament.points_per_game)
 
@@ -163,6 +166,7 @@ export function TournamentDetail({
 
       <NextMatchCard
         tournamentId={tournamentId}
+        sport={sport}
         matchType={matchType}
         isActive={isActive}
         hasCurrentMatch={currentMatch !== null}
@@ -182,6 +186,7 @@ export function TournamentDetail({
 
       <ParticipantsCard
         tournamentId={tournamentId}
+        sport={sport}
         participants={participants}
         players={players}
         playerNameById={playerNameById}
@@ -267,6 +272,7 @@ export function TournamentDetail({
 
 interface ParticipantsCardProps {
   tournamentId: string
+  sport: Sport
   participants: TournamentParticipant[] | undefined
   players: Player[] | undefined
   playerNameById: Map<string, string>
@@ -278,6 +284,7 @@ interface ParticipantsCardProps {
 
 function ParticipantsCard({
   tournamentId,
+  sport,
   participants,
   players,
   playerNameById,
@@ -287,6 +294,7 @@ function ParticipantsCard({
   onNextDrawChange,
 }: ParticipantsCardProps) {
   const { t } = useTranslation()
+  const { data: stats } = usePlayerStatsList(sport)
   const leaveParticipant = useLeaveParticipant(tournamentId)
   const addParticipant = useAddParticipant(tournamentId)
   const [leavingParticipant, setLeavingParticipant] = useState<{
@@ -314,6 +322,7 @@ function ParticipantsCard({
     })
   }
 
+  const statsByPlayerId = new Map((stats ?? []).map((s) => [s.player_id, s]))
   const activeParticipantIds = new Set(
     (participants ?? [])
       .filter((p) => p.status === 'active')
@@ -340,11 +349,28 @@ function ParticipantsCard({
                 <option value="" disabled>
                   {t('manage.addParticipantPlaceholder')}
                 </option>
-                {availablePlayers.map((player) => (
-                  <option key={player.id} value={player.id}>
-                    {player.name}
-                  </option>
-                ))}
+                {availablePlayers.map((player) => {
+                  // Fail open while stats are still loading (`stats ===
+                  // undefined`) so options aren't disabled during the brief
+                  // window before usePlayerStatsList resolves.
+                  const hasLevel =
+                    stats === undefined ||
+                    statsByPlayerId.get(player.id)?.self_selected_level != null
+                  return (
+                    <option
+                      key={player.id}
+                      value={player.id}
+                      disabled={!hasLevel}
+                      title={
+                        hasLevel
+                          ? undefined
+                          : t('tournaments.form.participantMissingLevel')
+                      }
+                    >
+                      {player.name}
+                    </option>
+                  )
+                })}
               </select>
             </label>
             <button
@@ -719,6 +745,7 @@ function CurrentMatchForm({
 
 interface NextMatchCardProps {
   tournamentId: string
+  sport: Sport
   matchType: MatchType
   isActive: boolean
   hasCurrentMatch: boolean
@@ -731,6 +758,7 @@ interface NextMatchCardProps {
 
 function NextMatchCard({
   tournamentId,
+  sport,
   matchType,
   isActive,
   hasCurrentMatch,
@@ -741,7 +769,7 @@ function NextMatchCard({
   onNextDrawChange,
 }: NextMatchCardProps) {
   const { t } = useTranslation()
-  const { data: drawInputs } = useDrawInputs(tournamentId)
+  const { data: drawInputs } = useDrawInputs(tournamentId, sport)
   const startNextMatch = useStartNextMatch(tournamentId)
   const [drawFailed, setDrawFailed] = useState(false)
   const [usedCurrentMatchFallback, setUsedCurrentMatchFallback] =

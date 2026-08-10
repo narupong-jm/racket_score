@@ -32,6 +32,7 @@ const cancelledTournament: Tournament = {
   id: 't1',
   name: 'Sunday Smash',
   type: 'singles',
+  sport: 'badminton',
   games_per_match: 3,
   points_per_game: 21,
   win_by: 2,

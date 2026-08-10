@@ -8,7 +8,8 @@ function makePlayer(id: string, name: string): Player {
     id,
     name,
     gender: 'male',
-    self_selected_level: 'beginner',
+    badminton_self_selected_level: 'beginner',
+    tennis_self_selected_level: null,
     created_at: '2026-01-01T00:00:00Z',
   }
 }
@@ -21,6 +22,7 @@ function makeRow(
     match_id: 'm1',
     tournament_id: 't1',
     tournament_type: 'singles',
+    sport: 'badminton',
     completed_at: '2026-01-05T00:00:00Z',
     won: true,
     points_for: 21,

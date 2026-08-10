@@ -7,11 +7,13 @@ import { EditablePlayerLevel } from './EditablePlayerLevel'
 import { EditablePlayerName } from './EditablePlayerName'
 import { Avatar } from '../../components/Avatar'
 import { Modal } from '../../components/Modal'
+import { useSport } from '../sport/useSport'
 
 export function PlayerList() {
   const { t } = useTranslation()
+  const { sport } = useSport()
   const { data: players, isLoading, isError } = usePlayers()
-  const { data: statsList } = usePlayerStatsList()
+  const { data: statsList } = usePlayerStatsList(sport!)
   const deletePlayer = useDeletePlayer()
   const [removingPlayer, setRemovingPlayer] = useState<{
     id: string
@@ -62,7 +64,12 @@ export function PlayerList() {
                   <EditablePlayerName player={player} />
                 </td>
                 <td>
-                  <EditablePlayerLevel player={player} stats={stats} />
+                  <EditablePlayerLevel
+                    playerId={player.id}
+                    playerName={player.name}
+                    stats={stats}
+                    sport={sport!}
+                  />
                 </td>
                 <td>
                   <button
@@ -70,9 +77,7 @@ export function PlayerList() {
                     className="danger"
                     disabled={hasHistory}
                     title={
-                      hasHistory
-                        ? t('member.removeDisabledHint')
-                        : undefined
+                      hasHistory ? t('member.removeDisabledHint') : undefined
                     }
                     onClick={() =>
                       setRemovingPlayer({ id: player.id, name: player.name })

@@ -35,6 +35,10 @@ vi.mock('../features/matches/matchesApi', async (importOriginal) => {
   }
 })
 
+vi.mock('../features/sport/useSport', () => ({
+  useSport: () => ({ sport: 'badminton', setSport: vi.fn() }),
+}))
+
 function renderPage() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -53,14 +57,16 @@ const players: Player[] = [
     id: 'p1',
     name: 'Alice',
     gender: 'female',
-    self_selected_level: 'beginner',
+    badminton_self_selected_level: 'beginner',
+    tennis_self_selected_level: null,
     created_at: '',
   },
   {
     id: 'p2',
     name: 'Bob',
     gender: 'male',
-    self_selected_level: 'beginner',
+    badminton_self_selected_level: 'beginner',
+    tennis_self_selected_level: null,
     created_at: '',
   },
 ]
@@ -87,6 +93,7 @@ const activeTournament: Tournament = {
   id: 't1',
   name: 'Sunday Smash',
   type: 'singles',
+  sport: 'badminton',
   games_per_match: 1,
   points_per_game: 21,
   win_by: 2,

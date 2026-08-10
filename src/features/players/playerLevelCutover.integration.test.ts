@@ -41,6 +41,7 @@ describe('effective_level cutover at exactly 3 matches (real project, anon key)'
       {
         name: `Cutover Test Player ${runId}`,
         gender: 'male',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -49,6 +50,7 @@ describe('effective_level cutover at exactly 3 matches (real project, anon key)'
       {
         name: `Cutover Test Opponent ${runId}`,
         gender: 'female',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -59,6 +61,7 @@ describe('effective_level cutover at exactly 3 matches (real project, anon key)'
       {
         name: `Cutover Test ${runId}`,
         type: 'singles',
+        sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
       },
@@ -86,17 +89,17 @@ describe('effective_level cutover at exactly 3 matches (real project, anon key)'
     }
 
     await playAndWin(1)
-    const statsAfter1 = await getPlayerStats(player.id)
+    const statsAfter1 = await getPlayerStats(player.id, 'badminton')
     expect(statsAfter1?.total_matches).toBe(1)
     expect(statsAfter1?.effective_level).toBe('beginner') // still self-selected
 
     await playAndWin(2)
-    const statsAfter2 = await getPlayerStats(player.id)
+    const statsAfter2 = await getPlayerStats(player.id, 'badminton')
     expect(statsAfter2?.total_matches).toBe(2)
     expect(statsAfter2?.effective_level).toBe('beginner') // still self-selected below the threshold
 
     await playAndWin(3)
-    const statsAfter3 = await getPlayerStats(player.id)
+    const statsAfter3 = await getPlayerStats(player.id, 'badminton')
     expect(statsAfter3?.total_matches).toBe(3)
     expect(statsAfter3?.win_rate).toBe(100)
     expect(statsAfter3?.effective_level).toBe('pro') // switched to the computed win-rate band

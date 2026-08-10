@@ -61,6 +61,7 @@ const completedTournament: Tournament = {
   id: 't1',
   name: 'Completed T',
   type: 'singles',
+  sport: 'badminton',
   games_per_match: 1,
   points_per_game: 21,
   win_by: 2,

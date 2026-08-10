@@ -8,25 +8,27 @@ import {
 } from '../matchmaking/resolveSkillValue'
 import { canonicalPairKey } from '../matchmaking/pairKey'
 import type { CandidatePlayer, PairingHistory } from '../matchmaking/types'
+import type { Sport } from '../sport/sportTypes'
 
 export interface DrawInputs {
   candidates: CandidatePlayer[]
   pairingHistory: PairingHistory
 }
 
-export function useDrawInputs(tournamentId: string) {
+export function useDrawInputs(tournamentId: string, sport: Sport) {
   return useQuery<DrawInputs>({
     queryKey: ['drawInputs', tournamentId],
-    queryFn: () => assembleDrawInputs(tournamentId),
+    queryFn: () => assembleDrawInputs(tournamentId, sport),
   })
 }
 
 export async function assembleDrawInputs(
   tournamentId: string,
+  sport: Sport,
 ): Promise<DrawInputs> {
   const [participants, statsList, matchHistory] = await Promise.all([
     listParticipants(tournamentId),
-    listPlayerStats(),
+    listPlayerStats(sport),
     getMatchHistory(tournamentId),
   ])
 

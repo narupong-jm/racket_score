@@ -23,6 +23,7 @@ describe('playersApi (real project, anon key)', () => {
       {
         name: testPlayerName,
         gender: 'female',
+        sport: 'badminton',
         self_selected_level: 'intermediate',
       },
       testWritePassphrase,
@@ -33,7 +34,7 @@ describe('playersApi (real project, anon key)', () => {
     const players = await listPlayers()
     expect(players.some((p) => p.id === createdId)).toBe(true)
 
-    const stats = await getPlayerStats(createdId)
+    const stats = await getPlayerStats(createdId, 'badminton')
     expect(stats).not.toBeNull()
     expect(stats?.total_matches).toBe(0)
     expect(stats?.effective_level).toBe('intermediate')
@@ -44,9 +45,9 @@ describe('playersApi (real project, anon key)', () => {
 
     const updated = await updatePlayer(
       createdId,
-      { self_selected_level: 'advanced' },
+      { sport: 'badminton', self_selected_level: 'advanced' },
       testWritePassphrase,
     )
-    expect(updated.self_selected_level).toBe('advanced')
+    expect(updated.badminton_self_selected_level).toBe('advanced')
   })
 })

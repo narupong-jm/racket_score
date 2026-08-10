@@ -1,5 +1,6 @@
 import { supabase } from '../../lib/supabaseClient'
 import type { Json, Tables } from '../../lib/database.types'
+import type { Sport } from '../sport/sportTypes'
 
 export type Match = Tables<'matches'>
 export type TournamentStanding = Tables<'tournament_standings'>
@@ -112,13 +113,14 @@ export interface RecentCompletedMatch {
   games: MatchGame[]
 }
 
-export async function listRecentCompletedMatches(): Promise<
-  RecentCompletedMatch[]
-> {
+export async function listRecentCompletedMatches(
+  sport: Sport,
+): Promise<RecentCompletedMatch[]> {
   const { data, error } = await supabase
     .from('matches')
-    .select('*, tournaments(name)')
+    .select('*, tournaments!inner(name, sport)')
     .eq('status', 'completed')
+    .eq('tournaments.sport', sport)
     .order('completed_at', { ascending: false })
   if (error) throw error
 

@@ -138,25 +138,28 @@ export type Database = {
       }
       players: {
         Row: {
+          badminton_self_selected_level: string | null
           created_at: string
           gender: string
           id: string
           name: string
-          self_selected_level: string
+          tennis_self_selected_level: string | null
         }
         Insert: {
+          badminton_self_selected_level?: string | null
           created_at?: string
           gender: string
           id?: string
           name: string
-          self_selected_level: string
+          tennis_self_selected_level?: string | null
         }
         Update: {
+          badminton_self_selected_level?: string | null
           created_at?: string
           gender?: string
           id?: string
           name?: string
-          self_selected_level?: string
+          tennis_self_selected_level?: string | null
         }
         Relationships: []
       }
@@ -215,6 +218,7 @@ export type Database = {
           name: string
           point_cap: number | null
           points_per_game: number
+          sport: string
           status: string
           type: string
           win_by: number
@@ -227,6 +231,7 @@ export type Database = {
           name: string
           point_cap?: number | null
           points_per_game: number
+          sport?: string
           status?: string
           type: string
           win_by?: number
@@ -239,6 +244,7 @@ export type Database = {
           name?: string
           point_cap?: number | null
           points_per_game?: number
+          sport?: string
           status?: string
           type?: string
           win_by?: number
@@ -253,6 +259,7 @@ export type Database = {
           match_id: string | null
           player_id: string | null
           points_for: number | null
+          sport: string | null
           tournament_id: string | null
           tournament_type: string | null
           won: boolean | null
@@ -295,6 +302,7 @@ export type Database = {
           name: string | null
           player_id: string | null
           self_selected_level: string | null
+          sport: string | null
           total_matches: number | null
           total_wins: number | null
           win_rate: number | null
@@ -308,8 +316,8 @@ export type Database = {
           matches_played: number | null
           matches_won: number | null
           name: string | null
-          player_id: string | null
           point_diff: number | null
+          player_id: string | null
           tournament_id: string | null
           win_rate: number | null
         }
@@ -369,6 +377,7 @@ export type Database = {
           name: string
           point_cap: number | null
           points_per_game: number
+          sport: string
           status: string
           type: string
           win_by: number
@@ -414,13 +423,15 @@ export type Database = {
           p_name: string
           p_passphrase: string
           p_self_selected_level: string
+          p_sport: string
         }
         Returns: {
+          badminton_self_selected_level: string | null
           created_at: string
           gender: string
           id: string
           name: string
-          self_selected_level: string
+          tennis_self_selected_level: string | null
         }
         SetofOptions: {
           from: '*'
@@ -435,6 +446,7 @@ export type Database = {
           p_name: string
           p_passphrase: string
           p_points_per_game: number
+          p_sport: string
           p_type: string
           p_win_by?: number
         }
@@ -446,6 +458,7 @@ export type Database = {
           name: string
           point_cap: number | null
           points_per_game: number
+          sport: string
           status: string
           type: string
           win_by: number
@@ -471,6 +484,7 @@ export type Database = {
           name: string
           point_cap: number | null
           points_per_game: number
+          sport: string
           status: string
           type: string
           win_by: number
@@ -527,13 +541,15 @@ export type Database = {
           p_name?: string
           p_passphrase: string
           p_self_selected_level?: string
+          p_sport?: string
         }
         Returns: {
+          badminton_self_selected_level: string | null
           created_at: string
           gender: string
           id: string
           name: string
-          self_selected_level: string
+          tennis_self_selected_level: string | null
         }
         SetofOptions: {
           from: '*'

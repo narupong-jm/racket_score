@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppLayout } from './components/AppLayout'
+import { HomePage } from './pages/HomePage'
 import { CreateTournamentPage } from './pages/CreateTournamentPage'
 import { ActivePage } from './pages/ActivePage'
 import { OverallScoreboardPage } from './pages/OverallScoreboardPage'
@@ -11,6 +12,7 @@ import { TournamentScoreboardRoute } from './features/tournaments/TournamentScor
 function App() {
   return (
     <Routes>
+      <Route path="/home" element={<HomePage />} />
       <Route element={<AppLayout />}>
         <Route index element={<Navigate to="/create" replace />} />
         <Route path="/create" element={<CreateTournamentPage />} />

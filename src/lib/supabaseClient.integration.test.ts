@@ -23,7 +23,7 @@ describe('supabaseClient (real project, anon key)', () => {
       .insert({
         name: 'Should Not Be Insertable',
         gender: 'male',
-        self_selected_level: 'beginner',
+        badminton_self_selected_level: 'beginner',
       })
       .select()
       .single()

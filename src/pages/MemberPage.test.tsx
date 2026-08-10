@@ -17,6 +17,10 @@ vi.mock('../features/passphrase/usePassphraseGate', () => ({
   }),
 }))
 
+vi.mock('../features/sport/useSport', () => ({
+  useSport: () => ({ sport: 'badminton', setSport: vi.fn() }),
+}))
+
 function renderWithClient() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },

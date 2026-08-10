@@ -19,7 +19,16 @@
     "active": "Active",
     "scoreboard": "Scoreboard",
     "history": "History",
-    "member": "Member"
+    "member": "Member",
+    "switchSport": "Switch sport"
+  },
+  "home": {
+    "heading": "Choose a sport",
+    "instruction": "Pick a sport to continue. You can switch anytime from the header."
+  },
+  "sport": {
+    "badminton": "Badminton",
+    "tennis": "Tennis"
   },
   "member": {
     "heading": "Member",
@@ -29,7 +38,8 @@
     "confirmRemoveTitle": "Remove {{name}} from the member pool?",
     "confirmRemoveBody": "This permanently deletes them. This can't be undone.",
     "confirmRemoveButton": "Yes, remove",
-    "removeFailed": "Couldn't remove that member. They may already be in a match or an active tournament."
+    "removeFailed": "Couldn't remove that member. They may already be in a match or an active tournament.",
+    "levelNotSet": "Not set yet"
   },
   "active": {
     "loading": "Loading tournaments...",
@@ -108,6 +118,7 @@
       "deuceCap": "Deuce cap: {{cap}}",
       "participantsLegend": "Participants",
       "notEnoughSelected": "Select at least {{needed}} players ({{selected}} selected).",
+      "participantMissingLevel": "This member hasn't set a level for this sport yet -- set one on the Member tab first.",
       "submit": "Create tournament"
     },
     "list": {

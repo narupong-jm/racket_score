@@ -12,6 +12,7 @@ describe('matchesApi: manually_adjusted flag (real project, anon key)', () => {
       {
         name: `Manually Adjusted Test ${runId}`,
         type: 'singles',
+        sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
       },
@@ -21,6 +22,7 @@ describe('matchesApi: manually_adjusted flag (real project, anon key)', () => {
       {
         name: `Manually Adjusted A ${runId}`,
         gender: 'male',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -29,6 +31,7 @@ describe('matchesApi: manually_adjusted flag (real project, anon key)', () => {
       {
         name: `Manually Adjusted B ${runId}`,
         gender: 'female',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -115,6 +118,7 @@ describe('matchesApi (real project, anon key)', () => {
       {
         name: `Matches API Test ${runId}`,
         type: 'doubles',
+        sport: 'badminton',
         games_per_match: 3,
         points_per_game: 21,
       },
@@ -127,6 +131,7 @@ describe('matchesApi (real project, anon key)', () => {
         {
           name: `Matches API Test ${label} ${runId}`,
           gender: label === 'A' || label === 'C' ? 'male' : 'female',
+          sport: 'badminton',
           self_selected_level: 'beginner',
         },
         testWritePassphrase,

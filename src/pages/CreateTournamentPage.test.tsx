@@ -61,6 +61,10 @@ vi.mock('../features/passphrase/usePassphraseGate', () => ({
   }),
 }))
 
+vi.mock('../features/sport/useSport', () => ({
+  useSport: () => ({ sport: 'badminton', setSport: vi.fn() }),
+}))
+
 function renderPage() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -85,7 +89,8 @@ function makePlayer(id: string, name: string): Player {
     id,
     name,
     gender: 'male',
-    self_selected_level: 'beginner',
+    badminton_self_selected_level: 'beginner',
+    tennis_self_selected_level: null,
     created_at: '',
   }
 }
@@ -95,6 +100,7 @@ function makeStats(playerId: string): PlayerStats {
     player_id: playerId,
     name: playerId,
     gender: 'male',
+    sport: 'badminton',
     self_selected_level: 'beginner',
     total_matches: 0,
     total_wins: 0,
@@ -114,6 +120,7 @@ const tournament: Tournament = {
   id: 't1',
   name: 'Sunday Smash',
   type: 'doubles',
+  sport: 'badminton',
   games_per_match: 3,
   points_per_game: 21,
   win_by: 2,
@@ -213,6 +220,7 @@ describe('CreateTournamentPage', () => {
           type: 'doubles',
           games_per_match: 3,
           points_per_game: 21,
+          sport: 'badminton',
         },
         'test-passphrase',
       )

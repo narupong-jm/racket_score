@@ -41,6 +41,7 @@ describe('deletePlayer (real project, anon key)', () => {
       {
         name: `Delete Test No History ${runId}`,
         gender: 'male',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -57,6 +58,7 @@ describe('deletePlayer (real project, anon key)', () => {
       {
         name: `Delete Test Has Match A ${runId}`,
         gender: 'male',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -65,6 +67,7 @@ describe('deletePlayer (real project, anon key)', () => {
       {
         name: `Delete Test Has Match B ${runId}`,
         gender: 'female',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -74,6 +77,7 @@ describe('deletePlayer (real project, anon key)', () => {
       {
         name: `Delete Test ${runId}`,
         type: 'singles',
+        sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
       },

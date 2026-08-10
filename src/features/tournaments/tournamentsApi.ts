@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabaseClient'
 import type { Tables } from '../../lib/database.types'
 import type { TournamentStanding } from '../matches/matchesApi'
+import type { Sport } from '../sport/sportTypes'
 
 export type Tournament = Tables<'tournaments'>
 export type TournamentParticipant = Tables<'tournament_participants'>
@@ -10,6 +11,7 @@ export interface CreateTournamentInput {
   type: 'singles' | 'doubles'
   games_per_match: number
   points_per_game: number
+  sport: Sport
   win_by?: number
 }
 
@@ -22,6 +24,7 @@ export async function createTournament(
     p_type: input.type,
     p_games_per_match: input.games_per_match,
     p_points_per_game: input.points_per_game,
+    p_sport: input.sport,
     p_win_by: input.win_by,
     p_passphrase: passphrase,
   })
@@ -29,11 +32,13 @@ export async function createTournament(
   return data
 }
 
-export async function listTournaments(): Promise<Tournament[]> {
-  const { data, error } = await supabase
+export async function listTournaments(sport?: Sport): Promise<Tournament[]> {
+  let query = supabase
     .from('tournaments')
     .select('*')
     .order('created_at', { ascending: false })
+  if (sport) query = query.eq('sport', sport)
+  const { data, error } = await query
   if (error) throw error
   return data
 }

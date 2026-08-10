@@ -36,6 +36,7 @@ describe('tournamentsApi (real project, anon key)', () => {
       {
         name: `Tournaments API Test ${crypto.randomUUID()}`,
         type: 'doubles',
+        sport: 'badminton',
         games_per_match: 3,
         points_per_game: 21,
       },
@@ -58,6 +59,7 @@ describe('tournamentsApi (real project, anon key)', () => {
       {
         name: testPlayerName,
         gender: 'male',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -88,6 +90,7 @@ describe('cancelTournament (real project, anon key)', () => {
       {
         name: `Cancel Test - No Matches ${runId}`,
         type: 'singles',
+        sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
       },
@@ -111,6 +114,7 @@ describe('cancelTournament (real project, anon key)', () => {
       {
         name: `Cancel Test - Confirmed Result ${runId}`,
         type: 'singles',
+        sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
       },
@@ -120,6 +124,7 @@ describe('cancelTournament (real project, anon key)', () => {
       {
         name: `Cancel Test A ${runId}`,
         gender: 'male',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -128,6 +133,7 @@ describe('cancelTournament (real project, anon key)', () => {
       {
         name: `Cancel Test B ${runId}`,
         gender: 'female',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -194,6 +200,7 @@ describe('leaveParticipant (real project, anon key)', () => {
       {
         name: `Leave Test - Round Trip ${runId}`,
         type: 'singles',
+        sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
       },
@@ -203,6 +210,7 @@ describe('leaveParticipant (real project, anon key)', () => {
       {
         name: `Leave Test A ${runId}`,
         gender: 'male',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -236,6 +244,7 @@ describe('leaveParticipant (real project, anon key)', () => {
       {
         name: `Leave Test - Current Match ${runId}`,
         type: 'singles',
+        sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
       },
@@ -245,6 +254,7 @@ describe('leaveParticipant (real project, anon key)', () => {
       {
         name: `Leave Test B ${runId}`,
         gender: 'male',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -253,6 +263,7 @@ describe('leaveParticipant (real project, anon key)', () => {
       {
         name: `Leave Test C ${runId}`,
         gender: 'female',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -306,6 +317,7 @@ describe('leaveParticipant (real project, anon key)', () => {
       {
         name: `Leave Test - Ended Tournament ${runId}`,
         type: 'singles',
+        sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
       },
@@ -315,6 +327,7 @@ describe('leaveParticipant (real project, anon key)', () => {
       {
         name: `Leave Test D ${runId}`,
         gender: 'male',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,

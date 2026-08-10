@@ -41,6 +41,7 @@ describe('player_stats is view-driven, not a batch job (real project, anon key)'
       {
         name: `Liveness Test A ${runId}`,
         gender: 'male',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -49,6 +50,7 @@ describe('player_stats is view-driven, not a batch job (real project, anon key)'
       {
         name: `Liveness Test B ${runId}`,
         gender: 'female',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -59,6 +61,7 @@ describe('player_stats is view-driven, not a batch job (real project, anon key)'
       {
         name: `Liveness Test ${runId}`,
         type: 'singles',
+        sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
       },
@@ -69,7 +72,7 @@ describe('player_stats is view-driven, not a batch job (real project, anon key)'
     await addParticipant(tournamentId, playerB.id, testWritePassphrase)
 
     // before any match: both players show 0 matches, self-selected level
-    const statsABefore = await getPlayerStats(playerA.id)
+    const statsABefore = await getPlayerStats(playerA.id, 'badminton')
     expect(statsABefore?.total_matches).toBe(0)
     expect(statsABefore?.effective_level).toBe('beginner')
 
@@ -90,8 +93,8 @@ describe('player_stats is view-driven, not a batch job (real project, anon key)'
 
     // immediately re-query, with no delay/wait/poll in between -- the view must
     // already reflect the just-recorded result on this very next read
-    const statsAAfter = await getPlayerStats(playerA.id)
-    const statsBAfter = await getPlayerStats(playerB.id)
+    const statsAAfter = await getPlayerStats(playerA.id, 'badminton')
+    const statsBAfter = await getPlayerStats(playerB.id, 'badminton')
 
     expect(statsAAfter?.total_matches).toBe(1)
     expect(statsAAfter?.total_wins).toBe(1)

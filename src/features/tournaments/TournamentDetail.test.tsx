@@ -10,7 +10,7 @@ import * as useDrawInputsModule from '../matches/useDrawInputs'
 import * as matchesApi from '../matches/matchesApi'
 import * as generateNextMatchModule from '../matchmaking/generateNextMatch'
 import type { Tournament, TournamentParticipant } from './tournamentsApi'
-import type { Player } from '../players/playersApi'
+import type { Player, PlayerStats } from '../players/playersApi'
 import type { Match, MatchHistoryEntry } from '../matches/matchesApi'
 import type { CandidatePlayer } from '../matchmaking/types'
 
@@ -85,6 +85,7 @@ const activeTournament: Tournament = {
   id: 't1',
   name: 'Active T',
   type: 'singles',
+  sport: 'badminton',
   games_per_match: 1,
   points_per_game: 21,
   win_by: 2,
@@ -107,17 +108,31 @@ const players: Player[] = [
     id: 'p1',
     name: 'Alice',
     gender: 'female',
-    self_selected_level: 'beginner',
+    badminton_self_selected_level: 'beginner',
+    tennis_self_selected_level: 'beginner',
     created_at: '',
   },
   {
     id: 'p2',
     name: 'Bob',
     gender: 'male',
-    self_selected_level: 'beginner',
+    badminton_self_selected_level: 'beginner',
+    tennis_self_selected_level: 'beginner',
     created_at: '',
   },
 ]
+
+const playerStats: PlayerStats[] = players.map((p) => ({
+  player_id: p.id,
+  name: p.name,
+  gender: p.gender,
+  sport: 'badminton',
+  self_selected_level: 'beginner',
+  total_matches: 0,
+  total_wins: 0,
+  win_rate: null,
+  effective_level: 'beginner',
+}))
 
 const twoCandidates: CandidatePlayer[] = [
   { id: 'p1', gender: 'female', skillValue: 50, matchesPlayedInTournament: 0 },
@@ -155,7 +170,7 @@ function makeParticipant(
 
 function setupCommonMocks() {
   vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
-  vi.mocked(playersApi.listPlayerStats).mockResolvedValue([])
+  vi.mocked(playersApi.listPlayerStats).mockResolvedValue(playerStats)
   vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([])
   vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
     candidates: twoCandidates,
@@ -311,14 +326,16 @@ describe('TournamentDetail: Next match card (Randomize / Start match)', () => {
         id: 'p3',
         name: 'Carol',
         gender: 'male',
-        self_selected_level: 'beginner',
+        badminton_self_selected_level: 'beginner',
+        tennis_self_selected_level: 'beginner',
         created_at: '',
       },
       {
         id: 'p4',
         name: 'Dave',
         gender: 'female',
-        self_selected_level: 'beginner',
+        badminton_self_selected_level: 'beginner',
+        tennis_self_selected_level: 'beginner',
         created_at: '',
       },
     ])
@@ -462,7 +479,8 @@ describe('TournamentDetail: Next match inline edit', () => {
         id: 'p3',
         name: 'Carol',
         gender: 'female',
-        self_selected_level: 'beginner',
+        badminton_self_selected_level: 'beginner',
+        tennis_self_selected_level: 'beginner',
         created_at: '',
       },
     ])
@@ -556,35 +574,40 @@ describe('TournamentDetail: Next match inline edit', () => {
         id: 'p1',
         name: 'Ann',
         gender: 'male',
-        self_selected_level: 'beginner',
+        badminton_self_selected_level: 'beginner',
+        tennis_self_selected_level: 'beginner',
         created_at: '',
       },
       {
         id: 'p2',
         name: 'Ben',
         gender: 'male',
-        self_selected_level: 'beginner',
+        badminton_self_selected_level: 'beginner',
+        tennis_self_selected_level: 'beginner',
         created_at: '',
       },
       {
         id: 'p3',
         name: 'Cid',
         gender: 'female',
-        self_selected_level: 'beginner',
+        badminton_self_selected_level: 'beginner',
+        tennis_self_selected_level: 'beginner',
         created_at: '',
       },
       {
         id: 'p4',
         name: 'Dee',
         gender: 'female',
-        self_selected_level: 'beginner',
+        badminton_self_selected_level: 'beginner',
+        tennis_self_selected_level: 'beginner',
         created_at: '',
       },
       {
         id: 'p5',
         name: 'Eve',
         gender: 'male',
-        self_selected_level: 'beginner',
+        badminton_self_selected_level: 'beginner',
+        tennis_self_selected_level: 'beginner',
         created_at: '',
       },
     ])
@@ -1020,7 +1043,8 @@ describe('TournamentDetail: Leave participant', () => {
         id: 'p3',
         name: 'Carol',
         gender: 'female',
-        self_selected_level: 'beginner',
+        badminton_self_selected_level: 'beginner',
+        tennis_self_selected_level: 'beginner',
         created_at: '',
       },
     ])
@@ -1177,7 +1201,8 @@ describe('TournamentDetail: Leave participant', () => {
         id: 'p3',
         name: 'Carol',
         gender: 'female',
-        self_selected_level: 'beginner',
+        badminton_self_selected_level: 'beginner',
+        tennis_self_selected_level: 'beginner',
         created_at: '',
       },
     ])
@@ -1360,5 +1385,57 @@ describe('TournamentDetail: Add participant', () => {
         "Couldn't add that participant. Please try again.",
       ),
     ).toBeInTheDocument()
+  })
+
+  it('disables a member with no level in this sport, with a tooltip, while a member with a level stays selectable', async () => {
+    const playerWithoutLevel: Player = {
+      id: 'p3',
+      name: 'Carol',
+      gender: 'female',
+      badminton_self_selected_level: null,
+      tennis_self_selected_level: 'beginner',
+      created_at: '',
+    }
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([
+      ...players,
+      playerWithoutLevel,
+    ])
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue([
+      ...playerStats,
+      {
+        player_id: 'p3',
+        name: 'Carol',
+        gender: 'female',
+        sport: 'badminton',
+        self_selected_level: null,
+        total_matches: 0,
+        total_wins: 0,
+        win_rate: null,
+        effective_level: null,
+      },
+    ])
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      makeParticipant('p1', 'left'),
+      makeParticipant('p2', 'left'),
+    ])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    const select = await screen.findByRole('combobox')
+    const carolOption = within(select).getByRole('option', { name: 'Carol' })
+    const bobOption = within(select).getByRole('option', { name: 'Bob' })
+
+    await waitFor(() => expect(carolOption).toBeDisabled())
+    expect(carolOption).toHaveAttribute(
+      'title',
+      "This member hasn't set a level for this sport yet -- set one on the Member tab first.",
+    )
+    expect(bobOption).not.toBeDisabled()
   })
 })

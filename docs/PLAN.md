@@ -2164,3 +2164,140 @@ step 1's design justification), not an oversight, but it means a repeat *teammat
 pairing and a repeat *opponent* pairing are weighted identically at this stage,
 which could theoretically be revisited if real usage shows one matters more than
 the other.
+
+## Phase 20 — Multi-Sport Support (Badminton + Tennis)
+
+Driven by `docs/IMPROVEMENT4.md` (concept confirmed via a one-question-at-a-time
+interview, 2026-08-10): the app now supports **Tennis** alongside Badminton, chosen
+at app entry via a new Home screen and switchable at any time via a persistent
+header control. Every existing feature (matchmaking, scoring engine, tournament
+lifecycle, both scoreboards) is reused unchanged per sport; only the player-level
+model and navigation gain a sport dimension. This is the largest schema/architecture
+change since Phase 13 — every player now has two independent skill/stat identities
+(one per sport) instead of one.
+
+**Confirmed decisions (see `IMPROVEMENT4.md` §0 for full rationale):** both
+self-selected and win-rate-derived effective level split per sport; every tab
+filters to the active sport workspace; Tennis reuses the badminton scoring engine
+byte-for-byte (no real tennis rules); matchmaking itself is 100% unchanged, only
+which `player_stats` rows feed it changes scope; all pre-existing data migrated to
+`sport = 'badminton'`; a member with no level in the active sport can't be selected
+as a participant until one is set on the Member tab.
+
+1. [x] **Schema migrations + RPC/view updates** via Supabase MCP `apply_migration`
+   against the live project: split `players.self_selected_level` into
+   `badminton_self_selected_level`/`tennis_self_selected_level` (nullable, existing
+   values backfilled to the badminton column); added `tournaments.sport` (`not null
+   default 'badminton'`, check-constrained to `badminton`/`tennis`); updated
+   `create_player`/`update_player`/`create_tournament` RPCs to take `p_sport` (old
+   overloads explicitly dropped, since Postgres doesn't replace a function whose
+   parameter list changed); rewrote `player_stats` as a sport-scoped view (2 rows per
+   player, cross-joined against both sports) so `total_matches`/`win_rate`/
+   `effective_level` are computed independently per sport; added `sport` to
+   `player_match_history`. `tournament_standings` needed no change (already scoped to
+   one tournament, which now has a fixed sport).
+   _Test:_ verified live via `execute_sql` with disposable fixtures — backfill
+   correctness, both-or-neither `update_player` guard, per-sport RPC branching, and
+   (most critically) cross-sport isolation: seeded one badminton match and one tennis
+   match for the same two players and confirmed each sport's `player_stats` row
+   reflected only that sport's result. `get_advisors` confirmed no new write path
+   opened. `generate_typescript_types` regenerated `database.types.ts`.
+
+2. [x] **`src/features/sport/` module**: `sportTypes.ts` (`SPORTS`/`Sport`, mirrors
+   `playerLevels.ts`), `SportContext.ts`/`SportProvider.tsx`/`useSport.ts` (mirrors
+   the passphrase-gate context/provider/hook pattern, minus the blocking-modal
+   machinery), backed by `src/lib/sportStore.ts` (`localStorage`, not
+   `sessionStorage`, since the choice must persist across restarts). Wired into
+   `main.tsx` alongside `PassphraseGateProvider`.
+   _Test:_ new `sportStore.test.ts`, `SportProvider.test.tsx` (initial null, restores
+   from a pre-seeded value, `setSport` updates + persists, throws outside provider).
+
+3. [x] **Home screen + routing gate + nav switcher.** New `src/pages/HomePage.tsx`
+   (full-screen icon picker, user-supplied `badminton.png`/`tennis.png` assets, no
+   bottom nav). `AppLayout.tsx` redirects to `/home` when `sport === null` and adds a
+   header switcher button back to `/home`. `App.tsx` adds the `/home` route outside
+   the `AppLayout` route group.
+   _Test:_ new `HomePage.test.tsx`; rewrote `App.test.tsx` to wrap with a real
+   `SportProvider` and cover the no-sport-cached redirect, sport-pick-lands-on-Create,
+   and header-switcher-navigates-to-Home cases.
+
+4. [x] **Data-layer sport-threading**: `playersApi.ts` (hand-written
+   `CreatePlayerInput`/`UpdatePlayerInput`, sport-filtered `getPlayerStats`/
+   `listPlayerStats`), `tournamentsApi.ts` (`CreateTournamentInput.sport`,
+   optional-filter `listTournaments`), `useDrawInputs.ts` (`sport` as an explicit
+   required param, not read from `useSport()` — lets `TournamentDetail` pass a
+   tournament's own fixed sport instead of the ambient workspace),
+   `usePlayerStatsList.ts`, `useTournaments.ts`, `scoreboardApi.ts`/
+   `useOverallScoreboard.ts`, `matchesApi.ts`'s `listRecentCompletedMatches`
+   (`tournaments!inner(name, sport)` embed + filter).
+   _Test:_ `npx tsc -b` narrowed incrementally after each file, confirming errors
+   propagated to callers as expected rather than being masked.
+
+5. [x] **`TournamentDetail.tsx`: missing-level exclusion in the participant
+   picker.** Reads the tournament's own fixed `sport`, passes it into
+   `usePlayerStatsList`/`useDrawInputs`; the Add-participant `<select>`'s options
+   render `disabled` with a `title` tooltip when the sport-scoped
+   `self_selected_level` is `null` — with a fail-open guard (`stats === undefined` ⇒
+   not disabled) so options aren't all disabled during the brief window before stats
+   load.
+   _Test:_ extended `TournamentDetail.test.tsx` with a fixture player missing the
+   sport-scoped level, asserting the disabled option + tooltip, using `waitFor` since
+   the fail-open→correct-disabled transition is async.
+
+6. [x] **i18n additions** (`en.json`/`th.json`, in parallel): `home.*`,
+   `sport.badminton`/`sport.tennis`, `nav.switchSport`,
+   `tournaments.form.participantMissingLevel`, `member.levelNotSet`.
+
+7. [x] **Member page**: `CreatePlayerForm.tsx` scopes new-member level entry to
+   `useSport()`'s active sport. `EditablePlayerLevel.tsx` rewritten to take
+   `{playerId, playerName, stats, sport}` (drops the `Player` prop entirely — the
+   sport-scoped level lives on `stats`); three states (not-set prompt / editable
+   pre-filled / fixed computed), returns `null` while `stats` is still loading.
+   `PlayerList.tsx` wires `usePlayerStatsList(sport)` through.
+   _Test:_ extended `PlayerList.test.tsx` with a `self_selected_level: null` fixture
+   covering the not-set prompt and its save call.
+
+8. [x] **`CreateTournamentPage.tsx`, `useCreateTournamentWithFirstDraw.ts`,
+   `HistoryPage.tsx`, `ActivePage.tsx`, `OverallScoreboardPage.tsx`**: threaded
+   `sport` from `useSport()` (or, for the post-creation draw, from the just-submitted
+   tournament input) into every list/query call and the participant checklist's
+   missing-level disabling.
+   _Test:_ extended each page's existing test file with a mocked `useSport`,
+   asserting the sport value reaches the underlying data call.
+
+9. [x] **Integration test fixture updates** (7 files, live Supabase project): every
+   `createPlayer`/`createTournament`/`getPlayerStats`/`useDrawInputs` call updated to
+   pass `sport: 'badminton'` explicitly, matching the new required RPC/function
+   signatures. Also fixed `supabaseClient.integration.test.ts`'s direct-insert probe,
+   which referenced the now-dropped `self_selected_level` column.
+   _Test:_ all 22 integration tests pass against the live project.
+
+10. [x] **Full regression.** `npm run build` (`tsc -b && vite build`); `npm run lint`;
+    `npm run format`; `npx vitest run` (whole suite).
+    _Test:_ `tsc -b`/`vite build`/`eslint .` all clean; all 249 tests pass across 52
+    files (including all 8 live-integration files).
+
+11. [x] **Manual verification via dev server / Playwright MCP.** First-launch (no
+    `localStorage`) correctly gated to Home with no bottom nav; picking a sport
+    landed on Create with the tab bar visible; the header switcher round-tripped to
+    Home and back; a full page reload with a sport already chosen skipped Home
+    entirely. Cross-sport isolation verified against real data: every pre-existing
+    (migrated) member showed correctly disabled with the missing-level tooltip in the
+    Tennis workspace and correctly enabled in Badminton; created a disposable member
+    live, confirmed their Badminton level appeared immediately (see bug note below),
+    confirmed they were disabled in Tennis, set their Tennis level from Member,
+    confirmed they became selectable in Tennis without affecting their Badminton
+    state. Fixture member cleaned up afterward via `execute_sql`.
+
+**Bug found and fixed during manual verification:** `useCreatePlayer.ts`'s
+`onSuccess` only invalidated the `['players']` query key, not `['playerStats']` (unlike
+`useDeletePlayer.ts`, which already invalidated both). Before Phase 20,
+`EditablePlayerLevel` read `player.self_selected_level` directly and so worked
+regardless of whether the stats query had refetched; after Phase 20 it depends
+entirely on the sport-scoped `stats` row and renders nothing (`return null`) while
+`stats` is `undefined`. The combination meant a freshly-created member's level cell
+stayed permanently blank in an already-mounted session until some unrelated
+invalidation happened to refetch `playerStats`. Fixed by adding the missing
+`invalidateQueries({ queryKey: ['playerStats'] })` call; verified live by creating a
+second disposable member in the same session and confirming its level cell populated
+immediately with no reload.

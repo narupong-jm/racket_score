@@ -138,10 +138,30 @@ p {
   top: 0;
   z-index: 10;
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   padding: 10px 16px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
+}
+
+.sport-switcher {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sport-switcher img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
 }
 
 .app-content {
@@ -562,6 +582,50 @@ button.danger {
 .icon-choice:disabled .icon-choice-option {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* ---------- Home (sport picker) ---------- */
+
+.home-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 640px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 48px 16px;
+  text-align: center;
+  justify-content: center;
+}
+
+.sport-picker-options {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.sport-picker-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sport-picker-option img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
 }
 
 /* ---------- Modal / confirm dialogs ---------- */

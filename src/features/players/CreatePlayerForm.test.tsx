@@ -16,6 +16,10 @@ vi.mock('../passphrase/usePassphraseGate', () => ({
   }),
 }))
 
+vi.mock('../sport/useSport', () => ({
+  useSport: () => ({ sport: 'badminton', setSport: vi.fn() }),
+}))
+
 function renderWithClient(ui: ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -39,7 +43,8 @@ describe('CreatePlayerForm', () => {
       id: '1',
       name: 'New Player',
       gender: 'female',
-      self_selected_level: 'advanced',
+      badminton_self_selected_level: 'advanced',
+      tennis_self_selected_level: null,
       created_at: '2026-01-01T00:00:00Z',
     })
     const user = userEvent.setup()
@@ -58,6 +63,7 @@ describe('CreatePlayerForm', () => {
         {
           name: 'New Player',
           gender: 'female',
+          sport: 'badminton',
           self_selected_level: 'advanced',
         },
         'test-passphrase',

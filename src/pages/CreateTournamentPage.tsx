@@ -18,6 +18,7 @@ import { useStartNextMatch } from '../features/matches/useMatchQueue'
 import { IconChoice } from '../components/IconChoice'
 import { Avatar } from '../components/Avatar'
 import type { RosterPlayer } from '../components/DrawSlotSelect'
+import { useSport } from '../features/sport/useSport'
 import singlesIcon from '../assets/icons/single_badminton.png'
 import doublesIcon from '../assets/icons/double_badminton.png'
 
@@ -29,6 +30,7 @@ const TOURNAMENT_TYPE_ICONS: Record<TournamentType, string> = {
 export function CreateTournamentPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { sport } = useSport()
 
   const [name, setName] = useState('')
   const [type, setType] = useState<TournamentType>('singles')
@@ -41,7 +43,7 @@ export function CreateTournamentPage() {
   >([])
 
   const { data: players } = usePlayers()
-  const { data: statsList } = usePlayerStatsList()
+  const { data: statsList } = usePlayerStatsList(sport!)
   const { mutate, isPending, data: result } = useCreateTournamentWithFirstDraw()
   const startFirstMatch = useStartNextMatch(result?.tournament.id ?? '')
 
@@ -78,7 +80,7 @@ export function CreateTournamentPage() {
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    if (!isValid) return
+    if (!isValid || !sport) return
 
     setSubmittedType(type)
     setSubmittedParticipantIds([...selectedIds])
@@ -88,6 +90,7 @@ export function CreateTournamentPage() {
         type,
         games_per_match: gamesPerMatch,
         points_per_game: pointsPerGame,
+        sport,
       },
       participantIds: [...selectedIds],
     })
@@ -173,20 +176,29 @@ export function CreateTournamentPage() {
           <ul className="avatar-list">
             {(players ?? []).map((player) => {
               const stats = statsByPlayerId.get(player.id)
-              const level = stats?.effective_level ?? player.self_selected_level
+              const level = stats?.effective_level ?? stats?.self_selected_level
+              const hasLevel = statsList === undefined || level != null
               return (
                 <li key={player.id} className="avatar-list-item">
-                  <label className="checklist-row">
+                  <label
+                    className="checklist-row"
+                    title={
+                      hasLevel
+                        ? undefined
+                        : t('tournaments.form.participantMissingLevel')
+                    }
+                  >
                     <input
                       type="checkbox"
                       aria-label={player.name}
                       checked={selectedIds.has(player.id)}
+                      disabled={!hasLevel}
                       onChange={() => toggleParticipant(player.id)}
                     />
                     <Avatar name={player.name} size={32} />
                     <span className="checklist-name">{player.name}</span>
                     <span className="checklist-level">
-                      {t(`level.${level}`)}
+                      {level ? t(`level.${level}`) : t('member.levelNotSet')}
                     </span>
                   </label>
                 </li>

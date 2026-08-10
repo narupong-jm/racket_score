@@ -64,6 +64,7 @@ describe('useDrawInputs (real project, anon key)', () => {
       {
         name: `Draw Inputs Test ${runId}`,
         type: 'doubles',
+        sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
       },
@@ -83,6 +84,7 @@ describe('useDrawInputs (real project, anon key)', () => {
         {
           name: `Draw Inputs Test ${label} ${runId}`,
           gender: genders[label],
+          sport: 'badminton',
           self_selected_level: levels[label],
         },
         testWritePassphrase,
@@ -98,6 +100,7 @@ describe('useDrawInputs (real project, anon key)', () => {
       {
         name: `Draw Inputs Test E ${runId}`,
         gender: 'male',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -111,6 +114,7 @@ describe('useDrawInputs (real project, anon key)', () => {
       {
         name: `Draw Inputs Test F ${runId}`,
         gender: 'female',
+        sport: 'badminton',
         self_selected_level: 'beginner',
       },
       testWritePassphrase,
@@ -170,9 +174,10 @@ describe('useDrawInputs (real project, anon key)', () => {
       testWritePassphrase,
     )
 
-    const { result } = renderHook(() => useDrawInputs(tournamentId!), {
-      wrapper: createWrapper(),
-    })
+    const { result } = renderHook(
+      () => useDrawInputs(tournamentId!, 'badminton'),
+      { wrapper: createWrapper() },
+    )
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
