@@ -46,6 +46,62 @@ the user):
 
 ---
 
+## ⚠️ Operational note: integration-test fixture cleanup silently fails — always verify
+
+**Every session that runs the `*.integration.test.ts(x)` suite against the live
+Supabase project must manually check for, and delete, leftover fixture data
+afterward — do not trust the tests' own `afterAll`/`finally` cleanup blocks to
+have actually worked.** This has bitten multiple sessions in a row (most
+recently during Phase 20, twice in the same session — see its "Bug found"
+note and the follow-up cleanup after it).
+
+**Root cause:** since Phase 16, the `anon` role's direct `DELETE` grant on
+`players` is revoked (all real writes go through passphrase-gated RPCs
+instead — see Phase 16). Most integration test files' cleanup code still
+calls `supabase.from('players').delete(...)` directly against the anon
+client, which now fails — but **silently**: Supabase returns no error the
+test assertions notice, so the test suite reports green while the fixture
+`players` row (and, transitively, anything that still points at it) is left
+behind in the live database. `tournaments`/`matches`/`match_participants`/
+`match_games` deletes in the same cleanup blocks generally *do* still
+succeed (their FK-cascade/anon-grant situation differs), which is what makes
+this easy to miss — a quick spot-check of tournaments looks clean while
+`players` quietly accumulates junk rows across every test run.
+
+**Why a single regex-based cleanup pass isn't reliable either:** fixture
+player names vary by test file (`"Cutover Test Player ${runId}"`,
+`"Manually Adjusted A ${runId}"`, `"Draw Inputs Test A ${runId}"`, etc.) and
+don't all share an obvious common substring like `"test"` — a pattern that
+looks thorough (e.g. `name ~* 'test|cutover|liveness|fixture'`) can still
+miss a whole file's fixtures (e.g. `matchesApi.integration.test.ts`'s
+`"Manually Adjusted A/B ${runId}"` players, which contain none of those
+words) and still report "0 leftover" on its own narrower recheck query.
+
+**What to actually do, every time integration tests run (not just once at
+the end of a session):**
+
+1. After any `*.integration.test.ts(x)` run, query `select count(*) from
+   players` (and compare against what you'd expect from real club members)
+   rather than trusting the test output alone.
+2. If checking by name pattern, build the pattern from the actual fixture
+   name prefixes used across **every** integration test file in
+   `src/features/**/*.integration.test.ts(x)` at that time (grep for
+   `` `${runId}` `` / template-literal name prefixes) — don't reuse a
+   pattern written for a previous session's fixture set without re-deriving
+   it, and don't stop after one cleanup pass without re-querying the full
+   player count to confirm nothing was missed.
+3. Prefer deleting via the Supabase MCP `execute_sql` tool (service-role
+   connection, not subject to the same anon grant restriction) rather than
+   trying to fix it through the app.
+4. The longer-term fix — updating every integration test's cleanup to
+   delete via an RPC (or documenting that `players` fixture rows are
+   permanently orphaned by design and must be cleaned up out-of-band) — has
+   not been done as of Phase 20 and is a reasonable candidate for a future
+   phase, since this has now caused repeat manual cleanup work across
+   multiple sessions.
+
+---
+
 ## Phase 1 — Repo & Tooling Scaffold
 
 1. [x] **Git init.** `git init`, add `.gitignore` (node_modules, dist, .env*,
