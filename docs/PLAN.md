@@ -55,18 +55,54 @@ have actually worked.** This has bitten multiple sessions in a row (most
 recently during Phase 20, twice in the same session — see its "Bug found"
 note and the follow-up cleanup after it).
 
-**Root cause:** since Phase 16, the `anon` role's direct `DELETE` grant on
-`players` is revoked (all real writes go through passphrase-gated RPCs
-instead — see Phase 16). Most integration test files' cleanup code still
-calls `supabase.from('players').delete(...)` directly against the anon
-client, which now fails — but **silently**: Supabase returns no error the
-test assertions notice, so the test suite reports green while the fixture
-`players` row (and, transitively, anything that still points at it) is left
-behind in the live database. `tournaments`/`matches`/`match_participants`/
-`match_games` deletes in the same cleanup blocks generally *do* still
-succeed (their FK-cascade/anon-grant situation differs), which is what makes
-this easy to miss — a quick spot-check of tournaments looks clean while
-`players` quietly accumulates junk rows across every test run.
+**Root cause (corrected 2026-08-16 — the original note below undersold the
+scope of this):** the `anon` role's direct `DELETE` grant is revoked on
+**every** core table, not just `players` — confirmed by querying
+`information_schema.role_table_grants` directly: `players`, `tournaments`,
+`matches`, `match_games`, `match_participants`, and `tournament_participants`
+all show only `SELECT`/`REFERENCES`/`TRIGGER` for `anon`, no `DELETE`/
+`INSERT`/`UPDATE`. All real writes go through passphrase-gated RPCs (see
+Phase 16), and RPCs only cover the app's actual write paths (create/update/
+end/cancel/leave/etc.) — there is no RPC for a hard delete of a tournament or
+match, since the app deliberately never exposes one (End/Cancel are soft
+status changes, per the domain model). So **every** `supabase.from(<table>)
+.delete(...)` call in every integration test's cleanup block is silently a
+no-op against the anon client, not just the `players` ones — Supabase
+returns no error the test assertions notice, so the suite reports green
+while the fixture rows (tournaments, matches, all of it) are left behind in
+the live database. The earlier "tournaments/matches/etc. deletes generally
+do still succeed" claim in this note was wrong (or stale — grants may have
+tightened further since it was written) and led a later session to spend a
+turn trying to fix only the `players` half of this before rediscovering the
+full scope live against the database.
+
+**Fixes considered and rejected (2026-08-16 session) — don't re-litigate
+these without new information:**
+- *Route cleanup through a service-role Supabase client (bypasses RLS/grants
+  entirely).* Would fully work, but requires adding `SUPABASE_SERVICE_ROLE_KEY`
+  to the local `.env` — the user was asked and **declined** to provide it for
+  this purpose. Don't ask again without the user raising it first.
+- *Add hard-delete RPCs for `tournaments`/`matches` (passphrase-gated, like
+  `delete_player`).* Would work but conflicts with the app's own design
+  intent — tournaments/matches are deliberately never hard-deletable through
+  the app (End/Cancel only). Adding a delete path purely to serve test
+  cleanup was judged not worth that tradeoff.
+- *Swap only the `players` cleanup calls to the `delete_player` RPC, leaving
+  the rest as direct anon deletes.* This was actually implemented and tested
+  live, then reverted: `delete_player` correctly rejects a player who still
+  has `match_participants`/active `tournament_participants` rows, and since
+  those rows *also* can't be removed by the anon client (see corrected root
+  cause above), the RPC calls failed loudly (`player_has_matches` /
+  `player_in_tournament`) on most fixtures instead of silently no-op-ing.
+  That's a regression, not a fix — it turns a quietly-passing suite into a
+  reliably-failing one without actually deleting anything. Do not reapply
+  this partial fix in isolation.
+
+**Until one of the rejected fixes above becomes viable (user provides a
+service-role key, or a hard-delete RPC is deliberately added), manual
+out-of-band cleanup via the Supabase MCP `execute_sql` tool (service-role
+connection) after every integration-test run remains the only way to
+actually remove fixture data — see the checklist below.**
 
 **Why a single regex-based cleanup pass isn't reliable either:** fixture
 player names vary by test file (`"Cutover Test Player ${runId}"`,
@@ -80,9 +116,11 @@ words) and still report "0 leftover" on its own narrower recheck query.
 **What to actually do, every time integration tests run (not just once at
 the end of a session):**
 
-1. After any `*.integration.test.ts(x)` run, query `select count(*) from
-   players` (and compare against what you'd expect from real club members)
-   rather than trusting the test output alone.
+1. After any `*.integration.test.ts(x)` run, query row counts for **all** of
+   `players`, `tournaments`, `matches`, `match_games`, `match_participants`,
+   `tournament_participants` (not just `players`) and compare against what
+   you'd expect from real club data, rather than trusting the test output
+   alone.
 2. If checking by name pattern, build the pattern from the actual fixture
    name prefixes used across **every** integration test file in
    `src/features/**/*.integration.test.ts(x)` at that time (grep for
@@ -93,12 +131,13 @@ the end of a session):**
 3. Prefer deleting via the Supabase MCP `execute_sql` tool (service-role
    connection, not subject to the same anon grant restriction) rather than
    trying to fix it through the app.
-4. The longer-term fix — updating every integration test's cleanup to
-   delete via an RPC (or documenting that `players` fixture rows are
-   permanently orphaned by design and must be cleaned up out-of-band) — has
-   not been done as of Phase 20 and is a reasonable candidate for a future
-   phase, since this has now caused repeat manual cleanup work across
-   multiple sessions.
+4. See "Fixes considered and rejected" above before proposing a code-level
+   fix — the obvious ones have already been evaluated against the live
+   database and either declined by the user or rejected as a design
+   mismatch. Deleting the leftover tournament rows first (which cascades
+   `matches`/`match_games`/`match_participants`/`tournament_participants`
+   via `ON DELETE CASCADE`) before deleting the leftover `players` rows
+   keeps the manual cleanup query short.
 
 ---
 
