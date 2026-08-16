@@ -42,6 +42,7 @@ import {
 } from '../../components/DrawSlotSelect'
 import type { MatchType } from '../matchmaking/types'
 import type { Match, MatchGame, MatchHistoryEntry } from '../matches/matchesApi'
+import { TournamentScoreboardSection } from './TournamentScoreboardSection'
 
 interface TournamentDetailProps {
   tournamentId: string
@@ -195,6 +196,11 @@ export function TournamentDetail({
         nextDraw={nextDraw}
         onNextDrawChange={setNextDraw}
       />
+
+      <section className="card">
+        <h3>{t('tournaments.detail.standingsHeading')}</h3>
+        <TournamentScoreboardSection tournamentId={tournamentId} />
+      </section>
 
       {isActive && hasConfirmedResult && (
         <div className="danger-zone">

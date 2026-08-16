@@ -23,6 +23,9 @@ export function useRecordMatchResult(tournamentId: string) {
       queryClient.invalidateQueries({
         queryKey: ['tournamentStandingsRanked', tournamentId],
       })
+      queryClient.invalidateQueries({
+        queryKey: ['tournamentTotalPoints', tournamentId],
+      })
     },
   })
 }
