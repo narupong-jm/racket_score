@@ -16,6 +16,7 @@ import {
 } from '../features/matchmaking/generateNextMatch'
 import { useStartNextMatch } from '../features/matches/useMatchQueue'
 import { IconChoice } from '../components/IconChoice'
+import { NumberStepper } from '../components/NumberStepper'
 import { Avatar } from '../components/Avatar'
 import type { RosterPlayer } from '../components/DrawSlotSelect'
 import { useSport } from '../features/sport/useSport'
@@ -34,8 +35,8 @@ export function CreateTournamentPage() {
 
   const [name, setName] = useState('')
   const [type, setType] = useState<TournamentType>('singles')
-  const [gamesPerMatch, setGamesPerMatch] = useState(3)
-  const [pointsPerGame, setPointsPerGame] = useState(21)
+  const [gamesPerMatch, setGamesPerMatch] = useState<number | ''>('')
+  const [pointsPerGame, setPointsPerGame] = useState<number | ''>('')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [submittedType, setSubmittedType] = useState<TournamentType>('singles')
   const [submittedParticipantIds, setSubmittedParticipantIds] = useState<
@@ -60,12 +61,14 @@ export function CreateTournamentPage() {
   )
 
   const trimmedName = name.trim()
-  const cap = computePointCap(pointsPerGame)
+  const cap = pointsPerGame === '' ? null : computePointCap(pointsPerGame)
   const neededCount = getNeededPlayerCount(type)
   const notEnoughSelected = selectedIds.size < neededCount
   const isValid =
     trimmedName.length > 0 &&
+    gamesPerMatch !== '' &&
     gamesPerMatch > 0 &&
+    pointsPerGame !== '' &&
     pointsPerGame > 0 &&
     !notEnoughSelected
 
@@ -144,32 +147,32 @@ export function CreateTournamentPage() {
         />
 
         <div className="field-row">
-          <label className="field">
-            <span className="field-label">
+          <div className="field">
+            <label className="field-label" htmlFor="games-per-match">
               {t('tournaments.form.gamesPerMatchLabel')}
-            </span>
-            <input
-              type="number"
-              min={1}
+            </label>
+            <NumberStepper
+              id="games-per-match"
               value={gamesPerMatch}
-              onChange={(event) => setGamesPerMatch(Number(event.target.value))}
+              onChange={setGamesPerMatch}
             />
-          </label>
+          </div>
 
-          <label className="field">
-            <span className="field-label">
+          <div className="field">
+            <label className="field-label" htmlFor="points-per-game">
               {t('tournaments.form.pointsPerGameLabel')}
-            </span>
-            <input
-              type="number"
-              min={1}
+            </label>
+            <NumberStepper
+              id="points-per-game"
               value={pointsPerGame}
-              onChange={(event) => setPointsPerGame(Number(event.target.value))}
+              onChange={setPointsPerGame}
             />
-          </label>
+          </div>
         </div>
 
-        <p className="meta-line">{t('tournaments.form.deuceCap', { cap })}</p>
+        {cap != null && (
+          <p className="meta-line">{t('tournaments.form.deuceCap', { cap })}</p>
+        )}
 
         <fieldset className="participant-checklist">
           <legend>{t('tournaments.form.participantsLegend')}</legend>

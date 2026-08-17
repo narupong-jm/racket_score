@@ -206,6 +206,8 @@ describe('CreateTournamentPage', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Bob' }))
     await user.click(screen.getByRole('checkbox', { name: 'Carol' }))
     await user.click(screen.getByRole('checkbox', { name: 'Dave' }))
+    await user.type(screen.getByLabelText('Games per match'), '3')
+    await user.type(screen.getByLabelText('Points per game'), '21')
 
     const submitButton = screen.getByRole('button', {
       name: /create tournament/i,
@@ -297,6 +299,8 @@ describe('CreateTournamentPage', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Carol' }))
     await user.click(screen.getByRole('checkbox', { name: 'Dave' }))
     await user.click(screen.getByRole('checkbox', { name: 'Eve' })) // bench player, not drawn
+    await user.type(screen.getByLabelText('Games per match'), '3')
+    await user.type(screen.getByLabelText('Points per game'), '21')
     await user.click(screen.getByRole('button', { name: /create tournament/i }))
 
     await screen.findByText(

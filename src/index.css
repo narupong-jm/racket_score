@@ -421,6 +421,37 @@ input[type='number'] {
   width: 100%;
 }
 
+.number-stepper {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.number-stepper input[type='number'] {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.number-stepper input[type='number']::-webkit-outer-spin-button,
+.number-stepper input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.number-stepper-btn {
+  flex: 0 0 auto;
+  width: 40px;
+  padding: 0;
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1;
+  background: transparent;
+  color: var(--text-h);
+  border-color: var(--border);
+}
+
 button {
   font: inherit;
   font-weight: 600;
