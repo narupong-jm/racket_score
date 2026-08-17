@@ -40,7 +40,9 @@ works identically per sport.
 - Balanced random matchmaking (not round-robin) — see [Matchmaking
   algorithm](#matchmaking-algorithm) below
 - Singles **or** doubles per tournament, with configurable games-per-match
-  and points-per-game
+  and points-per-game (entered via a −/+ stepper or typed directly, blank
+  by default). Points-per-game is fixed at 4 for Tennis rather than
+  organizer-entered — shown disabled/faded in the Create Tournament form.
 - Deuce cap auto-computed from the BWF 21→30 ratio:
   `round(pointsPerGame * 30 / 21)`
 - Two win-rate-based scoreboards: per-tournament and an overall
@@ -68,8 +70,10 @@ These are deliberate design choices, not missing features:
 
 - **Tennis uses the same rally-point scoring engine as badminton**, not
   real tennis rules — no sets, no 40-40/advantage deuce, no tie-break at 6
-  games. Organizers configure games-per-match/points-per-game/deuce-cap the
-  same way for either sport.
+  games. Organizers configure games-per-match the same way for either
+  sport; points-per-game is organizer-entered for Badminton but **fixed at
+  4 for Tennis** (shown disabled in the Create Tournament form rather than
+  editable). The deuce-cap formula applies identically either way.
 - **No user accounts.** Anyone with the link can browse all data — this is
   meant for private, trusted club use. Writes (creating/editing/recording
   anything) require a single shared passphrase, prompted for once per browser

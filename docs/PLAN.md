@@ -139,6 +139,16 @@ the end of a session):**
    via `ON DELETE CASCADE`) before deleting the leftover `players` rows
    keeps the manual cleanup query short.
 
+**Better pattern than name-prefix matching (found 2026-08-17):** every
+fixture name embeds a `crypto.randomUUID()`-style `runId` regardless of its
+prefix wording, so matching `name ~ '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-
+[0-9a-f]{4}-[0-9a-f]{12}'` (a bare UUID-shaped substring) catches every
+fixture file's rows in one query without needing to enumerate prefix words
+per file — it caught a `"Manually Adjusted A/B ${runId}"` pair that a
+`name ilike '%test%'` pass had missed. Prefer this regex over a prefix-word
+list; re-run it (not just an eyeball diff) after any cleanup to confirm zero
+rows remain.
+
 ---
 
 ## Phase 1 — Repo & Tooling Scaffold
@@ -2396,3 +2406,46 @@ invalidation happened to refetch `playerStats`. Fixed by adding the missing
 `invalidateQueries({ queryKey: ['playerStats'] })` call; verified live by creating a
 second disposable member in the same session and confirming its level cell populated
 immediately with no reload.
+
+## Phase 21 — Create Tournament Form Refinements (Stepper Input, Fixed Tennis Points-per-Game)
+
+Small follow-up patch to the Create Tournament form (`src/pages/CreateTournamentPage.tsx`),
+done in three incremental steps in one session, each committed/pushed/deployed
+separately per the user's request.
+
+1. [x] **`NumberStepper` component + blank-by-default Games/Points fields.** New
+   `src/components/NumberStepper.tsx` — a −/+ stepper control (`value: number | ''`,
+   floor at `min` (default 1), no ceiling) that's also directly typeable, replacing
+   the old plain `<input type="number">`. Wired into `CreateTournamentPage.tsx`'s
+   Games per match / Points per game fields, both of which now start **blank**
+   instead of prefilled (3/21) — submit stays disabled until both are filled. The
+   "Deuce cap: N" line only renders once points-per-game resolves to a value.
+   _Test:_ extended `CreateTournamentPage.test.tsx` to fill in both fields before
+   submitting (previously relied on the 3/21 defaults); `tsc -b --force`, lint, and
+   the full suite (250 tests/52 files) all clean; manual browser check of both the
+   +/− buttons and direct typing.
+
+2. [x] **Tennis's points-per-game fixed at a constant (4) instead of
+   organizer-entered.** `TENNIS_POINTS_PER_GAME = 4` in `CreateTournamentPage.tsx`;
+   an `effectivePointsPerGame` derived value resolves to this constant whenever
+   `sport === 'tennis'`, feeding the deuce-cap calculation, form validation, and the
+   `createTournament` payload. Badminton is unaffected — still organizer-entered via
+   the same `NumberStepper`.
+   _Test:_ new tennis-specific test case asserting the `createTournament` call
+   receives `points_per_game: 4` without the organizer entering it.
+
+3. [x] **Disabled/faded instead of hidden.** Revised step 2's UI after user
+   feedback that a silently-disappearing field read as broken: the Points per game
+   field now stays visible for Tennis but renders **disabled and faded**
+   (`NumberStepper` gained a `disabled` prop; `.number-stepper.is-disabled { opacity:
+   0.45 }` plus native `:disabled` on the input/buttons) at its fixed value, instead
+   of being conditionally unrendered.
+   _Test:_ updated the tennis test case to assert the field `toBeDisabled()` and
+   `toHaveValue(4)` rather than asserting it's absent from the DOM; manual browser
+   check confirmed typing into the disabled field has no effect. `tsc -b --force`,
+   lint, and the affected test files all clean.
+
+**Note:** integration-test runs during this session's manual verification
+re-populated leftover fixture rows in the live Supabase project twice (see the
+operational note above) — cleaned up both times via `execute_sql`, including the
+UUID-substring-regex refinement documented there.

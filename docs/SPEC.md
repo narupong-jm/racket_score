@@ -48,6 +48,11 @@ and rule (scoring engine, Match Generator, both scoreboards, mid-tournament
 roster changes) is reused unchanged per sport; only the player-level and
 navigation model changes. Not yet implemented as of this note — see
 `docs/IMPROVEMENT4.md` for the full schema/file-level plan.
+Updated: 2026-08-17 — refines the Create Tournament form (§4): Games per
+match / Points per game now start blank (no prefilled default) and use a
+−/+ stepper input (also directly typeable), and Tennis's Points per game
+is fixed at 4 rather than organizer-entered, shown disabled/faded in the
+form instead of hidden. Implemented as of this note.
 
 ## 1. Overview
 
@@ -151,15 +156,29 @@ sport (§3).
   described below applies to both sports identically. This is a
   deliberate simplification: Tennis tournaments do **not** use real
   tennis scoring (no sets, no 40-40/advantage deuce, no tie-break at 6
-  games).
+  games). The one difference is **points per game is not
+  organizer-configurable for Tennis** (below) — Badminton is the only
+  sport where the organizer picks this value.
 - A tournament is **one match type only**: singles OR doubles, chosen at
   creation. Running both requires two separate tournaments.
 - Per-tournament scoring configuration (set at creation):
-  - Number of games per match (e.g. best of 1, best of 3, ...)
-  - Target points per game (e.g. 15 / 21 / 25, organizer-defined)
+  - Number of games per match (e.g. best of 1, best of 3, ...) —
+    organizer-defined for both sports. The Create Tournament form's
+    Games per match / Points per game inputs start **blank** (no
+    prefilled default) and are edited with a stepper control (−/+
+    buttons, floor of 1, no ceiling) or by typing a number directly.
+  - Target points per game (e.g. 15 / 21 / 25) — **organizer-defined
+    for Badminton only**. For Tennis, this is **fixed at 4** (not
+    editable): the Create Tournament form still shows the field for
+    visibility, but rendered disabled/faded at its fixed value rather
+    than hidden, so the fixed target stays legible instead of silently
+    disappearing.
   - Deuce rule: must win by 2 points, capped at a ceiling scaled to the
     target (mirrors BWF's 21-point-target/30-cap ratio). Score entry is
-    validated against this rule.
+    validated against this rule. The Create Tournament form's "Deuce
+    cap: N" line only renders once a points-per-game value is resolved
+    (always true for Tennis, since it's fixed; shown for Badminton once
+    the organizer has entered a value).
 - **Participants are selected at creation time, from the member pool** —
   this remains the *only* way to build the initial roster. Once the
   tournament is running, the roster can still change in two narrow,
