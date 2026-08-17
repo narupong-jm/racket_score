@@ -28,6 +28,8 @@ const TOURNAMENT_TYPE_ICONS: Record<TournamentType, string> = {
   doubles: doublesIcon,
 }
 
+const TENNIS_POINTS_PER_GAME = 4
+
 export function CreateTournamentPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -60,16 +62,20 @@ export function CreateTournamentPage() {
     },
   )
 
+  const isTennis = sport === 'tennis'
+  const effectivePointsPerGame = isTennis ? TENNIS_POINTS_PER_GAME : pointsPerGame
+
   const trimmedName = name.trim()
-  const cap = pointsPerGame === '' ? null : computePointCap(pointsPerGame)
+  const cap =
+    effectivePointsPerGame === '' ? null : computePointCap(effectivePointsPerGame)
   const neededCount = getNeededPlayerCount(type)
   const notEnoughSelected = selectedIds.size < neededCount
   const isValid =
     trimmedName.length > 0 &&
     gamesPerMatch !== '' &&
     gamesPerMatch > 0 &&
-    pointsPerGame !== '' &&
-    pointsPerGame > 0 &&
+    effectivePointsPerGame !== '' &&
+    effectivePointsPerGame > 0 &&
     !notEnoughSelected
 
   function toggleParticipant(id: string) {
@@ -92,7 +98,7 @@ export function CreateTournamentPage() {
         name: trimmedName,
         type,
         games_per_match: gamesPerMatch,
-        points_per_game: pointsPerGame,
+        points_per_game: effectivePointsPerGame,
         sport,
       },
       participantIds: [...selectedIds],
@@ -158,16 +164,18 @@ export function CreateTournamentPage() {
             />
           </div>
 
-          <div className="field">
-            <label className="field-label" htmlFor="points-per-game">
-              {t('tournaments.form.pointsPerGameLabel')}
-            </label>
-            <NumberStepper
-              id="points-per-game"
-              value={pointsPerGame}
-              onChange={setPointsPerGame}
-            />
-          </div>
+          {!isTennis && (
+            <div className="field">
+              <label className="field-label" htmlFor="points-per-game">
+                {t('tournaments.form.pointsPerGameLabel')}
+              </label>
+              <NumberStepper
+                id="points-per-game"
+                value={pointsPerGame}
+                onChange={setPointsPerGame}
+              />
+            </div>
+          )}
         </div>
 
         {cap != null && (

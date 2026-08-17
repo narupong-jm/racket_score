@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { CreateTournamentPage } from './CreateTournamentPage'
@@ -9,6 +9,7 @@ import * as tournamentsApi from '../features/tournaments/tournamentsApi'
 import * as useDrawInputsModule from '../features/matches/useDrawInputs'
 import * as matchesApi from '../features/matches/matchesApi'
 import * as generateNextMatchModule from '../features/matchmaking/generateNextMatch'
+import * as useSportModule from '../features/sport/useSport'
 import type { Player, PlayerStats } from '../features/players/playersApi'
 import type { Tournament } from '../features/tournaments/tournamentsApi'
 import type { Match } from '../features/matches/matchesApi'
@@ -62,7 +63,7 @@ vi.mock('../features/passphrase/usePassphraseGate', () => ({
 }))
 
 vi.mock('../features/sport/useSport', () => ({
-  useSport: () => ({ sport: 'badminton', setSport: vi.fn() }),
+  useSport: vi.fn(),
 }))
 
 function renderPage() {
@@ -139,6 +140,13 @@ const firstMatch: Match = {
   completed_at: null,
   manually_adjusted: false,
 }
+
+beforeEach(() => {
+  vi.mocked(useSportModule.useSport).mockReturnValue({
+    sport: 'badminton',
+    setSport: vi.fn(),
+  })
+})
 
 afterEach(() => {
   vi.clearAllMocks()
@@ -329,6 +337,72 @@ describe('CreateTournamentPage', () => {
         ],
         'test-passphrase',
         true,
+      )
+    })
+  })
+
+  it('tennis: hides the Points per game field and submits a fixed value of 4', async () => {
+    vi.mocked(useSportModule.useSport).mockReturnValue({
+      sport: 'tennis',
+      setSport: vi.fn(),
+    })
+    vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue(
+      players.map((p) => makeStats(p.id)),
+    )
+    vi.mocked(tournamentsApi.createTournament).mockResolvedValue({
+      ...tournament,
+      sport: 'tennis',
+      points_per_game: 4,
+    })
+    vi.mocked(tournamentsApi.addParticipant).mockResolvedValue({
+      tournament_id: 't1',
+      player_id: 'p1',
+      joined_at: '2026-01-01T00:00:00Z',
+      status: 'active',
+      match_count_offset: 0,
+    })
+    vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
+      candidates: [],
+      pairingHistory: { opponentPairs: new Set(), teammatePairs: new Set() },
+    })
+    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
+      ok: true,
+      participants: [
+        { playerId: 'p1', team: 1 },
+        { playerId: 'p2', team: 1 },
+        { playerId: 'p3', team: 2 },
+        { playerId: 'p4', team: 2 },
+      ],
+    })
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.createMatch).mockResolvedValue(firstMatch)
+
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.type(await screen.findByLabelText(/name/i), 'Tennis Night')
+    await user.click(screen.getByRole('radio', { name: 'Doubles' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Alice' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Bob' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Carol' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Dave' }))
+    await user.type(screen.getByLabelText('Games per match'), '3')
+
+    expect(screen.queryByLabelText('Points per game')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /create tournament/i }))
+
+    await waitFor(() => {
+      expect(tournamentsApi.createTournament).toHaveBeenCalledWith(
+        {
+          name: 'Tennis Night',
+          type: 'doubles',
+          games_per_match: 3,
+          points_per_game: 4,
+          sport: 'tennis',
+        },
+        'test-passphrase',
       )
     })
   })
