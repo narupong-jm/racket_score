@@ -452,6 +452,14 @@ input[type='number'] {
   border-color: var(--border);
 }
 
+.number-stepper.is-disabled {
+  opacity: 0.45;
+}
+
+.number-stepper input[type='number']:disabled {
+  cursor: not-allowed;
+}
+
 button {
   font: inherit;
   font-weight: 600;

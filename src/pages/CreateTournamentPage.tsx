@@ -164,18 +164,17 @@ export function CreateTournamentPage() {
             />
           </div>
 
-          {!isTennis && (
-            <div className="field">
-              <label className="field-label" htmlFor="points-per-game">
-                {t('tournaments.form.pointsPerGameLabel')}
-              </label>
-              <NumberStepper
-                id="points-per-game"
-                value={pointsPerGame}
-                onChange={setPointsPerGame}
-              />
-            </div>
-          )}
+          <div className="field">
+            <label className="field-label" htmlFor="points-per-game">
+              {t('tournaments.form.pointsPerGameLabel')}
+            </label>
+            <NumberStepper
+              id="points-per-game"
+              value={effectivePointsPerGame}
+              onChange={setPointsPerGame}
+              disabled={isTennis}
+            />
+          </div>
         </div>
 
         {cap != null && (

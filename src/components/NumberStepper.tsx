@@ -5,6 +5,7 @@ interface NumberStepperProps {
   value: number | ''
   onChange: (value: number | '') => void
   min?: number
+  disabled?: boolean
 }
 
 export function NumberStepper({
@@ -12,6 +13,7 @@ export function NumberStepper({
   value,
   onChange,
   min = 1,
+  disabled = false,
 }: NumberStepperProps) {
   const canDecrement = value !== '' && value > min
 
@@ -42,12 +44,12 @@ export function NumberStepper({
   }
 
   return (
-    <div className="number-stepper">
+    <div className={disabled ? 'number-stepper is-disabled' : 'number-stepper'}>
       <button
         type="button"
         className="number-stepper-btn"
         onClick={decrement}
-        disabled={!canDecrement}
+        disabled={disabled || !canDecrement}
         aria-label="decrease"
       >
         −
@@ -57,12 +59,14 @@ export function NumberStepper({
         type="number"
         min={min}
         value={value}
+        disabled={disabled}
         onChange={handleInputChange}
       />
       <button
         type="button"
         className="number-stepper-btn"
         onClick={increment}
+        disabled={disabled}
         aria-label="increase"
       >
         +

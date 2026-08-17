@@ -341,7 +341,7 @@ describe('CreateTournamentPage', () => {
     })
   })
 
-  it('tennis: hides the Points per game field and submits a fixed value of 4', async () => {
+  it('tennis: disables the Points per game field at a fixed value of 4', async () => {
     vi.mocked(useSportModule.useSport).mockReturnValue({
       sport: 'tennis',
       setSport: vi.fn(),
@@ -389,7 +389,9 @@ describe('CreateTournamentPage', () => {
     await user.click(screen.getByRole('checkbox', { name: 'Dave' }))
     await user.type(screen.getByLabelText('Games per match'), '3')
 
-    expect(screen.queryByLabelText('Points per game')).not.toBeInTheDocument()
+    const pointsPerGameInput = screen.getByLabelText('Points per game')
+    expect(pointsPerGameInput).toBeDisabled()
+    expect(pointsPerGameInput).toHaveValue(4)
 
     await user.click(screen.getByRole('button', { name: /create tournament/i }))
 
