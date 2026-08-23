@@ -2449,3 +2449,99 @@ separately per the user's request.
 re-populated leftover fixture rows in the live Supabase project twice (see the
 operational note above) — cleaned up both times via `execute_sql`, including the
 UUID-substring-regex refinement documented there.
+
+## Phase 22 — Post-Phase-21 Patch: Next Match Edit-Draw Games Table + Persisted Draw
+
+A narrower, post-launch patch surfaced directly in conversation (not a
+`docs/IMPROVEMENT*.md`-driven phase), addressing two real pain points with the
+Next match card in Manage Tournament: the organizer has no visibility into who's
+played the fewest games while manually editing a draw, and a randomized-but-not-
+started pairing is lost if they navigate away, forcing a re-randomize. Recorded in
+`docs/SPEC.md` §6/§9 (Updated 2026-08-23) before any code changed, per the same
+docs-first convention as Phase 17.
+
+1. [x] **Next match card's Edit action becomes a popup with a games-played
+   reference table.** `TournamentDetail.tsx`'s `NextMatchCard`: replaced the inline
+   `editing` toggle with the existing `Modal` component (already used by
+   `FirstMatchDrawnPopup.tsx`), scoped to this card only — the tournament-creation
+   first-match popup is unchanged. Popup body keeps the per-slot `DrawSlotSelect`
+   dropdowns (team 1 / team 2, unchanged logic) on top, and adds a new read-only
+   `.games-played-table` below listing every `rosterPlayers` entry with a games-
+   played count for this tournament: `candidate.matchesPlayedInTournament` (from
+   `useDrawInputs`, completed matches only) **plus 1** if that player's ID is in
+   `currentMatchParticipantIds` (the in-progress Current match, otherwise excluded
+   from that count), sorted ascending; the matchup-line summary now always shows on
+   the card (previously hidden while editing), and the Edit button always reads
+   "Edit" (opens the popup) instead of toggling to "Done editing" — that label
+   moved to the popup's own close button. New i18n keys (`editDrawPopupHeading`,
+   `editDrawGamesTableHeading`, `editDrawGamesTablePlayer`,
+   `editDrawGamesTableGamesPlayed`) in `en.json`/`th.json`; new
+   `.games-played-table(-wrap)` CSS in `index.css`. _Test:_ two new cases in
+   `TournamentDetail.test.tsx` — popup opens on Edit/closes on Done editing, and
+   table rows sorted ascending by games played with a Current-match participant's
+   count showing the +1; all 32 pre-existing cases in the same file (including the
+   two manual-adjust/mixed-doubles-warning tests that click "Edit" and interact
+   with the dropdowns) pass unmodified. `tsc -b --force` and `npm run lint` clean.
+   Live browser check deferred to step 4 below — no tournament was active in
+   either sport's live data at implementation time to click through; doing so
+   would require creating a throwaway tournament in the live Supabase project via
+   the write passphrase, which weighs the value of a live check against polluting
+   real data, so it's left for the fuller step-4 pass (or real next-tournament
+   usage) instead of done speculatively here.
+2. [x] **Persist the drawn-but-not-started Next match to `localStorage`.** New
+   `src/lib/nextDrawStore.ts`, mirroring `sportStore.ts`'s plain get/set-function
+   shape (no hook/class) but JSON-serialized: `getCachedNextDraw(tournamentId)`,
+   `setCachedNextDraw(tournamentId, draw)`, `clearCachedNextDraw(tournamentId)`,
+   key `racket-score.nextDraw.<tournamentId>`. `TournamentDetail.tsx`'s `nextDraw`
+   `useState` gets a lazy initializer reading this cache, and a new
+   `handleNextDrawChange` wrapper (now passed as `onNextDrawChange` to both
+   `NextMatchCard` and `ParticipantsCard`, replacing the raw `setNextDraw`
+   setter) writes through to the cache on every change -- Randomize, a dropdown
+   swap, a draw failing, or Leave discarding the Next match all funnel through
+   this one function, which sets the cache on a non-null draw and clears it on
+   null. The Start-match-success clear specifically lives in
+   `useStartNextMatch`'s **mutation-level** `onSuccess` (`useMatchQueue.ts`), not
+   only the component's call-site `onSuccess` -- per-`mutate()` callbacks aren't
+   guaranteed to fire if the component unmounts first (e.g. the organizer
+   navigates away right as Start match resolves), while the mutation-level
+   callback is, matching the existing precedent in this same function's
+   `invalidateQueries` comment. _Test:_ new `src/lib/nextDrawStore.test.ts`
+   (round-trip, per-tournament keying, selective clear) plus two new
+   `TournamentDetail.test.tsx` cases -- a draw set before `unmount()`/remount is
+   still there after, and `localStorage`'s entry is gone once `createMatch`
+   resolves from Start match. Needed an unrelated fix alongside: added
+   `localStorage.clear()` to this test file's existing `afterEach` (matching
+   `SportProvider.test.tsx`'s precedent) -- without it, a draw cached by an
+   earlier test in the same run leaked into the Save-Result-lock tests, since
+   they all reuse tournament id `'t1'` and `localStorage` is shared across tests
+   in the same jsdom instance. `tsc -b --force`, `npm run lint`, and all three
+   affected test files (41 cases total) clean.
+3. [x] **`docs/SPEC.md` updated ahead of code.** §6 (new bullet describing the
+   Edit-popup's reference table) and §9 tab 2 (Next match bullet: popup shape +
+   localStorage persistence, cleared on Start match), plus a new dated "Updated"
+   note at the top. Done in this session, before any implementation step above.
+4. [x] **Full regression + manual verification.** `npx tsc -b --force`, `npm run
+   lint`, and `npx vitest run --exclude "**/*.integration.test.*"` (45 files / 236
+   tests, all clean) ahead of the live pass. Live walkthrough via Playwright MCP
+   against the real `racket-score` Supabase project (Chrome extension wasn't
+   connected this session): since no tournament was active in either sport at the
+   time, created a throwaway 3-player singles badminton tournament ("Phase22
+   smoke test (delete me)") with the real write passphrase, deleted afterward —
+   confirmed by explicit user choice before creating it. Verified live: (1) the
+   auto-drawn first match put the third player (Dragon) in the only Current-match
+   exclusion state possible with 3 players, so Randomize correctly fell back to
+   reusing a Current-match participant with the existing warning shown; opening
+   Edit Draw showed the popup with both current-match participants at "1" game
+   played (0 completed + the live +1) and Dragon at "0", sorted ascending, exactly
+   as designed; (2) swapping a dropdown to Dragon updated both the popup's
+   matchup summary and the card's matchup line live; (3) after `Done editing`,
+   saving the Current match's result (to unblock Start match, since only one
+   match runs at a time) and then a **full page reload** (`page.goto`, stronger
+   than in-app navigation) still showed the edited "คิ้ตตี้คาวาอิ้ พบ Dragon"
+   pairing in Next match without re-Randomizing; (4) `localStorage.getItem` for
+   that tournament's key was non-null before Start match and confirmed `null`
+   immediately after `createMatch` resolved. Cleanup: deleted the tournament row
+   via `execute_sql` (cascades removed its `matches`/`match_participants`/
+   `match_games`/`tournament_participants` rows automatically, per the FK
+   `ON DELETE CASCADE` confirmed beforehand) and verified all four counts back to
+   zero. Phase 22 complete.

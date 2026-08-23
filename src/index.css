@@ -709,6 +709,32 @@ button.danger {
   margin-top: 8px;
 }
 
+.games-played-table-wrap {
+  max-height: 240px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.games-played-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.games-played-table th,
+.games-played-table td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.games-played-table thead th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
 .review-list {
   list-style: none;
   margin: 0;

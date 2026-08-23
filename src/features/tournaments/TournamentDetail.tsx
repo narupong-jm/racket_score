@@ -9,6 +9,11 @@ import { useAddParticipant } from './useAddParticipant'
 import type { TournamentParticipant } from './tournamentsApi'
 import { computePointCap } from './computePointCap'
 import { formatDate } from '../../i18n/formatDate'
+import {
+  getCachedNextDraw,
+  setCachedNextDraw,
+  clearCachedNextDraw,
+} from '../../lib/nextDrawStore'
 import { Modal } from '../../components/Modal'
 import { Avatar } from '../../components/Avatar'
 import { usePlayers } from '../players/usePlayers'
@@ -66,9 +71,18 @@ export function TournamentDetail({
   const [endModalOpen, setEndModalOpen] = useState(false)
   const cancelTournament = useCancelTournament()
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
-  const [nextDraw, setNextDraw] = useState<GeneratedMatchParticipant[] | null>(
-    null,
-  )
+  const [nextDraw, setNextDrawState] = useState<
+    GeneratedMatchParticipant[] | null
+  >(() => getCachedNextDraw(tournamentId))
+
+  function handleNextDrawChange(draw: GeneratedMatchParticipant[] | null) {
+    setNextDrawState(draw)
+    if (draw) {
+      setCachedNextDraw(tournamentId, draw)
+    } else {
+      clearCachedNextDraw(tournamentId)
+    }
+  }
 
   if (!tournament) return <p>{t('tournaments.detail.notFound')}</p>
 
@@ -175,7 +189,7 @@ export function TournamentDetail({
         rosterPlayers={rosterPlayers}
         playerNameById={playerNameById}
         nextDraw={nextDraw}
-        onNextDrawChange={setNextDraw}
+        onNextDrawChange={handleNextDrawChange}
       />
 
       <RoundsPlayedList
@@ -194,7 +208,7 @@ export function TournamentDetail({
         isActive={isActive}
         currentMatchParticipantIds={currentMatchParticipantIds}
         nextDraw={nextDraw}
-        onNextDrawChange={setNextDraw}
+        onNextDrawChange={handleNextDrawChange}
       />
 
       <section className="card">
@@ -873,47 +887,92 @@ function NextMatchCard({
         )
       : false
 
+  const matchesPlayedById = new Map(
+    (drawInputs?.candidates ?? []).map((c) => [
+      c.id,
+      c.matchesPlayedInTournament,
+    ]),
+  )
+  const gamesPlayedRows = rosterPlayers
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+      gamesPlayed:
+        (matchesPlayedById.get(r.id) ?? 0) +
+        (currentMatchParticipantIds.includes(r.id) ? 1 : 0),
+    }))
+    .sort((a, b) => a.gamesPlayed - b.gamesPlayed)
+
   return (
     <section className="card">
       <h3>{t('manage.nextMatchHeading')}</h3>
       {!nextDraw && <p className="empty-state">{t('manage.notPickedYet')}</p>}
-      {nextDraw && !editing && (
+      {nextDraw && (
         <p className="matchup-line">
           {t('matches.draw.matchup', { team1, team2 })}
         </p>
       )}
-      {nextDraw && editing && (
-        <div className="draw-edit-teams">
-          <div className="draw-edit-team">
-            {nextDraw
-              .filter((p) => p.team === 1)
-              .map((p, i) => (
-                <DrawSlotSelect
-                  key={p.playerId}
-                  participant={p}
-                  index={i}
-                  draw={nextDraw}
-                  rosterPlayers={rosterPlayers}
-                  onSwap={handleSwap}
-                />
-              ))}
+      {nextDraw && (
+        <Modal open={editing} onClose={() => setEditing(false)}>
+          <h3>{t('manage.editDrawPopupHeading')}</h3>
+          <div className="draw-edit-teams">
+            <div className="draw-edit-team">
+              {nextDraw
+                .filter((p) => p.team === 1)
+                .map((p, i) => (
+                  <DrawSlotSelect
+                    key={p.playerId}
+                    participant={p}
+                    index={i}
+                    draw={nextDraw}
+                    rosterPlayers={rosterPlayers}
+                    onSwap={handleSwap}
+                  />
+                ))}
+            </div>
+            <span className="round-vs">vs</span>
+            <div className="draw-edit-team">
+              {nextDraw
+                .filter((p) => p.team === 2)
+                .map((p, i) => (
+                  <DrawSlotSelect
+                    key={p.playerId}
+                    participant={p}
+                    index={i}
+                    draw={nextDraw}
+                    rosterPlayers={rosterPlayers}
+                    onSwap={handleSwap}
+                  />
+                ))}
+            </div>
           </div>
-          <span className="round-vs">vs</span>
-          <div className="draw-edit-team">
-            {nextDraw
-              .filter((p) => p.team === 2)
-              .map((p, i) => (
-                <DrawSlotSelect
-                  key={p.playerId}
-                  participant={p}
-                  index={i}
-                  draw={nextDraw}
-                  rosterPlayers={rosterPlayers}
-                  onSwap={handleSwap}
-                />
-              ))}
+
+          <h4>{t('manage.editDrawGamesTableHeading')}</h4>
+          <div className="games-played-table-wrap">
+            <table className="games-played-table">
+              <thead>
+                <tr>
+                  <th>{t('manage.editDrawGamesTablePlayer')}</th>
+                  <th>{t('manage.editDrawGamesTableGamesPlayed')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {gamesPlayedRows.map((row) => (
+                  <tr key={row.id}>
+                    <td>{row.name}</td>
+                    <td>{row.gamesPlayed}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
+
+          <div className="modal-actions">
+            <button type="button" onClick={() => setEditing(false)}>
+              {t('manage.doneEditingDraw')}
+            </button>
+          </div>
+        </Modal>
       )}
 
       <div className="button-row">
@@ -929,10 +988,10 @@ function NextMatchCard({
           <button
             type="button"
             className="secondary"
-            onClick={() => setEditing((e) => !e)}
+            onClick={() => setEditing(true)}
             disabled={!isActive}
           >
-            {editing ? t('manage.doneEditingDraw') : t('manage.editDraw')}
+            {t('manage.editDraw')}
           </button>
         )}
         {nextDraw && (

@@ -53,6 +53,17 @@ match / Points per game now start blank (no prefilled default) and use a
 −/+ stepper input (also directly typeable), and Tennis's Points per game
 is fixed at 4 rather than organizer-entered, shown disabled/faded in the
 form instead of hidden. Implemented as of this note.
+Updated: 2026-08-23 — two small corrections found during real usage of the
+Next match card (§6, §9): (1) the Next match card's **Edit** action now
+opens as a popup with a read-only reference table (every participant's
+games-played count in this tournament, including the in-progress Current
+match, sorted fewest-to-most) shown alongside the existing player pickers,
+so the organizer can see who's played least while swapping players — the
+first-match creation popup (§9, tab 1) is unchanged. (2) a Next match
+draw that's been randomized but not yet started is now kept in the
+browser's local storage, keyed by tournament, so navigating away and back
+no longer loses it; it's cleared once Start match promotes it into
+Current match. Not yet implemented as of this note.
 
 ## 1. Overview
 
@@ -335,6 +346,17 @@ algorithm.
   violates §5's gender-balance rule; the organizer can still confirm the
   override. An edited draw is flagged as manually adjusted, and that flag
   is visible later in History (§9).
+- **Next match card's Edit popup (games-played reference table).** For the
+  Next match card specifically (not the tournament-creation first-match
+  popup, which is unchanged) — the Edit action opens as a **popup** with
+  two stacked sections: the same per-slot player pickers as before, on
+  top, unchanged; and below them, a **read-only reference table** listing
+  every participant in the tournament with their games-played count *in
+  this tournament* — completed matches, plus one more if that player is
+  currently part of the in-progress Current match — sorted from fewest
+  games played to most. The table exists to help the organizer spot who's
+  played least before choosing a swap; player swaps still happen only
+  through the pickers above it, not by interacting with the table.
 - **Next match must be drawn before Current match's result can be saved.**
   For every Current match — manually adjusted or not — the **Save result**
   button (§9) stays disabled until a Next match has been randomized. This
@@ -469,12 +491,17 @@ at every screen size (not a responsive top-nav on wider viewports):
      manually, on demand, for every match including the tournament's
      first one is drawn automatically at creation time per tab 1, but
      every match after that requires an explicit Randomize tap. The card
-     also has an **Edit** action (§6) to swap out one or more drawn
-     players inline before starting the match; an edited pairing is
-     flagged as manually adjusted (visible later in History). Once a
-     pairing exists here, a **Start match** button appears and moves it
-     into Current match (replacing whatever was there, resetting score
-     inputs), clearing Next match back to empty.
+     also has an **Edit** action (§6) that opens a popup — player pickers
+     on top, a read-only games-played reference table below (§6) — to swap
+     out one or more drawn players before starting the match; an edited
+     pairing is flagged as manually adjusted (visible later in History). A
+     drawn-but-not-yet-started pairing is kept in the browser's local
+     storage, keyed by tournament, so leaving this screen and coming back
+     (or reloading) doesn't lose it — the organizer no longer has to
+     Randomize again just from navigating away. Once a pairing exists
+     here, a **Start match** button appears and moves it into Current
+     match (replacing whatever was there, resetting score inputs),
+     clearing Next match back to empty and clearing the stored draw.
    - **Save result** opens a confirmation dialog (§6) before locking the
      result in; on confirm, it's appended to **Rounds played** (newest
      first, showing round label, both sides, winning side bolded/accented,

@@ -10,6 +10,7 @@ import {
   type MatchParticipantInput,
 } from './matchesApi'
 import { usePassphraseGate } from '../passphrase/usePassphraseGate'
+import { clearCachedNextDraw } from '../../lib/nextDrawStore'
 
 export interface TournamentMatches {
   matches: Match[]
@@ -66,6 +67,12 @@ export function useStartNextMatch(tournamentId: string) {
       )
     },
     onSuccess: () => {
+      // Cleared here (mutation-level onSuccess), not only via the
+      // mutate()-call-site onSuccess that resets local UI state -- this one
+      // is guaranteed to run even if the component unmounts (e.g. the
+      // organizer navigates away right as Start match resolves), unlike a
+      // per-mutate callback.
+      clearCachedNextDraw(tournamentId)
       // Must return this promise: React Query awaits a mutation-level
       // onSuccess before running the mutate()-call-site onSuccess, so the
       // refetched Current-match roster is in the cache before any caller

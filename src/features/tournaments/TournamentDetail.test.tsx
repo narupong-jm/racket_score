@@ -181,6 +181,7 @@ function setupCommonMocks() {
 
 afterEach(() => {
   vi.clearAllMocks()
+  localStorage.clear()
 })
 
 describe('TournamentDetail: Current match card', () => {
@@ -688,6 +689,188 @@ describe('TournamentDetail: Next match inline edit', () => {
         'test-passphrase',
         true,
       )
+    })
+  })
+})
+
+describe('TournamentDetail: Next match Edit Draw popup (games-played table)', () => {
+  it('opens the Edit Draw popup on Edit and closes it via Done editing', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
+      ok: true,
+      participants: [
+        { playerId: 'p1', team: 1 },
+        { playerId: 'p2', team: 2 },
+      ],
+    })
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(await screen.findByRole('button', { name: 'Randomize' }))
+    await screen.findByText('Alice vs Bob')
+    expect(screen.queryByText('Edit draw')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(await screen.findByText('Edit draw')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Done editing' }))
+    await waitFor(() => {
+      expect(screen.queryByText('Edit draw')).toBeNull()
+    })
+  })
+
+  it('lists every participant\'s games played this tournament, sorted fewest to most, including the +1 for the in-progress Current match participant', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      makeParticipant('p1'),
+      makeParticipant('p2'),
+      makeParticipant('p3'),
+    ])
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([
+      ...players,
+      {
+        id: 'p3',
+        name: 'Carol',
+        gender: 'female',
+        badminton_self_selected_level: 'beginner',
+        tennis_self_selected_level: 'beginner',
+        created_at: '',
+      },
+    ])
+    vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
+      candidates: [
+        {
+          id: 'p1',
+          gender: 'female',
+          skillValue: 50,
+          matchesPlayedInTournament: 1,
+        },
+        {
+          id: 'p2',
+          gender: 'male',
+          skillValue: 50,
+          matchesPlayedInTournament: 0,
+        },
+        {
+          id: 'p3',
+          gender: 'female',
+          skillValue: 50,
+          matchesPlayedInTournament: 0,
+        },
+      ],
+      pairingHistory: { opponentPairs: new Set(), teammatePairs: new Set() },
+    })
+    // p1 is currently playing in the Current match -- their completed-only
+    // count (1) should show as 2 in the popup's table.
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([
+      makeMatch('m1', 1, 'queued'),
+    ])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([
+      { match_id: 'm1', player_id: 'p1', team: 1 },
+    ])
+    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
+      ok: true,
+      participants: [
+        { playerId: 'p2', team: 1 },
+        { playerId: 'p3', team: 2 },
+      ],
+    })
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(await screen.findByRole('button', { name: 'Randomize' }))
+    await screen.findByText('Bob vs Carol')
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await screen.findByText('Edit draw')
+
+    const table = screen.getByRole('table')
+    const dataRows = within(table).getAllByRole('row').slice(1)
+    const rowTexts = dataRows.map((row) =>
+      within(row)
+        .getAllByRole('cell')
+        .map((cell) => cell.textContent),
+    )
+    expect(rowTexts).toEqual([
+      ['Bob', '0'],
+      ['Carol', '0'],
+      ['Alice', '2'],
+    ])
+  })
+})
+
+describe('TournamentDetail: Next match draw persistence (localStorage)', () => {
+  it('keeps a drawn-but-not-started Next match after the component remounts', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
+      ok: true,
+      participants: [
+        { playerId: 'p1', team: 1 },
+        { playerId: 'p2', team: 2 },
+      ],
+    })
+
+    const user = userEvent.setup()
+    const first = renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(await screen.findByRole('button', { name: 'Randomize' }))
+    await screen.findByText('Alice vs Bob')
+
+    first.unmount()
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    expect(await screen.findByText('Alice vs Bob')).toBeInTheDocument()
+    expect(screen.queryByText('Not picked yet')).toBeNull()
+  })
+
+  it('clears the cached draw once Start match successfully creates the match', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
+      ok: true,
+      participants: [
+        { playerId: 'p1', team: 1 },
+        { playerId: 'p2', team: 2 },
+      ],
+    })
+    vi.mocked(matchesApi.createMatch).mockResolvedValue(
+      makeMatch('m-new', 1, 'queued'),
+    )
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(await screen.findByRole('button', { name: 'Randomize' }))
+    await screen.findByText('Alice vs Bob')
+    expect(localStorage.getItem('racket-score.nextDraw.t1')).not.toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Start match' }))
+
+    await waitFor(() => {
+      expect(matchesApi.createMatch).toHaveBeenCalled()
+    })
+    await waitFor(() => {
+      expect(localStorage.getItem('racket-score.nextDraw.t1')).toBeNull()
     })
   })
 })
