@@ -2571,7 +2571,38 @@ RPC. `match_games.match_id`/`match_participants.match_id` already carry
 are plain (non-materialized) views recomputed on every read — so a single
 `DELETE FROM matches` is sufficient and stats reflect it with no refresh step.
 
-1. [ ] **Migration: new `delete_match_result(p_match_id uuid, p_passphrase
+**Implementation status (2026-09-13):** built via superpowers:subagent-driven-development
+in an isolated git worktree at `.claude/worktrees/phase-23-delete-match` (branch
+`worktree-phase-23-delete-match`, based on `main` @ `888c7f8`) — not yet merged to `main`.
+Steps 1-7 and 10 below are complete and independently reviewed (clean, no open findings).
+Step 8 (History wiring) is implemented, committed, and its own tests pass, but its
+independent SDD review was interrupted mid-check by a usage-limit pause before returning
+a verdict — **resume by re-dispatching that review before trusting step 8 as done**, per
+the SDD ledger. Steps 9, 11, and 12 have not been started. Full session ledger (pre-flight
+scan, every task's review outcome, and one ordering ruling — see below) lives at
+`.superpowers/sdd/PLAN/progress.md` inside the worktree (gitignored; not part of this
+commit). To resume: `cd` into the worktree (or re-run `EnterWorktree` with
+`path: .claude/worktrees/phase-23-delete-match`), re-read that ledger, and continue with
+subagent-driven-development from where it left off.
+
+**Execution-order note:** step 10 (i18n) was deliberately built *before* step 7 (the
+confirm modal) and steps 8-9 (History/Manage wiring), even though it's numbered after
+them — those three steps' own tests assert real rendered English/Thai copy from
+`en.json`/`th.json` (this repo's test convention, confirmed via `TournamentDetail.test.tsx`
+and others: they load the real i18n instance and assert on actual translated strings, not
+mocked/typed keys), so building the copy-consuming components first would have made their
+own tests fail against not-yet-existing keys. This is a plan-authoring ordering oversight,
+not a spec conflict — no other step's dependencies were affected. The checkbox numbering
+below is unchanged; only the build *order* differed (1, 2, 3, 4, 5, 6, 10, 7, 8, 9, 11, 12).
+
+**Environment note:** the worktree's `.env` had a stale `VITE_TEST_WRITE_PASSPHRASE` that no
+longer matched the live `racket-score` Supabase project's `app_secrets` hash (pre-existing,
+unrelated to this phase — caused 20 real-anon-key integration tests to fail with
+`invalid_passphrase` before any Phase 23 code existed). Fixed by updating both the
+worktree's and the main checkout's `.env` (line 3) to the current passphrase after
+confirming it against the live project via a disposable fixture write.
+
+1. [x] **Migration: new `delete_match_result(p_match_id uuid, p_passphrase
    text)` RPC** via Supabase MCP `apply_migration`, mirroring `delete_player`'s
    structure (`security definer`, `set search_path to 'public', 'pg_temp'`,
    `check_write_passphrase` first, `returns void`). Body: check the
@@ -2589,8 +2620,11 @@ are plain (non-materialized) views recomputed on every read — so a single
    `player_stats`/`tournament_standings` for its players already reflect the
    change on the very next read. Then `get_advisors` (security): expect
    exactly one new anon-executable `SECURITY DEFINER` advisory, consistent
-   with every other write RPC.
-2. [ ] **Migration: RLS policy rewrite on `matches`/`match_games`/
+   with every other write RPC. **Done:** applied via Supabase MCP (no local
+   migration file exists in this repo, matching `delete_player`'s own precedent);
+   all 5 test scenarios and the advisors check passed, independently re-verified by
+   a separate reviewer against the live database with its own fresh fixtures.
+2. [x] **Migration: RLS policy rewrite on `matches`/`match_games`/
    `match_participants`.** For each table, drop `anon_full_access` and create
    `anon_select` (`FOR SELECT TO anon USING (true)`, no `WITH CHECK`) — no
    write policy of any kind left for `anon` afterward. No grant changes (anon's
@@ -2599,17 +2633,30 @@ are plain (non-materialized) views recomputed on every read — so a single
    still `403`/`42501`; `GET /rest/v1/matches?select=id&limit=1` still `200`;
    `POST /rest/v1/rpc/delete_match_result` with the correct passphrase against
    a disposable fixture still succeeds. `pg_policies` shows the new
-   `anon_select`/`SELECT`/`true`/`null` shape on all three tables.
-3. [ ] **Regenerate `database.types.ts`** via Supabase MCP
-   `generate_typescript_types`. _Test:_ `npx tsc -b` — zero new errors.
-4. [ ] **`deleteMatchResult(matchId, passphrase)`** in
+   `anon_select`/`SELECT`/`true`/`null` shape on all three tables. **Done:**
+   real anon-key round trip confirmed DELETE rejected (`42501`), GET still 200,
+   and `delete_match_result` still succeeds post-change. One wording
+   discrepancy surfaced and was ruled on: the DELETE rejection returns HTTP
+   401, not the 403 this step's text assumed — PostgREST's standard mapping
+   for a GRANT-level `insufficient_privilege` rejection on the unauthenticated
+   `anon` role (checked before RLS is even evaluated); the error code `42501`
+   and the actual security property both match regardless, so this is a
+   plan-wording inaccuracy, not an implementation defect. Independently
+   reviewed and reproduced on a separate fresh fixture.
+3. [x] **Regenerate `database.types.ts`** via Supabase MCP
+   `generate_typescript_types`. _Test:_ `npx tsc -b` — zero new errors. **Done:**
+   purely mechanical regeneration, reviewed clean.
+4. [x] **`deleteMatchResult(matchId, passphrase)`** in
    `src/features/matches/matchesApi.ts`, mirroring `recordMatchResult`'s
    shape: `supabase.rpc('delete_match_result', { p_match_id, p_passphrase })`,
    throws on error, returns `Promise<void>`. _Test:_ `npx tsc -b`; extend
    `matchesApi.integration.test.ts` with a create+record+delete round trip
    confirming `listRecentCompletedMatches` no longer includes it, and a
-   wrong-passphrase case that leaves the fixture in place.
-5. [ ] **`useDeleteMatchResult` hook**, new
+   wrong-passphrase case that leaves the fixture in place. **Done:** mirrors
+   `deletePlayer`'s void-return shape exactly; new tests assert real DB state
+   (presence/absence in `listRecentCompletedMatches`, untouched row on wrong
+   passphrase), reviewed clean.
+5. [x] **`useDeleteMatchResult` hook**, new
    `src/features/matches/useDeleteMatchResult.ts`. Deliberately does not use
    `usePassphraseGate()` (would short-circuit via the session-cached
    passphrase, which this action must never do). Mutation variables:
@@ -2621,8 +2668,10 @@ are plain (non-materialized) views recomputed on every read — so a single
    `['overallScoreboard']` (not invalidated by `useRecordMatchResult` today,
    but needed here since deletion is reachable from History and affects the
    Overall Scoreboard). _Test:_ covered indirectly via steps 8/9's component
-   tests.
-6. [ ] **Impact-preview helper**, new
+   tests. **Done:** does not use `usePassphraseGate` (verified by grep); all 7
+   query keys confirmed un-suffixed and correctly named against their real
+   source files. Reviewed clean.
+6. [x] **Impact-preview helper**, new
    `src/features/matches/matchImpactPreview.ts` — pure function
    `computeMatchImpactPreview(participants, games, statsByPlayerId,
    playerNameById)` returning per-player `{ beforeMatches, beforeWinRate,
@@ -2637,7 +2686,11 @@ are plain (non-materialized) views recomputed on every read — so a single
    `aggregateScoreboard.ts`'s 0–1 fraction). _Test:_ new
    `matchImpactPreview.test.ts` — singles win/loss, doubles split, a player
    with no prior stats row, and a tied-games match crediting no one a win.
-7. [ ] **`DeleteMatchConfirmModal` component**, new
+   **Done:** reuses `summarizeGamesWon` as-is; ties correctly credit nobody
+   (does not reproduce `RoundsPlayedList`'s tie-credits-team2 bug). 5/5 tests
+   pass, independently hand-verified by the reviewer including the tie case.
+   Reviewed clean.
+7. [x] **`DeleteMatchConfirmModal` component**, new
    `src/features/matches/DeleteMatchConfirmModal.tsx`, built on
    `src/components/Modal.tsx`, matching `CurrentMatchForm`'s confirm-modal
    JSX and `PlayerList.tsx`'s inline-error-on-failure pattern. Props:
@@ -2655,12 +2708,22 @@ are plain (non-materialized) views recomputed on every read — so a single
    Confirm passes the exact typed passphrase, Cancel doesn't call the
    mutation and clears the field on reopen, a mocked rejection shows the
    generic error and keeps the field populated, Confirm disabled when empty.
+   **Done:** the critical constraint (passphrase confined to local `useState`,
+   never `passphraseStore`/`usePassphraseGate`) verified by grep, independently
+   re-confirmed by the reviewer. 5/5 tests pass, all non-vacuous. Reviewed
+   clean (2 minor notes parked: no `.reset()` on cancel/reopen, matching an
+   existing `PlayerList.tsx` precedent; brief loading-state flash while
+   `usePlayerStatsList` loads, no dedicated key existed).
 8. [ ] **History tab wiring** — `src/pages/HistoryPage.tsx`'s
    `ByMatchSection`: local `deletingRow` state, a delete button per row (data
    already in scope, no new fetch), one `DeleteMatchConfirmModal` rendered
    after the list. _Test:_ extend `HistoryPage.test.tsx` — row shows a
    Delete button, clicking opens the modal with that row's data, confirming
    calls the mocked `deleteMatchResult`, modal closes on success.
+   **Status: implemented and committed (commit `0e7de78`), 12/12 tests pass,
+   `tsc -b`/eslint/prettier clean — but the independent SDD review was
+   interrupted mid-check (no findings reported yet) by a usage-limit pause.
+   Re-dispatch that review before flipping this checkbox to `[x]`.**
 9. [ ] **Manage/Active screen wiring** — `src/features/tournaments/
    TournamentDetail.tsx`'s `RoundsPlayedList`. Quick-undo attaches to the
    **first row only** (`index === 0`, matches are already sorted newest-first
@@ -2673,13 +2736,17 @@ are plain (non-materialized) views recomputed on every read — so a single
    `TournamentDetail.test.tsx` — with two completed matches fixtured, only
    the newest row shows the quick-undo button; clicking it and confirming
    calls the mock with that match's id.
-10. [ ] **i18n additions** — `en.json`/`th.json`: `matches.deleteConfirm.
+10. [x] **i18n additions** — `en.json`/`th.json`: `matches.deleteConfirm.
     {title, body, impactHeading, impactLine, passphraseLabel, error,
     confirmButton}` (reusing `manage.roundLabel`/`matches.draw.matchup`
     substrings rather than re-encoding them; Cancel reuses `manage.cancel`),
     plus trigger labels `history.deleteMatch` and
     `manage.deleteLastMatchButton`. _Test:_ `npx tsc -b`; both locale files
-    checked for identical key sets in step 12's manual pass.
+    checked for identical key sets in step 12's manual pass. **Done — built
+    ahead of steps 7-9 per the execution-order note above:** 10 keys added,
+    real Thai translations (not machine-translated), key-set diff 0/212
+    identical, `tsc -b` clean. No new `cancel` key added (correctly reuses
+    `manage.cancel`). Reviewed clean.
 11. [ ] **Docs: `docs/SPEC.md` §6 rewrite.** Replace the "permanently locked
     ... no admin-override path ... deliberate simplification" sentence with
     wording for the new reality: scores still can't be edited in place, but a
