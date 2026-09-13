@@ -58,7 +58,8 @@
     "noTournaments": "ยังไม่มีทัวร์นาเมนต์",
     "showMore": "แสดงเพิ่มเติม",
     "showLess": "แสดงน้อยลง",
-    "manuallyAdjustedBadge": "ปรับด้วยมือ"
+    "manuallyAdjustedBadge": "ปรับด้วยมือ",
+    "deleteMatch": "ลบ"
   },
   "app": {
     "playersHeading": "ผู้เล่น",
@@ -227,7 +228,8 @@
     "addParticipantPlaceholder": "เลือกผู้เล่น...",
     "addParticipantButton": "เพิ่ม",
     "noPlayersToAdd": "สมาชิกทั้งหมดอยู่ในทัวร์นาเมนต์นี้แล้ว",
-    "addParticipantFailed": "เพิ่มผู้เล่นไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"
+    "addParticipantFailed": "เพิ่มผู้เล่นไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+    "deleteLastMatchButton": "ลบแมตช์ล่าสุด"
   },
   "matches": {
     "draw": {
@@ -251,6 +253,15 @@
       "gameTeam1Label": "เกมที่ {{n}} - ทีม 1",
       "gameTeam2Label": "เกมที่ {{n}} - ทีม 2",
       "submit": "บันทึกผล"
+    },
+    "deleteConfirm": {
+      "title": "ลบผลแมตช์นี้หรือไม่?",
+      "body": "การลบนี้จะลบผลแมตช์และเกมทั้งหมดที่บันทึกไว้อย่างถาวร และไม่สามารถย้อนกลับได้",
+      "impactHeading": "สถิติของผู้เล่นจะเปลี่ยนแปลง:",
+      "impactLine": "{{playerName}}: {{beforeMatches}} แมตช์ ({{beforeWinRate}}%) -> {{afterMatches}} แมตช์ ({{afterWinRate}}%)",
+      "passphraseLabel": "รหัสผ่าน",
+      "error": "ไม่สามารถลบแมตช์ได้ กรุณาลองใหม่อีกครั้ง",
+      "confirmButton": "ลบแมตช์"
     },
     "standings": {
       "loading": "กำลังโหลดตารางคะแนน...",
