@@ -49,6 +49,17 @@ export async function recordMatchResult(
   return data
 }
 
+export async function deleteMatchResult(
+  matchId: string,
+  passphrase: string,
+): Promise<void> {
+  const { error } = await supabase.rpc('delete_match_result', {
+    p_match_id: matchId,
+    p_passphrase: passphrase,
+  })
+  if (error) throw error
+}
+
 export interface MatchHistoryEntry {
   match_id: string
   player_id: string
