@@ -2574,11 +2574,9 @@ are plain (non-materialized) views recomputed on every read — so a single
 **Implementation status (2026-09-13):** built via superpowers:subagent-driven-development
 in an isolated git worktree at `.claude/worktrees/phase-23-delete-match` (branch
 `worktree-phase-23-delete-match`, based on `main` @ `888c7f8`) — not yet merged to `main`.
-Steps 1-7 and 10 below are complete and independently reviewed (clean, no open findings).
-Step 8 (History wiring) is implemented, committed, and its own tests pass, but its
-independent SDD review was interrupted mid-check by a usage-limit pause before returning
-a verdict — **resume by re-dispatching that review before trusting step 8 as done**, per
-the SDD ledger. Steps 9, 11, and 12 have not been started. Full session ledger (pre-flight
+Steps 1-8 and 10 below are complete and independently reviewed (clean, no open findings;
+step 8's review was resumed after an earlier usage-limit interruption and came back
+Approved with 3 minor notes parked). Steps 9, 11, and 12 have not been started. Full session ledger (pre-flight
 scan, every task's review outcome, and one ordering ruling — see below) lives at
 `.superpowers/sdd/PLAN/progress.md` inside the worktree (gitignored; not part of this
 commit). To resume: `cd` into the worktree (or re-run `EnterWorktree` with
@@ -2714,16 +2712,18 @@ confirming it against the live project via a disposable fixture write.
    clean (2 minor notes parked: no `.reset()` on cancel/reopen, matching an
    existing `PlayerList.tsx` precedent; brief loading-state flash while
    `usePlayerStatsList` loads, no dedicated key existed).
-8. [ ] **History tab wiring** — `src/pages/HistoryPage.tsx`'s
+8. [x] **History tab wiring** — `src/pages/HistoryPage.tsx`'s
    `ByMatchSection`: local `deletingRow` state, a delete button per row (data
    already in scope, no new fetch), one `DeleteMatchConfirmModal` rendered
    after the list. _Test:_ extend `HistoryPage.test.tsx` — row shows a
    Delete button, clicking opens the modal with that row's data, confirming
-   calls the mocked `deleteMatchResult`, modal closes on success.
-   **Status: implemented and committed (commit `0e7de78`), 12/12 tests pass,
-   `tsc -b`/eslint/prettier clean — but the independent SDD review was
-   interrupted mid-check (no findings reported yet) by a usage-limit pause.
-   Re-dispatch that review before flipping this checkbox to `[x]`.**
+   calls the mocked `deleteMatchResult`, modal closes on success. **Done:**
+   commit `0e7de78`, 12/12 tests pass, `tsc -b`/eslint/prettier clean;
+   independently reviewed clean (no Critical/Important findings). 3 minor
+   notes parked: delete button uses `.secondary` not `.danger` styling
+   (cosmetic), `.round-row`'s flex-column layout likely renders the button
+   full-width per row (unverified visually), and the single-row test
+   fixture would need `getAllByRole` once a second row is added.
 9. [ ] **Manage/Active screen wiring** — `src/features/tournaments/
    TournamentDetail.tsx`'s `RoundsPlayedList`. Quick-undo attaches to the
    **first row only** (`index === 0`, matches are already sorted newest-first
