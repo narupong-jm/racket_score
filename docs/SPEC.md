@@ -64,6 +64,12 @@ draw that's been randomized but not yet started is now kept in the
 browser's local storage, keyed by tournament, so navigating away and back
 no longer loses it; it's cleared once Start match promotes it into
 Current match. Not yet implemented as of this note.
+Updated: 2026-09-14 — adds the ability to permanently delete a confirmed
+match result (§6) via a passphrase-gated confirm dialog (§2) that previews
+per-player stat impact, accessible from History for any match or as a
+quick-undo on the Manage screen immediately after confirming the result;
+in-place score editing remains unsupported. Based on Phase 23 in
+`docs/PLAN.md`. Not yet implemented as of this note.
 
 ## 1. Overview
 
@@ -332,9 +338,13 @@ algorithm.
   score in a confirmation dialog ("Confirm this result? It can't be
   edited after." / Cancel / Confirm). **Once confirmed, a result is
   permanently locked** — there is no edit affordance for a completed
-  match anywhere in the app, and no admin-override path. Getting a score
-  wrong means it stays wrong; this is a deliberate simplification, not an
-  oversight.
+  match anywhere in the app. However, a confirmed match can be permanently
+  deleted via a passphrase-gated confirm dialog (accessible from History
+  for any match, or as a quick-undo on the Manage screen immediately after
+  confirming the result). The confirm dialog previews per-player stat
+  impact; deletion is a hard delete of the match, its games, and its
+  participants, and does not renumber `sequence_number` or restore any
+  Current/Next match state.
 - This lock applies only to a **result** once confirmed. A match that has
   been drawn but **not yet started** — the tournament's auto-drawn first
   match (still showing its creation-time confirmation popup) or a Next
@@ -555,7 +565,7 @@ at every screen size (not a responsive top-nav on wider viewports):
 - Live, point-by-point scoreboard mode.
 - Real player photo upload/storage — placeholder avatars only for now
   (§3).
-- Any edit or admin-override path for a confirmed match result (§6).
+- Editing/correcting a confirmed result's scores in place (§6) — whole-match deletion is supported starting Phase 23.
 - A dedicated "rejoin" UI distinct from Add participant — rejoining a
   participant who left reuses the same Add participant action (§4).
 - Real-time/automatic re-draw of an in-progress Next match when a
