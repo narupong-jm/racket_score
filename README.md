@@ -59,6 +59,12 @@ works identically per sport.
 - Cancel a tournament before its first match result is confirmed —
   replaces the End action during that window, permanent, shown as a
   "Cancelled" row in History
+- Delete a confirmed match result — a passphrase-gated confirm dialog
+  (reachable from History for any match, or a "delete last match"
+  quick-undo right after confirming a result on the Manage screen) that
+  previews the per-player stat impact before confirming; works for any
+  confirmed match in any tournament, active or ended. Scores still can't
+  be edited in place — this is a hard delete of the whole match
 - Thai/English language toggle, light/dark theme support
 - Shared write-access passphrase — anyone can browse freely, but creating,
   editing, or recording any data requires a passphrase, enforced at the
@@ -80,10 +86,14 @@ These are deliberate design choices, not missing features:
   session — see [Write-access passphrase](#write-access-passphrase) below.
   This is a lightweight gate against accidental or drive-by edits, not a
   real per-user auth system.
-- **Confirmed match results are permanently locked.** There is no edit UI
-  and no admin override anywhere in the app. A drawn-but-not-yet-started
-  match is different — the organizer can edit its lineup before it starts;
-  it's the _result_, once confirmed, that can never be changed.
+- **A confirmed match result's scores can never be edited in place.**
+  There is no score-edit UI anywhere in the app. What the organizer _can_
+  do is permanently delete the whole match (see Features above) — that's
+  a distinct action from editing, gated by the same passphrase and a
+  stat-impact preview, not a quiet correction. A drawn-but-not-yet-started
+  match is different again — the organizer can edit its lineup before it
+  starts; it's only the _result_, once confirmed, whose scores can't be
+  changed.
 - **The initial roster is chosen once, at tournament creation, from the
   player pool.** Leave and Add participant (see Features above) are the
   only two ways to change it afterward — both narrow, explicitly gated
