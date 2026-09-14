@@ -67,7 +67,8 @@ Current match. Not yet implemented as of this note.
 Updated: 2026-09-14 — adds the ability to permanently delete a confirmed
 match result (§6) via a passphrase-gated confirm dialog (§2) that previews
 per-player stat impact, accessible from History for any match or as a
-quick-undo on the Manage screen immediately after confirming the result;
+quick-undo on the Manage screen immediately after confirming the result,
+regardless of whether the tournament is still active or has already ended;
 in-place score editing remains unsupported. Based on Phase 23 in
 `docs/PLAN.md`. Not yet implemented as of this note.
 
@@ -341,7 +342,8 @@ algorithm.
   match anywhere in the app. However, a confirmed match can be permanently
   deleted via a passphrase-gated confirm dialog (accessible from History
   for any match, or as a quick-undo on the Manage screen immediately after
-  confirming the result). The confirm dialog previews per-player stat
+  confirming the result), regardless of whether the tournament is still
+  active or has already ended. The confirm dialog previews per-player stat
   impact; deletion is a hard delete of the match, its games, and its
   participants, and does not renumber `sequence_number` or restore any
   Current/Next match state.
