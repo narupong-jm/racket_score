@@ -2574,9 +2574,10 @@ are plain (non-materialized) views recomputed on every read — so a single
 **Implementation status (2026-09-13):** built via superpowers:subagent-driven-development
 in an isolated git worktree at `.claude/worktrees/phase-23-delete-match` (branch
 `worktree-phase-23-delete-match`, based on `main` @ `888c7f8`) — not yet merged to `main`.
-Steps 1-8 and 10 below are complete and independently reviewed (clean, no open findings;
+Steps 1-10 below are complete and independently reviewed (clean, no open findings;
 step 8's review was resumed after an earlier usage-limit interruption and came back
-Approved with 3 minor notes parked). Steps 9, 11, and 12 have not been started. Full session ledger (pre-flight
+Approved with 3 minor notes parked; step 9 Approved with 1 minor note parked). Steps 11
+and 12 have not been started. Full session ledger (pre-flight
 scan, every task's review outcome, and one ordering ruling — see below) lives at
 `.superpowers/sdd/PLAN/progress.md` inside the worktree (gitignored; not part of this
 commit). To resume: `cd` into the worktree (or re-run `EnterWorktree` with
@@ -2724,7 +2725,7 @@ confirming it against the live project via a disposable fixture write.
    (cosmetic), `.round-row`'s flex-column layout likely renders the button
    full-width per row (unverified visually), and the single-row test
    fixture would need `getAllByRole` once a second row is added.
-9. [ ] **Manage/Active screen wiring** — `src/features/tournaments/
+9. [x] **Manage/Active screen wiring** — `src/features/tournaments/
    TournamentDetail.tsx`'s `RoundsPlayedList`. Quick-undo attaches to the
    **first row only** (`index === 0`, matches are already sorted newest-first
    there — matches the "delete *last* match" framing), not to
@@ -2735,7 +2736,13 @@ confirming it against the live project via a disposable fixture write.
    `isActive` — scope is any confirmed match, any tournament. _Test:_ extend
    `TournamentDetail.test.tsx` — with two completed matches fixtured, only
    the newest row shows the quick-undo button; clicking it and confirming
-   calls the mock with that match's id.
+   calls the mock with that match's id. **Done:** commit `087953d`, full
+   suite 276/276 passing, `tsc -b`/lint clean; independently reviewed clean.
+   Correction: `tournamentName` was not actually already in scope as its own
+   variable (only `sport` was) — passed `tournament.name` directly at the
+   call site instead, verified correct by the reviewer against
+   `RecentCompletedMatch`'s shape. 1 minor note parked: `.secondary` button
+   styling (same cosmetic note as step 8).
 10. [x] **i18n additions** — `en.json`/`th.json`: `matches.deleteConfirm.
     {title, body, impactHeading, impactLine, passphraseLabel, error,
     confirmButton}` (reusing `manage.roundLabel`/`matches.draw.matchup`
