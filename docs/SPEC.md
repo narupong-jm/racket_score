@@ -117,7 +117,10 @@ sport (§3).
     actions in the same session aren't re-prompted, though each is still
     independently re-checked against the database. A wrong entry just
     shows an inline error and can be retried any number of times — no
-    lockout or rate-limiting.
+    lockout or rate-limiting. The one exception: permanently deleting a
+    confirmed match result (§6) always requires the passphrase typed
+    fresh into its own confirm dialog, never reading from or writing to
+    the session-cached passphrase.
   - Applies uniformly to every write path, present and future — any new
     create/edit/delete action added later must go through the same
     RPC-plus-passphrase pattern, not a direct table write.

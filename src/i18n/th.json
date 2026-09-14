@@ -258,7 +258,7 @@
       "title": "ลบผลแมตช์นี้หรือไม่?",
       "body": "การลบนี้จะลบผลแมตช์และเกมทั้งหมดที่บันทึกไว้อย่างถาวร และไม่สามารถย้อนกลับได้",
       "impactHeading": "สถิติของผู้เล่นจะเปลี่ยนแปลง:",
-      "impactLine": "{{playerName}}: {{beforeMatches}} แมตช์ ({{beforeWinRate}}%) -> {{afterMatches}} แมตช์ ({{afterWinRate}}%)",
+      "impactLine": "{{playerName}}: {{beforeMatches}} แมตช์ ({{beforeWinRate}}) -> {{afterMatches}} แมตช์ ({{afterWinRate}})",
       "passphraseLabel": "รหัสผ่าน",
       "error": "ไม่สามารถลบแมตช์ได้ กรุณาลองใหม่อีกครั้ง",
       "confirmButton": "ลบแมตช์"

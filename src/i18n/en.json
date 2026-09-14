@@ -258,7 +258,7 @@
       "title": "Delete this match result?",
       "body": "This will permanently delete the match result and all recorded games and participants. This action cannot be undone.",
       "impactHeading": "Player stats will change:",
-      "impactLine": "{{playerName}}: {{beforeMatches}} matches ({{beforeWinRate}}%) -> {{afterMatches}} matches ({{afterWinRate}}%)",
+      "impactLine": "{{playerName}}: {{beforeMatches}} matches ({{beforeWinRate}}) -> {{afterMatches}} matches ({{afterWinRate}})",
       "passphraseLabel": "Passphrase",
       "error": "Couldn't delete the match. Please try again.",
       "confirmButton": "Delete match"

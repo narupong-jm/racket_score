@@ -113,7 +113,7 @@ function ByMatchSection({
                     </span>
                     <button
                       type="button"
-                      className="secondary"
+                      className="danger"
                       onClick={() => setDeletingRow(row)}
                     >
                       {t('history.deleteMatch')}

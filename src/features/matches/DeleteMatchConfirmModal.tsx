@@ -7,6 +7,10 @@ import { computeMatchImpactPreview } from './matchImpactPreview'
 import type { RecentCompletedMatch } from './matchesApi'
 import type { Sport } from '../sport/sportTypes'
 
+function formatWinRate(rate: number | null): string {
+  return rate === null ? '—' : `${rate}%`
+}
+
 interface DeleteMatchConfirmModalProps {
   row: RecentCompletedMatch | null
   sport: Sport
@@ -43,6 +47,7 @@ export function DeleteMatchConfirmModal({
 
   function handleClose() {
     setPassphrase('')
+    deleteMatchResult.reset()
     onClose()
   }
 
@@ -72,9 +77,9 @@ export function DeleteMatchConfirmModal({
                 {t('matches.deleteConfirm.impactLine', {
                   playerName: entry.playerName,
                   beforeMatches: entry.beforeMatches,
-                  beforeWinRate: entry.beforeWinRate ?? 0,
+                  beforeWinRate: formatWinRate(entry.beforeWinRate),
                   afterMatches: entry.afterMatches,
-                  afterWinRate: entry.afterWinRate ?? 0,
+                  afterWinRate: formatWinRate(entry.afterWinRate),
                 })}
               </li>
             ))}

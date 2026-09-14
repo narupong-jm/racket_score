@@ -6,8 +6,12 @@ import {
   listRecentCompletedMatches,
   recordMatchResult,
 } from './matchesApi'
-import { createTournament, addParticipant } from '../tournaments/tournamentsApi'
-import { createPlayer } from '../players/playersApi'
+import {
+  createTournament,
+  addParticipant,
+  leaveParticipant,
+} from '../tournaments/tournamentsApi'
+import { createPlayer, deletePlayer } from '../players/playersApi'
 import { supabase } from '../../lib/supabaseClient'
 import { testWritePassphrase } from '../../test/testPassphrase'
 
@@ -233,26 +237,43 @@ describe('matchesApi: deleteMatchResult (real project, anon key)', () => {
   let matchToKeepId: string | undefined
 
   afterAll(async () => {
-    const matchIds = [matchToDeleteId, matchToKeepId].filter(
-      (id): id is string => Boolean(id),
-    )
-    if (matchIds.length > 0) {
-      await supabase.from('match_games').delete().in('match_id', matchIds)
-      await supabase
-        .from('match_participants')
-        .delete()
-        .in('match_id', matchIds)
-      await supabase.from('matches').delete().in('id', matchIds)
+    // Each step below is independent best-effort cleanup: a failure in one
+    // (e.g. matchToKeepId never got set because an earlier test failed)
+    // must not prevent the rest from running.
+    if (matchToKeepId) {
+      try {
+        await deleteMatchResult(matchToKeepId, testWritePassphrase)
+      } catch {
+        // best-effort cleanup only
+      }
     }
+    if (tournamentId) {
+      for (const playerId of playerIds) {
+        try {
+          await leaveParticipant(tournamentId, playerId, testWritePassphrase)
+        } catch {
+          // best-effort cleanup only
+        }
+      }
+    }
+    for (const playerId of playerIds) {
+      try {
+        await deletePlayer(playerId, testWritePassphrase)
+      } catch {
+        // best-effort cleanup only
+      }
+    }
+    // There is currently no RPC that hard-deletes a tournament, and `anon`
+    // has no direct DELETE privilege on `tournaments`/`tournament_participants`
+    // (Phase 16), so these raw deletes are known no-ops left in place only
+    // for documentation purposes -- matching the same known gap described in
+    // `deletePlayer.integration.test.ts`'s own `afterAll`.
     if (tournamentId) {
       await supabase
         .from('tournament_participants')
         .delete()
         .eq('tournament_id', tournamentId)
       await supabase.from('tournaments').delete().eq('id', tournamentId)
-    }
-    if (playerIds.length > 0) {
-      await supabase.from('players').delete().in('id', playerIds)
     }
   })
 

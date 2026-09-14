@@ -1094,7 +1094,7 @@ function RoundsPlayedList({
                 {index === 0 && (
                   <button
                     type="button"
-                    className="secondary"
+                    className="danger"
                     onClick={() =>
                       setDeletingRow({
                         match,
