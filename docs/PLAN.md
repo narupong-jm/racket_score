@@ -2545,3 +2545,163 @@ docs-first convention as Phase 17.
    `match_games`/`tournament_participants` rows automatically, per the FK
    `ON DELETE CASCADE` confirmed beforehand) and verified all four counts back to
    zero. Phase 22 complete.
+
+## Phase 23 — Delete a Confirmed Match Result
+
+The organizer currently has no way to fix a match result that was recorded
+wrong (wrong round/score entered) except manually deleting rows in Supabase
+directly. `docs/SPEC.md` §6 states this is deliberate: "Once confirmed, a
+result is permanently locked — there is no edit affordance ... and no
+admin-override path." This phase reverses that specific rule (score
+*editing* is still not offered — only whole-match *deletion* is being added)
+by giving the organizer a guarded way to permanently delete a confirmed
+match: a passphrase-gated confirm popup showing which players' stats will
+change, reachable from History (any match, any tournament) and from a
+"delete last match" quick-undo on the Manage screen right after confirming a
+result. Two corrections surfaced during planning, both folded into the steps
+below: `anon`'s write grants on `matches`/`match_games`/`match_participants`
+were already revoked in Phase 16 step 4, so the stale `anon_full_access`
+`ALL`/`true`/`true` RLS policy on these tables is misleading but not a live
+hole (step 2 is doc-accuracy cleanup, not a vulnerability fix); and every
+existing write RPC is `SECURITY DEFINER` owned by `postgres`, which bypasses
+RLS entirely on tables with `relforcerowsecurity = false` (true here), so
+tightening these policies to read-only for `anon` cannot break any existing
+RPC. `match_games.match_id`/`match_participants.match_id` already carry
+`ON DELETE CASCADE` to `matches.id`, and `player_stats`/`tournament_standings`
+are plain (non-materialized) views recomputed on every read — so a single
+`DELETE FROM matches` is sufficient and stats reflect it with no refresh step.
+
+1. [ ] **Migration: new `delete_match_result(p_match_id uuid, p_passphrase
+   text)` RPC** via Supabase MCP `apply_migration`, mirroring `delete_player`'s
+   structure (`security definer`, `set search_path to 'public', 'pg_temp'`,
+   `check_write_passphrase` first, `returns void`). Body: check the
+   passphrase; look up the match's `status`, raising `match_not_found` if
+   missing or `match_not_completed` if not `'completed'` (rejects
+   queued/undrawn matches — scope is confirmed results only); otherwise
+   `delete from public.matches where id = p_match_id` (cascade already
+   handles `match_games`/`match_participants`). Grant execute to `anon`.
+   _Test:_ via `execute_sql` against disposable fixture rows (create + record
+   a real completed match, clean up after): wrong passphrase rejects before
+   lookup; right passphrase against a nonexistent id → `match_not_found`;
+   right passphrase against a still-`queued` match → `match_not_completed`,
+   untouched; right passphrase against the completed fixture → succeeds,
+   its `match_games`/`match_participants` rows are gone (cascade proof), and
+   `player_stats`/`tournament_standings` for its players already reflect the
+   change on the very next read. Then `get_advisors` (security): expect
+   exactly one new anon-executable `SECURITY DEFINER` advisory, consistent
+   with every other write RPC.
+2. [ ] **Migration: RLS policy rewrite on `matches`/`match_games`/
+   `match_participants`.** For each table, drop `anon_full_access` and create
+   `anon_select` (`FOR SELECT TO anon USING (true)`, no `WITH CHECK`) — no
+   write policy of any kind left for `anon` afterward. No grant changes (anon's
+   grants on these tables are already read-only). _Test:_ real HTTP round-trip
+   with the actual anon key (not MCP): `DELETE /rest/v1/matches?id=eq.<id>`
+   still `403`/`42501`; `GET /rest/v1/matches?select=id&limit=1` still `200`;
+   `POST /rest/v1/rpc/delete_match_result` with the correct passphrase against
+   a disposable fixture still succeeds. `pg_policies` shows the new
+   `anon_select`/`SELECT`/`true`/`null` shape on all three tables.
+3. [ ] **Regenerate `database.types.ts`** via Supabase MCP
+   `generate_typescript_types`. _Test:_ `npx tsc -b` — zero new errors.
+4. [ ] **`deleteMatchResult(matchId, passphrase)`** in
+   `src/features/matches/matchesApi.ts`, mirroring `recordMatchResult`'s
+   shape: `supabase.rpc('delete_match_result', { p_match_id, p_passphrase })`,
+   throws on error, returns `Promise<void>`. _Test:_ `npx tsc -b`; extend
+   `matchesApi.integration.test.ts` with a create+record+delete round trip
+   confirming `listRecentCompletedMatches` no longer includes it, and a
+   wrong-passphrase case that leaves the fixture in place.
+5. [ ] **`useDeleteMatchResult` hook**, new
+   `src/features/matches/useDeleteMatchResult.ts`. Deliberately does not use
+   `usePassphraseGate()` (would short-circuit via the session-cached
+   passphrase, which this action must never do). Mutation variables:
+   `{ matchId, passphrase }`, typed fresh every call. `onSuccess` invalidates
+   by un-suffixed query-key prefix: `['matches']`, `['drawInputs']`,
+   `['playerStats']`, `['tournamentStandingsRanked']`,
+   `['tournamentTotalPoints']` (same five `useRecordMatchResult` invalidates,
+   minus the tournamentId suffix), plus `['recentCompletedMatches']` and
+   `['overallScoreboard']` (not invalidated by `useRecordMatchResult` today,
+   but needed here since deletion is reachable from History and affects the
+   Overall Scoreboard). _Test:_ covered indirectly via steps 8/9's component
+   tests.
+6. [ ] **Impact-preview helper**, new
+   `src/features/matches/matchImpactPreview.ts` — pure function
+   `computeMatchImpactPreview(participants, games, statsByPlayerId,
+   playerNameById)` returning per-player `{ beforeMatches, beforeWinRate,
+   afterMatches, afterWinRate }`. Computes the match winner via
+   `summarizeGamesWon(games)` with a tie yielding no winner (matching
+   `player_stats`'s own view — do not reuse `RoundsPlayedList`'s
+   `team1Won`/`!team1Won` pair, which silently credits team2 on a tie); per
+   participant, `afterMatches = max(0, total_matches - 1)`,
+   `afterWins = max(0, total_wins - (won ? 1 : 0))`,
+   `afterWinRate = afterMatches === 0 ? null : round(afterWins/afterMatches*100,
+   2)`, reproducing `player_stats`'s exact 0–100 formula (not
+   `aggregateScoreboard.ts`'s 0–1 fraction). _Test:_ new
+   `matchImpactPreview.test.ts` — singles win/loss, doubles split, a player
+   with no prior stats row, and a tied-games match crediting no one a win.
+7. [ ] **`DeleteMatchConfirmModal` component**, new
+   `src/features/matches/DeleteMatchConfirmModal.tsx`, built on
+   `src/components/Modal.tsx`, matching `CurrentMatchForm`'s confirm-modal
+   JSX and `PlayerList.tsx`'s inline-error-on-failure pattern. Props:
+   `row: { match, tournamentName, participants, games } | null` (same shape
+   as `RecentCompletedMatch`), `sport`, `playerNameById`, `onClose`. Renders
+   the impact preview (via `usePlayerStatsList(sport)` +
+   `computeMatchImpactPreview`) and a local `passphrase` input bound only to
+   component state — never touches `getCachedPassphrase()`/`sessionStorage`.
+   Calls `useDeleteMatchResult()` with `{ matchId: row.match.id, passphrase }`
+   on Confirm; clears passphrase and calls `onClose()` on success. On error,
+   shows one generic inline message (failure could be wrong-passphrase,
+   not-found, or already-deleted-elsewhere). Confirm disabled while pending
+   or the passphrase field is empty. _Test:_ new
+   `DeleteMatchConfirmModal.test.tsx` — impact numbers render correctly,
+   Confirm passes the exact typed passphrase, Cancel doesn't call the
+   mutation and clears the field on reopen, a mocked rejection shows the
+   generic error and keeps the field populated, Confirm disabled when empty.
+8. [ ] **History tab wiring** — `src/pages/HistoryPage.tsx`'s
+   `ByMatchSection`: local `deletingRow` state, a delete button per row (data
+   already in scope, no new fetch), one `DeleteMatchConfirmModal` rendered
+   after the list. _Test:_ extend `HistoryPage.test.tsx` — row shows a
+   Delete button, clicking opens the modal with that row's data, confirming
+   calls the mocked `deleteMatchResult`, modal closes on success.
+9. [ ] **Manage/Active screen wiring** — `src/features/tournaments/
+   TournamentDetail.tsx`'s `RoundsPlayedList`. Quick-undo attaches to the
+   **first row only** (`index === 0`, matches are already sorted newest-first
+   there — matches the "delete *last* match" framing), not to
+   `CurrentMatchCard`'s empty state. New `sport`/`tournamentName` props on
+   `RoundsPlayedList` (both already in scope in `TournamentDetail`'s render
+   call); local `deletingRow` state and one `DeleteMatchConfirmModal`
+   rendered in the section, same pattern as step 8. Available regardless of
+   `isActive` — scope is any confirmed match, any tournament. _Test:_ extend
+   `TournamentDetail.test.tsx` — with two completed matches fixtured, only
+   the newest row shows the quick-undo button; clicking it and confirming
+   calls the mock with that match's id.
+10. [ ] **i18n additions** — `en.json`/`th.json`: `matches.deleteConfirm.
+    {title, body, impactHeading, impactLine, passphraseLabel, error,
+    confirmButton}` (reusing `manage.roundLabel`/`matches.draw.matchup`
+    substrings rather than re-encoding them; Cancel reuses `manage.cancel`),
+    plus trigger labels `history.deleteMatch` and
+    `manage.deleteLastMatchButton`. _Test:_ `npx tsc -b`; both locale files
+    checked for identical key sets in step 12's manual pass.
+11. [ ] **Docs: `docs/SPEC.md` §6 rewrite.** Replace the "permanently locked
+    ... no admin-override path ... deliberate simplification" sentence with
+    wording for the new reality: scores still can't be edited in place, but a
+    confirmed match can now be permanently deleted via a passphrase-gated
+    confirm dialog (History, or a "delete last match" quick-undo right after
+    confirming) that previews per-player stat impact; deletion is a hard
+    delete of the match + games + participants, doesn't renumber
+    `sequence_number` or restore Current/Next state, and works for any
+    confirmed match in any tournament (active or ended). Update the matching
+    "Out of scope" bullet to instead read "Editing/correcting a confirmed
+    result's scores in place (§6) — whole-match deletion is supported
+    starting Phase 23." _Test:_ none (docs-only); reviewed in step 12.
+12. [ ] **Full regression + manual verification.** `npm run build`, `npm run
+    lint`, `npx vitest run` (whole suite) clean. Manual pass via dev server /
+    Playwright MCP: delete a disposable match from History (impact preview
+    correct, wrong passphrase rejected with field retained, right passphrase
+    deletes it with no manual refresh, Supabase confirms the cascade and
+    live view recompute); confirm a result on an active tournament, verify
+    the quick-undo button appears only on the newest Rounds Played row, use
+    it, verify Current match card doesn't try to restore the deleted match;
+    repeat once against an **ended** tournament's match via History; confirm
+    an unrelated cached write (e.g. add a participant) right after a delete
+    does **not** re-prompt for passphrase, proving the delete modal's field
+    never touched `sessionStorage`; confirm a raw anon `DELETE
+    /rest/v1/matches?id=eq.<id>` via direct HTTP still rejects with `42501`.
