@@ -8,8 +8,10 @@ import {
   teamNames,
   summarizeGamesWon,
 } from '../features/matches/matchFormatting'
+import { DeleteMatchConfirmModal } from '../features/matches/DeleteMatchConfirmModal'
 import { useSport } from '../features/sport/useSport'
 import type { Sport } from '../features/sport/sportTypes'
+import type { RecentCompletedMatch } from '../features/matches/matchesApi'
 
 function SectionToggle({
   collapsed,
@@ -51,6 +53,9 @@ function ByMatchSection({
   const { t } = useTranslation()
   const { data: matches, isLoading, isError } = useRecentCompletedMatches(sport)
   const [collapsed, setCollapsed] = useState(true)
+  const [deletingRow, setDeletingRow] = useState<RecentCompletedMatch | null>(
+    null,
+  )
 
   return (
     <section className="card">
@@ -74,7 +79,8 @@ function ByMatchSection({
           )}
           {!isLoading && !isError && matches && matches.length > 0 && (
             <ul className="round-list">
-              {matches.map(({ match, tournamentName, participants, games }) => {
+              {matches.map((row) => {
+                const { match, tournamentName, participants, games } = row
                 const team1Name = teamNames(participants, 1, playerNameById)
                 const team2Name = teamNames(participants, 2, playerNameById)
                 const { team1Games, team2Games } = summarizeGamesWon(games)
@@ -105,6 +111,13 @@ function ByMatchSection({
                     <span className="round-score">
                       {t('manage.finalScore', { team1Games, team2Games })}
                     </span>
+                    <button
+                      type="button"
+                      className="danger"
+                      onClick={() => setDeletingRow(row)}
+                    >
+                      {t('history.deleteMatch')}
+                    </button>
                   </li>
                 )
               })}
@@ -112,6 +125,12 @@ function ByMatchSection({
           )}
         </>
       )}
+      <DeleteMatchConfirmModal
+        row={deletingRow}
+        sport={sport}
+        playerNameById={playerNameById}
+        onClose={() => setDeletingRow(null)}
+      />
     </section>
   )
 }

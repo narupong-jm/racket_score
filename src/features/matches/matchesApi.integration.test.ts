@@ -1,7 +1,17 @@
 import { afterAll, describe, expect, it } from 'vitest'
-import { createMatch, getMatchHistory, recordMatchResult } from './matchesApi'
-import { createTournament, addParticipant } from '../tournaments/tournamentsApi'
-import { createPlayer } from '../players/playersApi'
+import {
+  createMatch,
+  deleteMatchResult,
+  getMatchHistory,
+  listRecentCompletedMatches,
+  recordMatchResult,
+} from './matchesApi'
+import {
+  createTournament,
+  addParticipant,
+  leaveParticipant,
+} from '../tournaments/tournamentsApi'
+import { createPlayer, deletePlayer } from '../players/playersApi'
 import { supabase } from '../../lib/supabaseClient'
 import { testWritePassphrase } from '../../test/testPassphrase'
 
@@ -216,5 +226,154 @@ describe('matchesApi (real project, anon key)', () => {
     expect(
       history.filter((h) => h.match_id === matchId && h.team === 1),
     ).toHaveLength(2)
+  })
+})
+
+describe('matchesApi: deleteMatchResult (real project, anon key)', () => {
+  const runId = crypto.randomUUID()
+  let tournamentId: string | undefined
+  const playerIds: string[] = []
+  let matchToDeleteId: string | undefined
+  let matchToKeepId: string | undefined
+
+  afterAll(async () => {
+    // Each step below is independent best-effort cleanup: a failure in one
+    // (e.g. matchToKeepId never got set because an earlier test failed)
+    // must not prevent the rest from running.
+    if (matchToKeepId) {
+      try {
+        await deleteMatchResult(matchToKeepId, testWritePassphrase)
+      } catch {
+        // best-effort cleanup only
+      }
+    }
+    if (tournamentId) {
+      for (const playerId of playerIds) {
+        try {
+          await leaveParticipant(tournamentId, playerId, testWritePassphrase)
+        } catch {
+          // best-effort cleanup only
+        }
+      }
+    }
+    for (const playerId of playerIds) {
+      try {
+        await deletePlayer(playerId, testWritePassphrase)
+      } catch {
+        // best-effort cleanup only
+      }
+    }
+    // There is currently no RPC that hard-deletes a tournament, and `anon`
+    // has no direct DELETE privilege on `tournaments`/`tournament_participants`
+    // (Phase 16), so these raw deletes are known no-ops left in place only
+    // for documentation purposes -- matching the same known gap described in
+    // `deletePlayer.integration.test.ts`'s own `afterAll`.
+    if (tournamentId) {
+      await supabase
+        .from('tournament_participants')
+        .delete()
+        .eq('tournament_id', tournamentId)
+      await supabase.from('tournaments').delete().eq('id', tournamentId)
+    }
+  })
+
+  it('sets up a singles tournament with two players and two completed matches', async () => {
+    const tournament = await createTournament(
+      {
+        name: `Delete Match Test ${runId}`,
+        type: 'singles',
+        sport: 'badminton',
+        games_per_match: 1,
+        points_per_game: 21,
+      },
+      testWritePassphrase,
+    )
+    tournamentId = tournament.id
+
+    const playerA = await createPlayer(
+      {
+        name: `Delete Match Test A ${runId}`,
+        gender: 'male',
+        sport: 'badminton',
+        self_selected_level: 'beginner',
+      },
+      testWritePassphrase,
+    )
+    const playerB = await createPlayer(
+      {
+        name: `Delete Match Test B ${runId}`,
+        gender: 'female',
+        sport: 'badminton',
+        self_selected_level: 'beginner',
+      },
+      testWritePassphrase,
+    )
+    playerIds.push(playerA.id, playerB.id)
+    await addParticipant(tournamentId, playerA.id, testWritePassphrase)
+    await addParticipant(tournamentId, playerB.id, testWritePassphrase)
+
+    const matchToDelete = await createMatch(
+      tournamentId,
+      1,
+      [
+        { player_id: playerA.id, team: 1 },
+        { player_id: playerB.id, team: 2 },
+      ],
+      testWritePassphrase,
+    )
+    matchToDeleteId = matchToDelete.id
+    await recordMatchResult(
+      matchToDeleteId,
+      [{ game_number: 1, team1_score: 21, team2_score: 15 }],
+      testWritePassphrase,
+    )
+
+    const matchToKeep = await createMatch(
+      tournamentId,
+      2,
+      [
+        { player_id: playerA.id, team: 1 },
+        { player_id: playerB.id, team: 2 },
+      ],
+      testWritePassphrase,
+    )
+    matchToKeepId = matchToKeep.id
+    await recordMatchResult(
+      matchToKeepId,
+      [{ game_number: 1, team1_score: 21, team2_score: 10 }],
+      testWritePassphrase,
+    )
+  })
+
+  it('create+record+delete round trip: the match disappears from listRecentCompletedMatches', async () => {
+    if (!matchToDeleteId) throw new Error('matchToDeleteId not set')
+
+    const beforeDelete = await listRecentCompletedMatches('badminton')
+    expect(beforeDelete.some((entry) => entry.match.id === matchToDeleteId)).toBe(
+      true,
+    )
+
+    await deleteMatchResult(matchToDeleteId, testWritePassphrase)
+
+    const afterDelete = await listRecentCompletedMatches('badminton')
+    expect(afterDelete.some((entry) => entry.match.id === matchToDeleteId)).toBe(
+      false,
+    )
+  })
+
+  it('rejects a wrong passphrase and leaves the match unaffected', async () => {
+    if (!matchToKeepId) throw new Error('matchToKeepId not set')
+
+    await expect(
+      deleteMatchResult(matchToKeepId, `${testWritePassphrase}-wrong`),
+    ).rejects.toThrow()
+
+    const { data: stillThere, error } = await supabase
+      .from('matches')
+      .select('*')
+      .eq('id', matchToKeepId)
+      .single()
+    expect(error).toBeNull()
+    expect(stillThere?.status).toBe('completed')
   })
 })

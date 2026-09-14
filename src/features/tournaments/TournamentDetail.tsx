@@ -46,7 +46,13 @@ import {
   type RosterPlayer,
 } from '../../components/DrawSlotSelect'
 import type { MatchType } from '../matchmaking/types'
-import type { Match, MatchGame, MatchHistoryEntry } from '../matches/matchesApi'
+import type {
+  Match,
+  MatchGame,
+  MatchHistoryEntry,
+  RecentCompletedMatch,
+} from '../matches/matchesApi'
+import { DeleteMatchConfirmModal } from '../matches/DeleteMatchConfirmModal'
 import { TournamentScoreboardSection } from './TournamentScoreboardSection'
 
 interface TournamentDetailProps {
@@ -197,6 +203,8 @@ export function TournamentDetail({
         participantsFor={participantsFor}
         gamesFor={gamesFor}
         playerNameById={playerNameById}
+        sport={sport}
+        tournamentName={tournament.name}
       />
 
       <ParticipantsCard
@@ -1034,6 +1042,8 @@ interface RoundsPlayedListProps {
   participantsFor: (matchId: string) => MatchHistoryEntry[]
   gamesFor: (matchId: string) => MatchGame[]
   playerNameById: Map<string, string>
+  sport: Sport
+  tournamentName: string
 }
 
 function RoundsPlayedList({
@@ -1041,8 +1051,13 @@ function RoundsPlayedList({
   participantsFor,
   gamesFor,
   playerNameById,
+  sport,
+  tournamentName,
 }: RoundsPlayedListProps) {
   const { t } = useTranslation()
+  const [deletingRow, setDeletingRow] = useState<RecentCompletedMatch | null>(
+    null,
+  )
 
   return (
     <section className="card">
@@ -1051,7 +1066,7 @@ function RoundsPlayedList({
         <p className="empty-state">{t('manage.noRoundsPlayed')}</p>
       ) : (
         <ul className="round-list">
-          {matches.map((match) => {
+          {matches.map((match, index) => {
             const participants = participantsFor(match.id)
             const matchGames = gamesFor(match.id)
             const team1Name = teamNames(participants, 1, playerNameById)
@@ -1076,11 +1091,33 @@ function RoundsPlayedList({
                 <span className="round-score">
                   {t('manage.finalScore', { team1Games, team2Games })}
                 </span>
+                {index === 0 && (
+                  <button
+                    type="button"
+                    className="danger"
+                    onClick={() =>
+                      setDeletingRow({
+                        match,
+                        tournamentName,
+                        participants,
+                        games: matchGames,
+                      })
+                    }
+                  >
+                    {t('manage.deleteLastMatchButton')}
+                  </button>
+                )}
               </li>
             )
           })}
         </ul>
       )}
+      <DeleteMatchConfirmModal
+        row={deletingRow}
+        sport={sport}
+        playerNameById={playerNameById}
+        onClose={() => setDeletingRow(null)}
+      />
     </section>
   )
 }

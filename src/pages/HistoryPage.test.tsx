@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -7,12 +7,13 @@ import { HistoryPage } from './HistoryPage'
 import * as playersApi from '../features/players/playersApi'
 import * as tournamentsApi from '../features/tournaments/tournamentsApi'
 import * as matchesApi from '../features/matches/matchesApi'
-import type { Player } from '../features/players/playersApi'
+import type { Player, PlayerStats } from '../features/players/playersApi'
 import type { Tournament } from '../features/tournaments/tournamentsApi'
 import type { RecentCompletedMatch } from '../features/matches/matchesApi'
 
 vi.mock('../features/players/playersApi', () => ({
   listPlayers: vi.fn(),
+  listPlayerStats: vi.fn(),
 }))
 
 vi.mock('../features/tournaments/tournamentsApi', async (importOriginal) => {
@@ -32,6 +33,7 @@ vi.mock('../features/matches/matchesApi', async (importOriginal) => {
   return {
     ...actual,
     listRecentCompletedMatches: vi.fn(),
+    deleteMatchResult: vi.fn(),
   }
 })
 
@@ -345,6 +347,113 @@ describe('HistoryPage', () => {
 
       expect(await screen.findByText('Round 2')).toBeInTheDocument()
       expect(screen.getByText('Manually adjusted')).toBeInTheDocument()
+    })
+  })
+
+  describe('deleting a match', () => {
+    const statsList: PlayerStats[] = [
+      {
+        player_id: 'p1',
+        name: 'Alice',
+        gender: 'female',
+        sport: 'badminton',
+        self_selected_level: 'beginner',
+        total_matches: 5,
+        total_wins: 3,
+        win_rate: 60,
+        effective_level: 'beginner',
+      },
+      {
+        player_id: 'p2',
+        name: 'Bob',
+        gender: 'male',
+        sport: 'badminton',
+        self_selected_level: 'beginner',
+        total_matches: 5,
+        total_wins: 2,
+        win_rate: 40,
+        effective_level: 'beginner',
+      },
+    ]
+
+    async function expandByMatchAndGetDeleteButton() {
+      const user = userEvent.setup()
+      renderPage()
+
+      await user.click(screen.getAllByRole('button', { name: 'Show more' })[0])
+      await screen.findByText('Round 2')
+
+      return {
+        user,
+        deleteButton: screen.getByRole('button', { name: 'Delete' }),
+      }
+    }
+
+    it('shows a Delete button on a match row', async () => {
+      vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+      vi.mocked(playersApi.listPlayerStats).mockResolvedValue(statsList)
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([
+        recentMatch,
+      ])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([])
+
+      const { deleteButton } = await expandByMatchAndGetDeleteButton()
+      expect(deleteButton).toBeInTheDocument()
+    })
+
+    it('opens the confirm modal with that row data when Delete is clicked', async () => {
+      vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+      vi.mocked(playersApi.listPlayerStats).mockResolvedValue(statsList)
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([
+        recentMatch,
+      ])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([])
+
+      const { user, deleteButton } = await expandByMatchAndGetDeleteButton()
+      await user.click(deleteButton)
+
+      expect(
+        await screen.findByRole('heading', {
+          name: 'Delete this match result?',
+        }),
+      ).toBeInTheDocument()
+      // Impact preview proves the modal received this row's participants/games.
+      expect(
+        await screen.findByText('Alice: 5 matches (60%) -> 4 matches (50%)'),
+      ).toBeInTheDocument()
+      expect(
+        screen.getByText('Bob: 5 matches (40%) -> 4 matches (50%)'),
+      ).toBeInTheDocument()
+    })
+
+    it('calls deleteMatchResult with the typed passphrase on Confirm, and closes the modal', async () => {
+      vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+      vi.mocked(playersApi.listPlayerStats).mockResolvedValue(statsList)
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([
+        recentMatch,
+      ])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([])
+      vi.mocked(matchesApi.deleteMatchResult).mockResolvedValue(undefined)
+
+      const { user, deleteButton } = await expandByMatchAndGetDeleteButton()
+      await user.click(deleteButton)
+
+      const passphraseInput = await screen.findByLabelText('Passphrase')
+      await user.type(passphraseInput, 'the-real-secret')
+      await user.click(screen.getByRole('button', { name: 'Delete match' }))
+
+      await waitFor(() => {
+        expect(matchesApi.deleteMatchResult).toHaveBeenCalledWith(
+          'm1',
+          'the-real-secret',
+        )
+      })
+
+      await waitFor(() => {
+        expect(
+          screen.queryByRole('heading', { name: 'Delete this match result?' }),
+        ).not.toBeInTheDocument()
+      })
     })
   })
 })

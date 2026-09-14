@@ -54,6 +54,7 @@ vi.mock('../matches/matchesApi', async (importOriginal) => {
     listGamesForMatches: vi.fn(),
     createMatch: vi.fn(),
     recordMatchResult: vi.fn(),
+    deleteMatchResult: vi.fn(),
   }
 })
 
@@ -1620,5 +1621,78 @@ describe('TournamentDetail: Add participant', () => {
       "This member hasn't set a level for this sport yet -- set one on the Member tab first.",
     )
     expect(bobOption).not.toBeDisabled()
+  })
+})
+
+describe('TournamentDetail: Rounds played -- delete last match', () => {
+  function setUpTwoCompletedMatches() {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([
+      makeMatch('m1', 1, 'completed'),
+      makeMatch('m2', 2, 'completed'),
+    ])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([
+      { match_id: 'm1', player_id: 'p1', team: 1 },
+      { match_id: 'm1', player_id: 'p2', team: 2 },
+      { match_id: 'm2', player_id: 'p1', team: 1 },
+      { match_id: 'm2', player_id: 'p2', team: 2 },
+    ])
+    vi.mocked(matchesApi.listGamesForMatches).mockResolvedValue([
+      { match_id: 'm1', game_number: 1, team1_score: 21, team2_score: 15 },
+      { match_id: 'm2', game_number: 1, team1_score: 21, team2_score: 18 },
+    ])
+  }
+
+  it('shows the "Delete last match" button only on the newest (first) row', async () => {
+    setUpTwoCompletedMatches()
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    // Rounds are sorted newest-first, so "Round 2" (m2) is the first row.
+    await screen.findByText('Round 2')
+    expect(screen.getByText('Round 1')).toBeInTheDocument()
+
+    expect(
+      screen.getAllByRole('button', { name: 'Delete last match' }),
+    ).toHaveLength(1)
+  })
+
+  it('confirming the delete calls deleteMatchResult with the newest match id', async () => {
+    setUpTwoCompletedMatches()
+    vi.mocked(matchesApi.deleteMatchResult).mockResolvedValue(undefined)
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await screen.findByText('Round 2')
+    await user.click(
+      screen.getByRole('button', { name: 'Delete last match' }),
+    )
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Delete this match result?',
+      }),
+    ).toBeInTheDocument()
+
+    const passphraseInput = await screen.findByLabelText('Passphrase')
+    await user.type(passphraseInput, 'the-real-secret')
+    await user.click(screen.getByRole('button', { name: 'Delete match' }))
+
+    await waitFor(() => {
+      expect(matchesApi.deleteMatchResult).toHaveBeenCalledWith(
+        'm2',
+        'the-real-secret',
+      )
+    })
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('heading', { name: 'Delete this match result?' }),
+      ).not.toBeInTheDocument()
+    })
   })
 })

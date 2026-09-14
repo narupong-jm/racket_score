@@ -58,7 +58,8 @@
     "noTournaments": "No tournaments yet.",
     "showMore": "Show more",
     "showLess": "Show less",
-    "manuallyAdjustedBadge": "Manually adjusted"
+    "manuallyAdjustedBadge": "Manually adjusted",
+    "deleteMatch": "Delete"
   },
   "app": {
     "playersHeading": "Players",
@@ -227,7 +228,8 @@
     "addParticipantPlaceholder": "Select a player...",
     "addParticipantButton": "Add",
     "noPlayersToAdd": "Everyone in the member pool is already active in this tournament.",
-    "addParticipantFailed": "Couldn't add that participant. Please try again."
+    "addParticipantFailed": "Couldn't add that participant. Please try again.",
+    "deleteLastMatchButton": "Delete last match"
   },
   "matches": {
     "draw": {
@@ -251,6 +253,15 @@
       "gameTeam1Label": "Game {{n}} - Team 1",
       "gameTeam2Label": "Game {{n}} - Team 2",
       "submit": "Submit result"
+    },
+    "deleteConfirm": {
+      "title": "Delete this match result?",
+      "body": "This will permanently delete the match result and all recorded games and participants. This action cannot be undone.",
+      "impactHeading": "Player stats will change:",
+      "impactLine": "{{playerName}}: {{beforeMatches}} matches ({{beforeWinRate}}) -> {{afterMatches}} matches ({{afterWinRate}})",
+      "passphraseLabel": "Passphrase",
+      "error": "Couldn't delete the match. Please try again.",
+      "confirmButton": "Delete match"
     },
     "standings": {
       "loading": "Loading standings...",

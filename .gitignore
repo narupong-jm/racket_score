@@ -6,3 +6,4 @@ dist
 README_GUIDELINE.md
 .DS_Store
 .playwright-mcp
+.superpowers

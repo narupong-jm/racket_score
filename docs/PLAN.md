@@ -2571,7 +2571,48 @@ RPC. `match_games.match_id`/`match_participants.match_id` already carry
 are plain (non-materialized) views recomputed on every read — so a single
 `DELETE FROM matches` is sufficient and stats reflect it with no refresh step.
 
-1. [ ] **Migration: new `delete_match_result(p_match_id uuid, p_passphrase
+**Implementation status (2026-09-14):** built via superpowers:subagent-driven-development
+in an isolated git worktree at `.claude/worktrees/phase-23-delete-match` (branch
+`worktree-phase-23-delete-match`, based on `main` @ `888c7f8`) — not yet merged to `main`.
+All 12 steps below are complete. Steps 1-11 independently reviewed clean (step 8's
+review was resumed after an earlier usage-limit interruption and came back Approved
+with 3 minor notes parked; step 9 Approved with 1 minor note parked; step 11 needed
+one fix round for a dropped scope clause, then came back clean). Step 12 (full
+regression + live manual verification against the real Supabase project, user-
+authorized beforehand) passed every point with concrete evidence; fixture cleanup
+independently re-verified by the controller. The final whole-branch review (dispatched
+on the most capable model, per superpowers:subagent-driven-development) came back
+"Ready to merge with fixes" — no Critical findings; 2 Important findings (an
+un-updated `docs/SPEC.md` §2 contradicting §6's new passphrase-isolation behavior,
+and an integration test's cleanup silently leaking live fixture rows past this
+phase's own RLS tightening) plus 3 escalated and 2 new Minor findings were all
+addressed in one fix wave (commit `23ebdfc`) and independently re-reviewed clean —
+no further fix round needed. Phase 23 is now fully implemented, reviewed end to end,
+and ready for `superpowers:finishing-a-development-branch`. Full session ledger (pre-flight
+scan, every task's review outcome, and one ordering ruling — see below) lives at
+`.superpowers/sdd/PLAN/progress.md` inside the worktree (gitignored; not part of this
+commit). To resume: `cd` into the worktree (or re-run `EnterWorktree` with
+`path: .claude/worktrees/phase-23-delete-match`), re-read that ledger, and continue with
+subagent-driven-development from where it left off.
+
+**Execution-order note:** step 10 (i18n) was deliberately built *before* step 7 (the
+confirm modal) and steps 8-9 (History/Manage wiring), even though it's numbered after
+them — those three steps' own tests assert real rendered English/Thai copy from
+`en.json`/`th.json` (this repo's test convention, confirmed via `TournamentDetail.test.tsx`
+and others: they load the real i18n instance and assert on actual translated strings, not
+mocked/typed keys), so building the copy-consuming components first would have made their
+own tests fail against not-yet-existing keys. This is a plan-authoring ordering oversight,
+not a spec conflict — no other step's dependencies were affected. The checkbox numbering
+below is unchanged; only the build *order* differed (1, 2, 3, 4, 5, 6, 10, 7, 8, 9, 11, 12).
+
+**Environment note:** the worktree's `.env` had a stale `VITE_TEST_WRITE_PASSPHRASE` that no
+longer matched the live `racket-score` Supabase project's `app_secrets` hash (pre-existing,
+unrelated to this phase — caused 20 real-anon-key integration tests to fail with
+`invalid_passphrase` before any Phase 23 code existed). Fixed by updating both the
+worktree's and the main checkout's `.env` (line 3) to the current passphrase after
+confirming it against the live project via a disposable fixture write.
+
+1. [x] **Migration: new `delete_match_result(p_match_id uuid, p_passphrase
    text)` RPC** via Supabase MCP `apply_migration`, mirroring `delete_player`'s
    structure (`security definer`, `set search_path to 'public', 'pg_temp'`,
    `check_write_passphrase` first, `returns void`). Body: check the
@@ -2589,8 +2630,11 @@ are plain (non-materialized) views recomputed on every read — so a single
    `player_stats`/`tournament_standings` for its players already reflect the
    change on the very next read. Then `get_advisors` (security): expect
    exactly one new anon-executable `SECURITY DEFINER` advisory, consistent
-   with every other write RPC.
-2. [ ] **Migration: RLS policy rewrite on `matches`/`match_games`/
+   with every other write RPC. **Done:** applied via Supabase MCP (no local
+   migration file exists in this repo, matching `delete_player`'s own precedent);
+   all 5 test scenarios and the advisors check passed, independently re-verified by
+   a separate reviewer against the live database with its own fresh fixtures.
+2. [x] **Migration: RLS policy rewrite on `matches`/`match_games`/
    `match_participants`.** For each table, drop `anon_full_access` and create
    `anon_select` (`FOR SELECT TO anon USING (true)`, no `WITH CHECK`) — no
    write policy of any kind left for `anon` afterward. No grant changes (anon's
@@ -2599,17 +2643,30 @@ are plain (non-materialized) views recomputed on every read — so a single
    still `403`/`42501`; `GET /rest/v1/matches?select=id&limit=1` still `200`;
    `POST /rest/v1/rpc/delete_match_result` with the correct passphrase against
    a disposable fixture still succeeds. `pg_policies` shows the new
-   `anon_select`/`SELECT`/`true`/`null` shape on all three tables.
-3. [ ] **Regenerate `database.types.ts`** via Supabase MCP
-   `generate_typescript_types`. _Test:_ `npx tsc -b` — zero new errors.
-4. [ ] **`deleteMatchResult(matchId, passphrase)`** in
+   `anon_select`/`SELECT`/`true`/`null` shape on all three tables. **Done:**
+   real anon-key round trip confirmed DELETE rejected (`42501`), GET still 200,
+   and `delete_match_result` still succeeds post-change. One wording
+   discrepancy surfaced and was ruled on: the DELETE rejection returns HTTP
+   401, not the 403 this step's text assumed — PostgREST's standard mapping
+   for a GRANT-level `insufficient_privilege` rejection on the unauthenticated
+   `anon` role (checked before RLS is even evaluated); the error code `42501`
+   and the actual security property both match regardless, so this is a
+   plan-wording inaccuracy, not an implementation defect. Independently
+   reviewed and reproduced on a separate fresh fixture.
+3. [x] **Regenerate `database.types.ts`** via Supabase MCP
+   `generate_typescript_types`. _Test:_ `npx tsc -b` — zero new errors. **Done:**
+   purely mechanical regeneration, reviewed clean.
+4. [x] **`deleteMatchResult(matchId, passphrase)`** in
    `src/features/matches/matchesApi.ts`, mirroring `recordMatchResult`'s
    shape: `supabase.rpc('delete_match_result', { p_match_id, p_passphrase })`,
    throws on error, returns `Promise<void>`. _Test:_ `npx tsc -b`; extend
    `matchesApi.integration.test.ts` with a create+record+delete round trip
    confirming `listRecentCompletedMatches` no longer includes it, and a
-   wrong-passphrase case that leaves the fixture in place.
-5. [ ] **`useDeleteMatchResult` hook**, new
+   wrong-passphrase case that leaves the fixture in place. **Done:** mirrors
+   `deletePlayer`'s void-return shape exactly; new tests assert real DB state
+   (presence/absence in `listRecentCompletedMatches`, untouched row on wrong
+   passphrase), reviewed clean.
+5. [x] **`useDeleteMatchResult` hook**, new
    `src/features/matches/useDeleteMatchResult.ts`. Deliberately does not use
    `usePassphraseGate()` (would short-circuit via the session-cached
    passphrase, which this action must never do). Mutation variables:
@@ -2621,8 +2678,10 @@ are plain (non-materialized) views recomputed on every read — so a single
    `['overallScoreboard']` (not invalidated by `useRecordMatchResult` today,
    but needed here since deletion is reachable from History and affects the
    Overall Scoreboard). _Test:_ covered indirectly via steps 8/9's component
-   tests.
-6. [ ] **Impact-preview helper**, new
+   tests. **Done:** does not use `usePassphraseGate` (verified by grep); all 7
+   query keys confirmed un-suffixed and correctly named against their real
+   source files. Reviewed clean.
+6. [x] **Impact-preview helper**, new
    `src/features/matches/matchImpactPreview.ts` — pure function
    `computeMatchImpactPreview(participants, games, statsByPlayerId,
    playerNameById)` returning per-player `{ beforeMatches, beforeWinRate,
@@ -2637,7 +2696,11 @@ are plain (non-materialized) views recomputed on every read — so a single
    `aggregateScoreboard.ts`'s 0–1 fraction). _Test:_ new
    `matchImpactPreview.test.ts` — singles win/loss, doubles split, a player
    with no prior stats row, and a tied-games match crediting no one a win.
-7. [ ] **`DeleteMatchConfirmModal` component**, new
+   **Done:** reuses `summarizeGamesWon` as-is; ties correctly credit nobody
+   (does not reproduce `RoundsPlayedList`'s tie-credits-team2 bug). 5/5 tests
+   pass, independently hand-verified by the reviewer including the tie case.
+   Reviewed clean.
+7. [x] **`DeleteMatchConfirmModal` component**, new
    `src/features/matches/DeleteMatchConfirmModal.tsx`, built on
    `src/components/Modal.tsx`, matching `CurrentMatchForm`'s confirm-modal
    JSX and `PlayerList.tsx`'s inline-error-on-failure pattern. Props:
@@ -2655,13 +2718,25 @@ are plain (non-materialized) views recomputed on every read — so a single
    Confirm passes the exact typed passphrase, Cancel doesn't call the
    mutation and clears the field on reopen, a mocked rejection shows the
    generic error and keeps the field populated, Confirm disabled when empty.
-8. [ ] **History tab wiring** — `src/pages/HistoryPage.tsx`'s
+   **Done:** the critical constraint (passphrase confined to local `useState`,
+   never `passphraseStore`/`usePassphraseGate`) verified by grep, independently
+   re-confirmed by the reviewer. 5/5 tests pass, all non-vacuous. Reviewed
+   clean (2 minor notes parked: no `.reset()` on cancel/reopen, matching an
+   existing `PlayerList.tsx` precedent; brief loading-state flash while
+   `usePlayerStatsList` loads, no dedicated key existed).
+8. [x] **History tab wiring** — `src/pages/HistoryPage.tsx`'s
    `ByMatchSection`: local `deletingRow` state, a delete button per row (data
    already in scope, no new fetch), one `DeleteMatchConfirmModal` rendered
    after the list. _Test:_ extend `HistoryPage.test.tsx` — row shows a
    Delete button, clicking opens the modal with that row's data, confirming
-   calls the mocked `deleteMatchResult`, modal closes on success.
-9. [ ] **Manage/Active screen wiring** — `src/features/tournaments/
+   calls the mocked `deleteMatchResult`, modal closes on success. **Done:**
+   commit `0e7de78`, 12/12 tests pass, `tsc -b`/eslint/prettier clean;
+   independently reviewed clean (no Critical/Important findings). 3 minor
+   notes parked: delete button uses `.secondary` not `.danger` styling
+   (cosmetic), `.round-row`'s flex-column layout likely renders the button
+   full-width per row (unverified visually), and the single-row test
+   fixture would need `getAllByRole` once a second row is added.
+9. [x] **Manage/Active screen wiring** — `src/features/tournaments/
    TournamentDetail.tsx`'s `RoundsPlayedList`. Quick-undo attaches to the
    **first row only** (`index === 0`, matches are already sorted newest-first
    there — matches the "delete *last* match" framing), not to
@@ -2672,15 +2747,25 @@ are plain (non-materialized) views recomputed on every read — so a single
    `isActive` — scope is any confirmed match, any tournament. _Test:_ extend
    `TournamentDetail.test.tsx` — with two completed matches fixtured, only
    the newest row shows the quick-undo button; clicking it and confirming
-   calls the mock with that match's id.
-10. [ ] **i18n additions** — `en.json`/`th.json`: `matches.deleteConfirm.
+   calls the mock with that match's id. **Done:** commit `087953d`, full
+   suite 276/276 passing, `tsc -b`/lint clean; independently reviewed clean.
+   Correction: `tournamentName` was not actually already in scope as its own
+   variable (only `sport` was) — passed `tournament.name` directly at the
+   call site instead, verified correct by the reviewer against
+   `RecentCompletedMatch`'s shape. 1 minor note parked: `.secondary` button
+   styling (same cosmetic note as step 8).
+10. [x] **i18n additions** — `en.json`/`th.json`: `matches.deleteConfirm.
     {title, body, impactHeading, impactLine, passphraseLabel, error,
     confirmButton}` (reusing `manage.roundLabel`/`matches.draw.matchup`
     substrings rather than re-encoding them; Cancel reuses `manage.cancel`),
     plus trigger labels `history.deleteMatch` and
     `manage.deleteLastMatchButton`. _Test:_ `npx tsc -b`; both locale files
-    checked for identical key sets in step 12's manual pass.
-11. [ ] **Docs: `docs/SPEC.md` §6 rewrite.** Replace the "permanently locked
+    checked for identical key sets in step 12's manual pass. **Done — built
+    ahead of steps 7-9 per the execution-order note above:** 10 keys added,
+    real Thai translations (not machine-translated), key-set diff 0/212
+    identical, `tsc -b` clean. No new `cancel` key added (correctly reuses
+    `manage.cancel`). Reviewed clean.
+11. [x] **Docs: `docs/SPEC.md` §6 rewrite.** Replace the "permanently locked
     ... no admin-override path ... deliberate simplification" sentence with
     wording for the new reality: scores still can't be edited in place, but a
     confirmed match can now be permanently deleted via a passphrase-gated
@@ -2691,8 +2776,14 @@ are plain (non-materialized) views recomputed on every read — so a single
     confirmed match in any tournament (active or ended). Update the matching
     "Out of scope" bullet to instead read "Editing/correcting a confirmed
     result's scores in place (§6) — whole-match deletion is supported
-    starting Phase 23." _Test:_ none (docs-only); reviewed in step 12.
-12. [ ] **Full regression + manual verification.** `npm run build`, `npm run
+    starting Phase 23." _Test:_ none (docs-only); reviewed in step 12. **Done:**
+    §6 rewritten, Out-of-scope bullet updated, new "Updated: 2026-09-14" note
+    added ending "Not yet implemented as of this note." (correct — this
+    branch is unmerged). One fix round: the first pass omitted the
+    "active or ended" scope clause from both the §6 paragraph and the
+    Updated note; re-review confirmed both fixed cleanly, no new breakage.
+    Commits 6d2a639, 25d5b1c.
+12. [x] **Full regression + manual verification.** `npm run build`, `npm run
     lint`, `npx vitest run` (whole suite) clean. Manual pass via dev server /
     Playwright MCP: delete a disposable match from History (impact preview
     correct, wrong passphrase rejected with field retained, right passphrase
@@ -2705,3 +2796,29 @@ are plain (non-materialized) views recomputed on every read — so a single
     does **not** re-prompt for passphrase, proving the delete modal's field
     never touched `sessionStorage`; confirm a raw anon `DELETE
     /rest/v1/matches?id=eq.<id>` via direct HTTP still rejects with `42501`.
+    **Done:** `build`/`lint` clean; full vitest suite 276/276 (one flaky
+    timeout on the first run, in a pre-existing Phase-20 integration test
+    unrelated to this phase, confirmed via `git log` and a clean standalone
+    + full-suite re-run). Live Playwright MCP pass against the real
+    `racket-score` project via a disposable "Phase23 smoke test (delete
+    me)" tournament (user-authorized beforehand): all points verified with
+    concrete evidence — impact-preview numbers cross-checked against
+    hand-computed `player_stats` arithmetic on every delete; wrong
+    passphrase rejected with the field retained; correct passphrase deletes
+    with no manual refresh and immediate DB/view consistency; quick-undo
+    shown only on the newest of 2 Rounds-played rows; identical behavior
+    against an ended tournament; raw anon HTTP DELETE still rejected
+    (`42501`, surfacing as HTTP 401 per Task 2's finding). **Ruling on this
+    step's own wording:** rather than the literal "does not re-prompt"
+    scenario (ambiguous — with a passphrase already cached, that check
+    can't distinguish "no leak" from "leaked the same correct value"), the
+    implementer deliberately cleared `sessionStorage` before each
+    delete-modal use, confirmed it stayed `null` after (proves the modal
+    never writes to the cache), then confirmed a subsequent unrelated write
+    DID re-prompt (proves nothing was left there to skip) — a strictly
+    stronger proof of the same isolation property. Fixture cleanup verified
+    back to zero by both the implementer and an independent controller
+    spot-check. 2 minor notes parked, both explicitly out of this task's
+    scope: the flaky test could use a `testTimeout` bump in an unrelated
+    future pass; the live project carries unrelated leftover fixture rows
+    from past sessions, predating and untouched by Phase 23.

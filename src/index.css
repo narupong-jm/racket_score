@@ -925,6 +925,10 @@ button.danger {
   padding-bottom: 0;
 }
 
+.round-row > button {
+  align-self: flex-start;
+}
+
 .round-label,
 .round-tournament {
   font-size: 12px;

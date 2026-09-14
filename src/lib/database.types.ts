@@ -316,8 +316,8 @@ export type Database = {
           matches_played: number | null
           matches_won: number | null
           name: string | null
-          point_diff: number | null
           player_id: string | null
+          point_diff: number | null
           tournament_id: string | null
           win_rate: number | null
         }
@@ -469,6 +469,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      delete_match_result: {
+        Args: { p_match_id: string; p_passphrase: string }
+        Returns: undefined
       }
       delete_player: {
         Args: { p_id: string; p_passphrase: string }
