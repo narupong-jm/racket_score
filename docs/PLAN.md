@@ -2574,11 +2574,15 @@ are plain (non-materialized) views recomputed on every read — so a single
 **Implementation status (2026-09-14):** built via superpowers:subagent-driven-development
 in an isolated git worktree at `.claude/worktrees/phase-23-delete-match` (branch
 `worktree-phase-23-delete-match`, based on `main` @ `888c7f8`) — not yet merged to `main`.
-Steps 1-11 below are complete and independently reviewed (clean, no open findings;
-step 8's review was resumed after an earlier usage-limit interruption and came back
-Approved with 3 minor notes parked; step 9 Approved with 1 minor note parked; step 11
-needed one fix round for a dropped scope clause, then came back clean). Step 12 (full
-regression + manual verification) has not been started. Full session ledger (pre-flight
+All 12 steps below are complete. Steps 1-11 independently reviewed clean (step 8's
+review was resumed after an earlier usage-limit interruption and came back Approved
+with 3 minor notes parked; step 9 Approved with 1 minor note parked; step 11 needed
+one fix round for a dropped scope clause, then came back clean). Step 12 (full
+regression + live manual verification against the real Supabase project, user-
+authorized beforehand) passed every point with concrete evidence; fixture cleanup
+independently re-verified by the controller. The final whole-branch review (per
+superpowers:subagent-driven-development) is the only step remaining before this
+branch is ready to finish. Full session ledger (pre-flight
 scan, every task's review outcome, and one ordering ruling — see below) lives at
 `.superpowers/sdd/PLAN/progress.md` inside the worktree (gitignored; not part of this
 commit). To resume: `cd` into the worktree (or re-run `EnterWorktree` with
@@ -2773,7 +2777,7 @@ confirming it against the live project via a disposable fixture write.
     "active or ended" scope clause from both the §6 paragraph and the
     Updated note; re-review confirmed both fixed cleanly, no new breakage.
     Commits 6d2a639, 25d5b1c.
-12. [ ] **Full regression + manual verification.** `npm run build`, `npm run
+12. [x] **Full regression + manual verification.** `npm run build`, `npm run
     lint`, `npx vitest run` (whole suite) clean. Manual pass via dev server /
     Playwright MCP: delete a disposable match from History (impact preview
     correct, wrong passphrase rejected with field retained, right passphrase
@@ -2786,3 +2790,29 @@ confirming it against the live project via a disposable fixture write.
     does **not** re-prompt for passphrase, proving the delete modal's field
     never touched `sessionStorage`; confirm a raw anon `DELETE
     /rest/v1/matches?id=eq.<id>` via direct HTTP still rejects with `42501`.
+    **Done:** `build`/`lint` clean; full vitest suite 276/276 (one flaky
+    timeout on the first run, in a pre-existing Phase-20 integration test
+    unrelated to this phase, confirmed via `git log` and a clean standalone
+    + full-suite re-run). Live Playwright MCP pass against the real
+    `racket-score` project via a disposable "Phase23 smoke test (delete
+    me)" tournament (user-authorized beforehand): all points verified with
+    concrete evidence — impact-preview numbers cross-checked against
+    hand-computed `player_stats` arithmetic on every delete; wrong
+    passphrase rejected with the field retained; correct passphrase deletes
+    with no manual refresh and immediate DB/view consistency; quick-undo
+    shown only on the newest of 2 Rounds-played rows; identical behavior
+    against an ended tournament; raw anon HTTP DELETE still rejected
+    (`42501`, surfacing as HTTP 401 per Task 2's finding). **Ruling on this
+    step's own wording:** rather than the literal "does not re-prompt"
+    scenario (ambiguous — with a passphrase already cached, that check
+    can't distinguish "no leak" from "leaked the same correct value"), the
+    implementer deliberately cleared `sessionStorage` before each
+    delete-modal use, confirmed it stayed `null` after (proves the modal
+    never writes to the cache), then confirmed a subsequent unrelated write
+    DID re-prompt (proves nothing was left there to skip) — a strictly
+    stronger proof of the same isolation property. Fixture cleanup verified
+    back to zero by both the implementer and an independent controller
+    spot-check. 2 minor notes parked, both explicitly out of this task's
+    scope: the flaky test could use a `testTimeout` bump in an unrelated
+    future pass; the live project carries unrelated leftover fixture rows
+    from past sessions, predating and untouched by Phase 23.
