@@ -2580,9 +2580,15 @@ with 3 minor notes parked; step 9 Approved with 1 minor note parked; step 11 nee
 one fix round for a dropped scope clause, then came back clean). Step 12 (full
 regression + live manual verification against the real Supabase project, user-
 authorized beforehand) passed every point with concrete evidence; fixture cleanup
-independently re-verified by the controller. The final whole-branch review (per
-superpowers:subagent-driven-development) is the only step remaining before this
-branch is ready to finish. Full session ledger (pre-flight
+independently re-verified by the controller. The final whole-branch review (dispatched
+on the most capable model, per superpowers:subagent-driven-development) came back
+"Ready to merge with fixes" — no Critical findings; 2 Important findings (an
+un-updated `docs/SPEC.md` §2 contradicting §6's new passphrase-isolation behavior,
+and an integration test's cleanup silently leaking live fixture rows past this
+phase's own RLS tightening) plus 3 escalated and 2 new Minor findings were all
+addressed in one fix wave (commit `23ebdfc`) and independently re-reviewed clean —
+no further fix round needed. Phase 23 is now fully implemented, reviewed end to end,
+and ready for `superpowers:finishing-a-development-branch`. Full session ledger (pre-flight
 scan, every task's review outcome, and one ordering ruling — see below) lives at
 `.superpowers/sdd/PLAN/progress.md` inside the worktree (gitignored; not part of this
 commit). To resume: `cd` into the worktree (or re-run `EnterWorktree` with
