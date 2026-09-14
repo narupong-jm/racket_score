@@ -2571,13 +2571,14 @@ RPC. `match_games.match_id`/`match_participants.match_id` already carry
 are plain (non-materialized) views recomputed on every read — so a single
 `DELETE FROM matches` is sufficient and stats reflect it with no refresh step.
 
-**Implementation status (2026-09-13):** built via superpowers:subagent-driven-development
+**Implementation status (2026-09-14):** built via superpowers:subagent-driven-development
 in an isolated git worktree at `.claude/worktrees/phase-23-delete-match` (branch
 `worktree-phase-23-delete-match`, based on `main` @ `888c7f8`) — not yet merged to `main`.
-Steps 1-10 below are complete and independently reviewed (clean, no open findings;
+Steps 1-11 below are complete and independently reviewed (clean, no open findings;
 step 8's review was resumed after an earlier usage-limit interruption and came back
-Approved with 3 minor notes parked; step 9 Approved with 1 minor note parked). Steps 11
-and 12 have not been started. Full session ledger (pre-flight
+Approved with 3 minor notes parked; step 9 Approved with 1 minor note parked; step 11
+needed one fix round for a dropped scope clause, then came back clean). Step 12 (full
+regression + manual verification) has not been started. Full session ledger (pre-flight
 scan, every task's review outcome, and one ordering ruling — see below) lives at
 `.superpowers/sdd/PLAN/progress.md` inside the worktree (gitignored; not part of this
 commit). To resume: `cd` into the worktree (or re-run `EnterWorktree` with
@@ -2754,7 +2755,7 @@ confirming it against the live project via a disposable fixture write.
     real Thai translations (not machine-translated), key-set diff 0/212
     identical, `tsc -b` clean. No new `cancel` key added (correctly reuses
     `manage.cancel`). Reviewed clean.
-11. [ ] **Docs: `docs/SPEC.md` §6 rewrite.** Replace the "permanently locked
+11. [x] **Docs: `docs/SPEC.md` §6 rewrite.** Replace the "permanently locked
     ... no admin-override path ... deliberate simplification" sentence with
     wording for the new reality: scores still can't be edited in place, but a
     confirmed match can now be permanently deleted via a passphrase-gated
@@ -2765,7 +2766,13 @@ confirming it against the live project via a disposable fixture write.
     confirmed match in any tournament (active or ended). Update the matching
     "Out of scope" bullet to instead read "Editing/correcting a confirmed
     result's scores in place (§6) — whole-match deletion is supported
-    starting Phase 23." _Test:_ none (docs-only); reviewed in step 12.
+    starting Phase 23." _Test:_ none (docs-only); reviewed in step 12. **Done:**
+    §6 rewritten, Out-of-scope bullet updated, new "Updated: 2026-09-14" note
+    added ending "Not yet implemented as of this note." (correct — this
+    branch is unmerged). One fix round: the first pass omitted the
+    "active or ended" scope clause from both the §6 paragraph and the
+    Updated note; re-review confirmed both fixed cleanly, no new breakage.
+    Commits 6d2a639, 25d5b1c.
 12. [ ] **Full regression + manual verification.** `npm run build`, `npm run
     lint`, `npx vitest run` (whole suite) clean. Manual pass via dev server /
     Playwright MCP: delete a disposable match from History (impact preview
