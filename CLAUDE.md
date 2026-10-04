@@ -4,23 +4,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Phases 1-20 of `docs/PLAN.md` are complete and shipped, including Phase 13's 5-tab bottom-nav
+Phases 1-23 of `docs/PLAN.md` are complete and shipped, including Phase 13's 5-tab bottom-nav
 overhaul (Create / Active / Scoreboard / History / Member) and every IMPROVEMENT-doc-driven patch
-since (`docs/IMPROVEMENT.md` through `docs/IMPROVEMENT4.md`). Do not assume from old conversation
-history or partial doc reads that any of this is still in flight — check `docs/PLAN.md`'s phase
-checkboxes (all `[x]`) and `src/` directly if in doubt.
+(`docs/IMPROVEMENT.md` through `docs/IMPROVEMENT4.md` — all four are fully absorbed into shipped
+phases: IMPROVEMENT.md → Phase 13, IMPROVEMENT2.md → Phase 14, IMPROVEMENT3.md → Phase 18,
+IMPROVEMENT4.md → Phase 20; nothing in any of them is still outstanding). Phases 21-23 then shipped
+without a numbered IMPROVEMENT doc of their own (driven directly by `docs/SPEC.md`'s dated "Updated"
+notes instead). Do not assume from old conversation history or partial doc reads that any of this
+is still in flight — check `docs/PLAN.md`'s phase checkboxes (all `[x]`) and `src/` directly if in
+doubt.
 
-**Most recent phase — Phase 20, multi-sport support (Badminton + Tennis):** driven by
-`docs/IMPROVEMENT4.md`. The app now gates entry behind a **Home** screen (sport icon picker,
-persisted to `localStorage`, switchable anytime via a header control), and every tab
-(Create/Active/Scoreboard/History/Member) scopes its data to the active sport workspace. A
-player's skill level — both self-selected and win-rate-derived `effective_level` — is now tracked
-**independently per sport**: `players.self_selected_level` was split into
-`badminton_self_selected_level`/`tennis_self_selected_level`, and `player_stats` is now a
-sport-scoped view (2 rows per player, one per sport) rather than one row per player. Tennis reuses
-the badminton scoring engine and matchmaking algorithm byte-for-byte — there is no real-tennis
-scoring (sets/deuce-advantage/tie-break), only a `tournaments.sport` tag. `docs/SPEC.md` §1/§3/§4/§9
-describe this as the current target state and are accurate as of this note.
+**Most recent phase — Phase 23, delete a confirmed match result:** reverses the previous
+"permanently locked, no admin-override" rule for whole-match deletion only (in-place score editing
+is still unsupported). A passphrase-gated confirm dialog previews per-player stat impact before
+deleting; reachable from History (any match, any tournament, active or ended) or as a "delete last
+match" quick-undo on the Manage screen's newest Rounds-played row immediately after confirming a
+result. Hard delete of the match + games + participants — doesn't renumber `sequence_number` or
+restore Current/Next state. `docs/SPEC.md` §6 and its "Updated: 2026-09-14" note describe this as
+the current target state and are accurate as of this note.
+
+Two intermediate phases, for context: **Phase 21** (Create Tournament form refinements — blank-by-
+default stepper inputs for games/match and points/game, Tennis's points-per-game fixed at 4 and
+shown disabled rather than hidden) and **Phase 22** (Next-match Edit popup gained a read-only
+games-played reference table, and an un-started Next-match draw now persists to `localStorage` per
+tournament so navigating away doesn't lose it).
 
 **Node version note:** the local Node is v20.13.1, below what several current package majors
 require (`vite@8`+/rolldown, `eslint@10`'s dependency chain declares `^20.19`, `jsdom@30`+). Where
@@ -33,19 +40,23 @@ Read these files first, in this order, before doing any implementation work:
 
 1. **`docs/SPEC.md`** — confirmed product requirements. Source of truth for _what_ to build. Carries
    dated "Updated" notes at the top tracking each revision — read those before trusting any single
-   section, since some (§3-§9) have been rewritten more than once.
-2. **`docs/IMPROVEMENT.md`** — the concept doc behind `docs/SPEC.md`'s current §3-§9 and `docs/PLAN.md`'s current
-   Phase 13. Not itself normative (docs/SPEC.md is), but explains the UI/UX reasoning and references a
-   mockup that isn't reproduced in `docs/SPEC.md`'s prose.
-3. **`docs/RESEARCH.md`** — environment/account state as of planning time (Supabase org/projects, local
+   section, since some (§3-§9) have been rewritten more than once. Note: each "Updated" note's own
+   trailing "Not yet implemented as of this note" caveat describes status *at spec-revision time*,
+   not now — every one of them has since shipped (cross-check `docs/PLAN.md`'s phase checkboxes, not
+   the caveat text, for current status).
+2. **`docs/PLAN.md`** — the phased implementation plan, including stack decisions and clarifications
+   that refine `docs/SPEC.md`. This is the primary execution guide and the authoritative record of
+   what's actually shipped — work phase by phase, in order, verifying each step's stated test before
+   moving to the next.
+3. **`docs/IMPROVEMENT.md`/`IMPROVEMENT2.md`/`IMPROVEMENT3.md`/`IMPROVEMENT4.md`** — historical concept
+   docs, each the design rationale behind one already-shipped phase (`IMPROVEMENT.md` → Phase 13,
+   `IMPROVEMENT2.md` → Phase 14, `IMPROVEMENT3.md` → Phase 18, `IMPROVEMENT4.md` → Phase 20). Not
+   normative and not in-flight — read whichever one matches the phase you're touching for the
+   UI/UX/schema reasoning behind it, but trust `docs/PLAN.md`'s checkboxes and `src/` over anything
+   in these phrased as a future/pending change.
+4. **`docs/RESEARCH.md`** — environment/account state as of planning time (Supabase org/projects, local
    tooling availability, git status). Useful for knowing what's already provisioned vs. what needs
    to be created, but re-verify rather than trusting it blindly since it's a point-in-time snapshot.
-4. **`docs/PLAN.md`** — the phased implementation plan, including stack decisions and clarifications
-   that refine `docs/SPEC.md`. This is the primary execution guide — work phase by phase, in order,
-   verifying each step's stated test before moving to the next.
-5. **`docs/IMPROVEMENT2.md`** — a narrower, later patch on top of the shipped Phase 13 app (see
-   "Post-Phase-13 patch in flight" above): matchmaking corrections, manual draw editing, and History
-   collapse. Read this in addition to the above four when working on this specific patch.
 
 ## Stack
 
@@ -134,25 +145,37 @@ surfaced real pre-existing errors once actually run.
   there is no photo upload or `players.photo`/`avatar_url` column; don't add one without the user
   explicitly asking, per `docs/SPEC.md` §3's deferral.
 - **Doubles pairs/teams are never persisted** — every tournament re-pairs individuals from the pool.
-- **Participants are chosen once, at tournament-creation time, from the member pool — never
-  after.** There is deliberately no "add a late player to an in-progress tournament" feature (it
-  existed early on and was explicitly removed — see `docs/SPEC.md` §4 and Phase 13's step 2). Don't
-  reintroduce it without being asked.
+- **Participants start from a roster chosen once at tournament-creation time**, but — as of Phase
+  18 (`docs/IMPROVEMENT3.md`), a **deliberate reversal** of the original "never after" rule that
+  Phase 13 had introduced — the roster can change mid-tournament via two guarded actions: an active
+  participant can **Leave** (soft-remove, reversible, blocked while they're in the in-progress
+  Current match or once the tournament has ended/been cancelled; immediately excluded from the
+  Match Generator's candidate pool, but History/Scoreboard are untouched since those read
+  completed-match data, not the roster) and the organizer can **Add participant** to bring in a late
+  arrival or rejoin someone who left (reuses the same `tournament_participants` row rather than
+  duplicating it; the new/returning participant gets a fairness `match_count_offset` equal to the
+  current minimum matches-played among active participants, so the draw doesn't penalize them for
+  joining late — this offset only feeds the matchmaking algorithm, never History/Scoreboard/win-rate,
+  which always reflect real completed matches). Both actions are passphrase-gated, same as every
+  other write. See `docs/SPEC.md` §4 for full detail.
 - A tournament is singles OR doubles (not both), with its own games-per-match, points-per-game, and
   a deuce cap **auto-computed from the BWF 21→30 ratio**: `cap = round(pointsPerGame * 30 / 21)`.
   There is **no fixed total round/match count** — a tournament runs until the organizer manually
   ends it; UI showing round progress must say "Round N", never "Round N of M".
 - Best-of-N match results that include more games than needed to decide the match (e.g. a 3rd game
   after a 2-0 sweep in best-of-3) must be **rejected** at validation, not silently accepted.
-- Once a match **result** is confirmed (via the confirm-before-save dialog), it is **permanently
-  locked** — no edit UI, no admin override, anywhere in the app. This is deliberate, not a
-  to-do. **Separately** (per `docs/IMPROVEMENT2.md` §2, not yet implemented), a match that's been
-  drawn but **not yet started** — the auto-drawn first match's creation-time confirmation popup, or
-  the Manage screen's Next match card before Start match is tapped — can have its players edited
-  inline, swapping a drawn player for someone else in the tournament's roster. This only touches the
-  *draw*, never a confirmed *result*; the UI warns but does not block if the edited lineup violates
-  the gender-balance rule below, and the edited match is flagged as manually-adjusted (visible later
-  in History).
+- Once a match **result** is confirmed (via the confirm-before-save dialog), its **scores are
+  permanently locked** — no edit UI, no admin override to change them, anywhere in the app. This is
+  deliberate, not a to-do. As of Phase 23, a confirmed match *can* be permanently **deleted**
+  (not edited) via a passphrase-gated confirm dialog that previews per-player stat impact —
+  reachable from History (any match, any tournament) or as a "delete last match" quick-undo on the
+  Manage screen right after confirming a result (see "Project status" above for the full picture).
+  Separately (per `docs/IMPROVEMENT2.md` §2, Phase 14), a match that's been drawn but **not yet
+  started** — the auto-drawn first match's creation-time confirmation popup, or the Manage screen's Next match card
+  before Start match is tapped — can have its players edited inline, swapping a drawn player for
+  someone else in the tournament's roster. This only touches the *draw*, never a confirmed *result*;
+  the UI warns but does not block if the edited lineup violates the gender-balance rule below, and
+  the edited match is flagged as manually-adjusted (visible later in History).
 - Single-court model: matches are drawn one at a time. As of Phase 13, drawing is split into two
   explicit, independently-managed slots in the Manage Tournament screen — **Next match** (filled
   only by an explicit "Randomize" tap, one match type's needed-player-count via
@@ -161,17 +184,17 @@ surfaced real pre-existing errors once actually run.
   tournament's very first match is the one exception — it's auto-drawn immediately at creation
   time, with a confirmation popup, before the organizer ever sees the Manage screen.
 - Matchmaking priority order (highest to lowest): **equal match count** (per `docs/IMPROVEMENT2.md`
-  §1.1, not yet implemented, this is a **hard invariant** — the gap between the most- and
+  §1.1, implemented in Phase 14, this is a **hard invariant** — the gap between the most- and
   least-played participant must never exceed 1; when the lowest-count tier is short of the needed
   player count, every player in that tier is drawn and only the remaining seats are filled from the
   next tier) → skill balance → gender balance → avoid repeat pairings → random choice among
   remaining ties. Tie-break randomness must never override a higher-priority criterion (e.g. it
   can't cross tiers of the equal-match-count grouping). **Doubles is a special case** (per
-  `docs/IMPROVEMENT2.md` §1.2, not yet implemented): gender balance (2-male-2-female quartets/team
+  `docs/IMPROVEMENT2.md` §1.2, implemented in Phase 14): gender balance (2-male-2-female quartets/team
   splits over any unbalanced alternative) is promoted to a **hard filter above skill balance**, not
   a tiebreak — so for doubles the effective order is equal match count → gender balance (hard) →
   skill balance → avoid repeat pairings; singles is unaffected. **Current-match exclusion** (per
-  `docs/IMPROVEMENT2.md` §1.3, not yet implemented): while a Current match is in progress, its
+  `docs/IMPROVEMENT2.md` §1.3, implemented in Phase 14): while a Current match is in progress, its
   participants are excluded from the Next-match candidate pool, with a reuse fallback + UI warning
   if too few other players remain.
 - **Two distinct scoreboards, both win-rate-based** (as of Phase 13 — the earlier games-won/
