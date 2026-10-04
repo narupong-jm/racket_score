@@ -30,7 +30,9 @@ works identically per sport.
   decisions](#design-decisions--intentional-limitations)) — the two sports
   never share match history or stats for the same person.
 - Central, persistent player pool with generated placeholder avatars
-  (initials + name-derived color)
+  (initials + name-derived color); a member can be renamed or removed, though
+  removal is blocked server-side if they have any match history or are still
+  on an active tournament's roster
 - Self-selected skill level until 3 matches are played, then an
   automatically computed win-rate-derived effective level — tracked
   **independently per sport**, so a player's Badminton and Tennis levels
@@ -50,7 +52,12 @@ works identically per sport.
 - 5-tab bottom navigation: Create / Active / Scoreboard / History / Member
 - Manual override for a drawn-but-not-yet-started match — swap a player
   before the match starts, with a non-blocking warning if the edit breaks
-  doubles' gender-balance rule; edited matches are flagged in History
+  doubles' gender-balance rule; edited matches are flagged in History. The
+  edit popup shows a read-only games-played reference table for every
+  roster player, sorted fewest-to-most, so the organizer can see who's
+  behind while swapping; a randomized-but-not-started Next match also
+  survives navigating away (persisted per tournament in `localStorage`
+  until Start match promotes it)
 - Mid-tournament roster changes: a participant can leave (soft-removed,
   reversible, immediately excluded from future draws) and the organizer
   can add a late arrival or bring a left participant back — either way a
