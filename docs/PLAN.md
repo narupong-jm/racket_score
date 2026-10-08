@@ -2857,6 +2857,49 @@ phase is a 1-court tournament.
 order: 1-4 (data), 5-7 (pure logic + store + hooks), **10 (i18n) before 8-9** (their tests assert real rendered
 copy, per the Phase 23 ordering lesson), then 8, 9, 11, 12. The checkbox numbering below is unchanged by that order.
 
+**Implementation status (2026-10-08, end of session 2):** being built via `superpowers:subagent-driven-development` in an
+isolated worktree at `.claude/worktrees/phase-24-multi-court` (branch `worktree-phase-24-multi-court`, based on `main` @
+`17af775`) — **not merged to `main`**. Steps 1-8 are complete and independently reviewed; step 9 is split in three
+dispatches: 9a (court cards + queue core) is complete and reviewed, 9b+9c (queue-Edit popup "Now" column, Matches played
+ordering/labels, derived reuse warning, `manage.startFailed`, dead-key cleanup) is **implemented and committed (`e8d93de`)
+but NOT yet task-reviewed**; step 10 is half done (i18n keys added; the Active/History label switch, "10b", is not started);
+steps 11-12 and the merge-time migration 2b are not started. Branch state at the stop: `tsc -b` clean, non-integration
+suite 53 files / 373 tests passing, worktree clean. The live database already carries migrations A and B (additive);
+fixtures from integration runs were cleaned and re-verified (9 tournaments / 106 matches / 0 queued / 0 UUID-named rows).
+
+**To resume:** `cd` into the worktree (or `EnterWorktree` with `path: .claude/worktrees/phase-24-multi-court`), read the
+git-ignored SDD workspace `.superpowers/sdd/phase24/` — `progress.md` (ledger: every task outcome, all rulings and deferred
+minors), `contracts.md` (binding cross-task interfaces C1-C6), `task-<N>-brief.md` / `-report.md` per task — then continue in
+this order: (1) task-review of commit `e8d93de` (BASE = `44caeef`; use a diff file + a reviewer on at least a mid-tier model),
+(2) task 10b (brief already written at `.superpowers/sdd/phase24/task-10b-brief.md`), (3) step 11 docs, (4) step 12 regression +
+live verification, (5) final whole-branch review on the most capable model, (6) `superpowers:finishing-a-development-branch`
+and, only at merge time, migration 2b. If `.superpowers/` is gone, rebuild from `git log` (one commit per step, subjects
+"Phase 24 step N: ...") and this section.
+
+**Rulings made during execution (all recorded in the ledger as `Ruling:`; cost if wrong in parentheses):**
+- Supabase branching is Pro-only and the org is on the free plan, so migrations A/B were applied **additively to the live
+  project** (old `create_tournament`/`create_match` overloads stay until merge). (Production now has both overloads;
+  forgetting migration 2b leaves the old ones callable.)
+- Step 4 keeps the app compiling with a shim: `CreateTournamentInput.court_count` optional (default 1) until step 8 made it
+  required; `useStartNextMatch` passed court 1 until 9a deleted it. (Shims are gone.)
+- Step 5 also exports `drawMatches` (sequential multi-draw) because the create flow and Fill queue both need it.
+- Step 6/7 **added** the queue store and hooks next to the old `nextDrawStore`/`useStartNextMatch` instead of replacing them;
+  9a deleted the old ones once the last caller migrated. The store has `subscribeQueue` and the hook uses
+  `useSyncExternalStore` so every component and the mutation-level `shiftQueue` stay in sync.
+- Step 10 was **add-only** (new keys, no copy changes) so existing component tests stayed valid until each component was
+  migrated; the Active/History label switch was split out as 10b because it needs `formatMatchLabel` from 9bc.
+- Step 8: the 1-court popup title uses a new key `titleSingle` (a plural of `titleMulti` was rejected because C4 fixed the
+  key name). Step 9bc: the queue reuse warning is derived from the current queue each render rather than cached from the
+  last draw (it now also shows on a Create-flow-prefilled queue that overlaps).
+- Fixture cleanup is done by the controller via `execute_sql` (UUID-name regex, tournaments first then players), never by
+  subagents, per the operational note at the top of this file.
+
+**Deferred minors worth a look before merge (details in the ledger):** the pre-existing race where `useRecordMatchResult`
+invalidates without awaiting (a draw right after Save can under-count the just-finished players by one — check during step
+12); in-progress matches sharing a court or with `court_number > court_count` are never rendered; the `matchesApi` rollback
+test uses a bare `.rejects.toThrow()`; a few test-strength gaps in the plannedMatches/matchQueueStore/useStartMatchOnCourt tests;
+Thai wording nits (`reusedWarning`, `removeFromQueue`); `manage.done` is kept only because the parity guard lists it.
+
 1. [x] **Migration A — schema (additive only).** Via Supabase MCP `apply_migration`: `tournaments.court_count smallint
    not null default 1 check (court_count between 1 and 8)`; `matches.court_number smallint null check (court_number
    >= 1)`; partial unique index on `(tournament_id, court_number) where status = 'queued'` (NULL court numbers from
@@ -2917,28 +2960,35 @@ copy, per the Phase 23 ordering lesson), then 8, 9, 11, 12. The checkbox numberi
    live counts re-verified (9 tournaments / 106 matches / 0 queued / 0 fixture rows). Parked minors: the rollback test
    in `matchesApi.integration.test.ts` uses a bare `.rejects.toThrow()` and could assert the FK error code (23503); the
    `deleteMatchResult` assertions there were only re-wrapped by Prettier.
-5. [ ] **Pure planned-match helper.** New `src/features/matchmaking/plannedMatches.ts`:
+5. [x] **Pure planned-match helper.** New `src/features/matchmaking/plannedMatches.ts`:
    `applyPlannedMatches(inputs, plannedMatches)` adds +1 to `matchesPlayedInTournament` per appearance and adds the
    planned matches' opponent/teammate pairs to `PairingHistory`; `findReusedPlayerIds(drawn, plannedMatches)` returns
    drawn players already in a planned match (drives the reuse warning). `selectCandidatePool` and the pickers are
    untouched. _Test:_ new unit tests (counts, pairs, reuse detection) plus a sequential-draw case in
    `fairnessInvariant.test.ts` — drawing a full queue one match at a time keeps the max-min planned-count gap <= 1.
-6. [ ] **Queue store.** Replace `src/lib/nextDrawStore.ts` with `src/lib/matchQueueStore.ts`: per-tournament
+   **Done (2026-10-08, commit f15a409):** `plannedMatches.ts` exports `applyPlannedMatches`, `findReusedPlayerIds`, `drawMatches`; review clean.
+6. [x] **Queue store.** Replace `src/lib/nextDrawStore.ts` with `src/lib/matchQueueStore.ts`: per-tournament
    `QueuedMatch[]` (`{ participants, manuallyAdjusted }`), new storage key, and a one-time migration of a legacy
    single-draw key into a one-entry queue. _Test:_ rewrite `nextDrawStore.test.ts` as `matchQueueStore.test.ts` —
    get/set/clear, legacy migration, corrupt JSON returns an empty queue.
-7. [ ] **Hooks.** New `useMatchQueueDrafts(tournamentId)` (add / remove / update / `removeContaining(playerId)` /
+   **Done (2026-10-08, commit 2f19c1a):** `src/lib/matchQueueStore.ts` (stable-snapshot `getQueue`, `setQueue`/`shiftQueue`/`clearQueue`, `subscribeQueue`,
+   legacy single-draw migration); `nextDrawStore.ts` was left in place until 9a. Review clean.
+7. [x] **Hooks.** New `useMatchQueueDrafts(tournamentId)` (add / remove / update / `removeContaining(playerId)` /
    clear; callers enforce the n+1 cap). `useStartNextMatch` becomes `useStartMatchOnCourt` — no sequence calculation,
    passes the court, and on success removes the started entry from the stored queue and invalidates `['matches']`
    and `['drawInputs']`. Correct the stale "at most one queued row" docblock in `useMatchQueue.ts`. _Test:_ update
    `useMatchQueue.test.tsx`.
-8. [ ] **Create flow.** `CreateTournamentPage` gets a courts `NumberStepper` (1-8, default 1, locked after creation);
+   **Done (2026-10-08, commit 4908127):** `useMatchQueueDrafts` (`useSyncExternalStore`) and `useStartMatchOnCourt` (mutation-level `shiftQueue` + awaited invalidation); the
+   old `useStartNextMatch` was kept until 9a. Review clean.
+8. [x] **Create flow.** `CreateTournamentPage` gets a courts `NumberStepper` (1-8, default 1, locked after creation);
    `useCreateTournamentWithFirstDraw` draws **n** matches sequentially (accumulating planned counts between draws,
    reusing players with the §5 warning when the roster is too small, still requiring at least one match's worth of
    players) and returns an array; `FirstMatchDrawnPopup` lists the n matches as compact one-line rows, where Edit expands only that row in place into
    the pickers (with a Done button) and the reuse warning sits under the list (layout "B" from the mockup comparison); Confirm writes them to
    the queue store (no `createMatch` call) and navigates to Manage. _Test:_ update `CreateTournamentPage.test.tsx`,
    `useCreateTournamentWithFirstDraw.test.tsx`, `FirstMatchDrawnPopup.test.tsx`.
+   **Done (2026-10-08, commits 990d01b + 6d89849):** courts stepper (1-8, default 1), `drawMatches`-based first draw of n matches, compact one-line popup rows with in-place Edit/Done,
+   confirm writes the queue (no `createMatch`) and navigates. Review found one Important (1-court title "First 1 matches drawn"); fixed with a `titleSingle` key; re-review clean.
 9. [ ] **Manage screen.** In `TournamentDetail.tsx`: `CurrentMatchCard` becomes a per-court `CourtCard` (a court in
    progress is a full card with its own score inputs, Save result and "Is last match"; a **free court collapses to a
    one-line strip** with a Start match button that names the queue head, disabled with a hint when the queue is
@@ -2953,11 +3003,18 @@ copy, per the Phase 23 ordering lesson), then 8, 9, 11, 12. The checkbox numberi
    to `matchFormatting.ts`. _Test:_ rework the affected `describe` blocks in `TournamentDetail.test.tsx`
    (Current/Next, Edit popup, persistence, save-lock, Leave, delete-last) and add multi-court cases (two courts,
    start-blocked, queue cap, Fill queue, per-court Save).
+   **Partly done (2026-10-08):** 9a (commit 44caeef) — `CourtCard`/`CourtMatchForm`/`QueueCard`, `TournamentDetail.tsx` 1123 -> 595 lines, `nextDrawStore` and `useStartNextMatch`
+   deleted — implemented by an opus agent and reviewed clean by an opus reviewer (no Critical/Important). 9b+9c (commit e8d93de) — queue Edit popup titled "Edit queue match k of m"
+   with a "Now" column (`playerNow.ts`), Matches played ordered by `completed_at` desc with `formatMatchLabel`, cancel body `confirmCancelBodyMulti`, reuse warning derived each
+   render, `manage.startFailed`, 20 dead locale keys removed — **implemented, tests green, awaiting its task review**. Leave on any court and `removeContaining` are covered by 9a.
 10. [ ] **Labels + i18n.** `ActivePage.tsx` shows the highest started match number instead of `matches.length`;
     `HistoryPage.tsx` uses `formatMatchLabel`; `en.json` / `th.json` gain "Match N · Court X", Court N / Court free,
     Queue, Fill queue, Remove, the courts label, queue-full, start-blocked, and reused-warning wording, and the
     cancel-body text stops saying "Next or Current". Real Thai translations, not machine-translated. _Test:_
     `npx tsc -b`; en/th key sets identical; update `ActivePage.test.tsx` and `HistoryPage.test.tsx`.
+   **Half done (2026-10-08, commit 597c853):** all 32 new keys (+ `titleSingle`, `startFailed`) exist in en/th with a locale-parity test (`src/i18n/localeParity.test.ts`);
+   review clean. **Remaining = task 10b:** `ActivePage.tsx` shows `active.matchLabel` with the highest started `sequence_number`; `HistoryPage.tsx` uses `formatMatchLabel` (needs
+   `courtCount` added to `RecentCompletedMatch` / `listRecentCompletedMatches`); then delete `active.roundLabel` / `manage.roundLabel` if unreferenced. Brief ready in the SDD workspace.
 11. [ ] **Docs.** Flip `docs/SPEC.md`'s 2026-10-08 note to implemented; update `README.md` Features; sync
     `CLAUDE.md` project status and domain-model bullets (single-court -> multi-court, queue in `localStorage`,
     planned counts); tick this phase's boxes with outcomes. _Test:_ none (docs-only).
