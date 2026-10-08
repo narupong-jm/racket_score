@@ -39,6 +39,7 @@ const row: RecentCompletedMatch = {
     status: 'completed',
     manually_adjusted: false,
     created_at: '2026-01-01T00:00:00Z',
+    court_number: null,
     completed_at: '2026-01-01T00:10:00Z',
   },
   tournamentName: 'Spring Open',

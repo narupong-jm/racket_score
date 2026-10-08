@@ -92,6 +92,7 @@ const activeTournament: Tournament = {
   win_by: 2,
   point_cap: 30,
   status: 'active',
+  court_count: 1,
   created_at: '2026-01-01T00:00:00Z',
   ended_at: null,
 }
@@ -151,6 +152,7 @@ function makeMatch(
     sequence_number: sequenceNumber,
     status,
     created_at: '2026-01-01T00:00:00Z',
+    court_number: null,
     completed_at: status === 'completed' ? '2026-01-01T00:00:00Z' : null,
     manually_adjusted: false,
   }

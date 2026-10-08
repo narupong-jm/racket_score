@@ -2857,26 +2857,47 @@ phase is a 1-court tournament.
 order: 1-4 (data), 5-7 (pure logic + store + hooks), **10 (i18n) before 8-9** (their tests assert real rendered
 copy, per the Phase 23 ordering lesson), then 8, 9, 11, 12. The checkbox numbering below is unchanged by that order.
 
-1. [ ] **Migration A — schema.** Via Supabase MCP `apply_migration`: `tournaments.court_count smallint not null
-   default 1 check (court_count between 1 and 8)`; `matches.court_number smallint null check (court_number >= 1)`;
-   backfill existing `status='queued'` rows to `court_number = 1`; partial unique index on
-   `(tournament_id, court_number) where status = 'queued'`. First check with `execute_sql` that no duplicate
-   `(tournament_id, sequence_number)` pairs exist, then add a unique index on that pair. _Test:_ `execute_sql` on
-   disposable fixtures — inserting a second `queued` match on the same court is rejected; two `queued` matches on
-   different courts are allowed; completed matches may share a `court_number`; existing tournaments read back
-   `court_count = 1`.
-2. [ ] **Migration B — RPCs.** `create_tournament` gains `p_court_count int default 1` (validates 1..8; **drop the
-   old overload**, following the `drop_old_rpc_overloads_pre_sport` precedent so PostgREST never sees an ambiguous
-   pair). `create_match` gains `p_court_number` and **drops the client-supplied `p_sequence_number`** — the server
-   computes max+1 while holding `FOR UPDATE` on the tournament row (old overload dropped). It raises
-   `tournament_not_active`, `invalid_court` (outside `1..court_count`), `court_occupied`, and
-   `participant_on_court` (any participant already in another `queued` match); still atomic across `matches` +
-   `match_participants`, still passphrase-checked first. `leave_participant`, `cancel_tournament`,
-   `record_match_result`, `delete_match_result` stay unchanged. _Test:_ `execute_sql` per error code, two courts
-   started back to back get sequence numbers 1 and 2 with no collision, then `get_advisors` (security) — expect only
-   the same anon-executable `SECURITY DEFINER` advisories as the other write RPCs.
-3. [ ] **Regenerate `src/lib/database.types.ts`** via Supabase MCP `generate_typescript_types`. _Test:_ `npx tsc -b` —
+1. [x] **Migration A — schema (additive only).** Via Supabase MCP `apply_migration`: `tournaments.court_count smallint
+   not null default 1 check (court_count between 1 and 8)`; `matches.court_number smallint null check (court_number
+   >= 1)`; partial unique index on `(tournament_id, court_number) where status = 'queued'` (NULL court numbers from
+   the still-deployed old code never collide). Pre-checked on production 2026-10-08: 0 duplicate
+   `(tournament_id, sequence_number)` pairs, 0 `queued` rows, 9 tournaments, 106 matches. **Deployment strategy
+   (decided 2026-10-08):** the org is on Supabase's free plan, which has no branching (Pro-only), so Phase 24's
+   migrations are applied to the live `racket-score` project *additively* so the deployed app keeps working until
+   this branch merges; destructive cleanup is a separate migration (step 2b). _Test:_ `execute_sql` on disposable
+   fixtures — a second `queued` match on the same court is rejected; two on different courts are allowed;
+   completed matches may share a `court_number`; existing tournaments read back `court_count = 1`.
+   **Done (2026-10-08):** applied as `phase24_multi_court_schema`. Tested in a rolled-back `DO` block (no fixture rows
+   left): `court_count` defaults to 1, a duplicate `queued` court is rejected, a second court is allowed, completed
+   matches may reuse a court, NULL court numbers coexist (old code path), `court_count = 9` is rejected.
+2. [x] **Migration B — RPCs (new overloads beside the old ones).** New `create_tournament(p_name, p_type,
+   p_games_per_match, p_points_per_game, p_sport, p_court_count, p_passphrase, p_win_by default 2)` — `p_court_count`
+   is *required* (no default) and validated 1..8, so old and new named-argument calls can never both match (the
+   ambiguity that `drop_old_rpc_overloads_pre_sport` guarded against). New `create_match(p_tournament_id,
+   p_participants, p_court_number, p_passphrase, p_manually_adjusted default false)` — argument order differs from the
+   old `(uuid, int, jsonb, text, bool)` signature so Postgres accepts both; the server computes `sequence_number` as
+   max+1 while holding `FOR UPDATE` on the tournament row, and raises `tournament_not_found`,
+   `tournament_not_active`, `invalid_court` (outside `1..court_count`), `court_occupied`, and `participant_on_court`
+   (any participant already in another `queued` match); atomic across `matches` + `match_participants`, passphrase
+   checked first, plain `raise exception '<code>'` like the other RPCs. `leave_participant`, `cancel_tournament`,
+   `record_match_result`, `delete_match_result` unchanged. _Test:_ `execute_sql` per error code, two courts started
+   back to back get sequence numbers 1 and 2 with no collision, an old-signature call still works, then
+   `get_advisors` (security) — only the expected anon-executable `SECURITY DEFINER` advisories.
+   **2b. (at merge time, not before)** Migration C: drop the old `create_tournament` / `create_match` overloads and add
+   a unique index on `(tournament_id, sequence_number)`. _Test:_ old-signature call now fails, new flows unaffected.
+   **Done (2026-10-08):** applied as `phase24_multi_court_rpcs` (old overloads left in place). `pg_proc` shows both
+   overloads of each function; a wrong-passphrase call resolves to exactly one overload in all four combinations
+   (old/new x positional/named) and fails with `invalid_passphrase`. `get_advisors` (security): only the two expected new
+   anon `SECURITY DEFINER` advisories (the new `create_match` / `create_tournament`), same class as every other write
+   RPC; no new advisory types. The per-error-code checks (`invalid_court`, `court_occupied`, `participant_on_court`,
+   `tournament_not_active`, sequence numbering) need the write passphrase, so they run as real anon-key integration
+   tests in step 4 rather than in `execute_sql`.
+3. [x] **Regenerate `src/lib/database.types.ts`** via Supabase MCP `generate_typescript_types`. _Test:_ `npx tsc -b` —
    errors only at the call sites that later steps change.
+   **Done (2026-10-08):** `database.types.ts` updated to match the live schema (court columns; `create_match` /
+   `create_tournament` as two-overload unions). Existing call sites compile unchanged because the old overloads are
+   still present; only 13 test fixtures needed the new required `court_count` / `court_number` fields. `tsc -b` clean,
+   non-integration suite 251/251.
 4. [ ] **API layer.** `tournamentsApi.createTournament` / `CreateTournamentInput` gain `court_count`;
    `matchesApi.createMatch(tournamentId, courtNumber, participants, passphrase, manuallyAdjusted)` (no sequence
    argument); `Match` type exposes `court_number`. _Test:_ extend `tournamentsApi.integration.test.ts` and

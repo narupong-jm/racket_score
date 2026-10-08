@@ -38,6 +38,7 @@ function makeMatch(id: string, sequenceNumber: number): Match {
     sequence_number: sequenceNumber,
     status: 'queued',
     created_at: '2026-01-01T00:00:00Z',
+    court_number: null,
     completed_at: null,
     manually_adjusted: true,
   }
