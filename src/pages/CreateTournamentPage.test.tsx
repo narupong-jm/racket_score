@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -12,7 +12,7 @@ import * as generateNextMatchModule from '../features/matchmaking/generateNextMa
 import * as useSportModule from '../features/sport/useSport'
 import type { Player, PlayerStats } from '../features/players/playersApi'
 import type { Tournament } from '../features/tournaments/tournamentsApi'
-import type { Match } from '../features/matches/matchesApi'
+import { clearQueue, getQueue } from '../lib/matchQueueStore'
 
 vi.mock('../features/players/playersApi', () => ({
   listPlayers: vi.fn(),
@@ -132,18 +132,8 @@ const tournament: Tournament = {
   ended_at: null,
 }
 
-const firstMatch: Match = {
-  id: 'm1',
-  tournament_id: 't1',
-  sequence_number: 1,
-  status: 'queued',
-  created_at: '2026-01-01T00:00:00Z',
-  court_number: null,
-  completed_at: null,
-  manually_adjusted: false,
-}
-
 beforeEach(() => {
+  clearQueue('t1')
   vi.mocked(useSportModule.useSport).mockReturnValue({
     sport: 'badminton',
     setSport: vi.fn(),
@@ -205,7 +195,6 @@ describe('CreateTournamentPage', () => {
       ],
     })
     vi.mocked(matchesApi.listMatches).mockResolvedValue([])
-    vi.mocked(matchesApi.createMatch).mockResolvedValue(firstMatch)
 
     const user = userEvent.setup()
     renderPage()
@@ -233,40 +222,40 @@ describe('CreateTournamentPage', () => {
           games_per_match: 3,
           points_per_game: 21,
           sport: 'badminton',
+          court_count: 1,
         },
         'test-passphrase',
       )
     })
 
     expect(
-      await screen.findByText(
-        (_, element) =>
-          element?.textContent === 'First match: Alice & Bob vs Carol & Dave',
-      ),
+      await screen.findByRole('heading', { name: 'First 1 matches drawn' }),
     ).toBeInTheDocument()
-    // Not persisted yet -- the popup shows a computed draft until Confirm is clicked.
+    expect(
+      within(screen.getByRole('dialog')).getByRole('listitem'),
+    ).toHaveTextContent('1.Alice & Bob vs Carol & Dave')
+    // Nothing is persisted or queued yet -- the popup shows a computed draft.
     expect(matchesApi.createMatch).not.toHaveBeenCalled()
+    expect(getQueue('t1')).toEqual([])
 
     await user.click(
       screen.getByRole('button', { name: 'Go to Manage Tournament' }),
     )
 
-    await waitFor(() => {
-      expect(matchesApi.createMatch).toHaveBeenCalledWith(
-        't1',
-        1,
-        [
-          { player_id: 'p1', team: 1 },
-          { player_id: 'p2', team: 1 },
-          { player_id: 'p3', team: 2 },
-          { player_id: 'p4', team: 2 },
-        ],
-        'test-passphrase',
-        false,
-      )
-    })
-
     expect(await screen.findByText('Manage tournament t1')).toBeInTheDocument()
+    expect(getQueue('t1')).toEqual([
+      {
+        participants: [
+          { playerId: 'p1', team: 1 },
+          { playerId: 'p2', team: 1 },
+          { playerId: 'p3', team: 2 },
+          { playerId: 'p4', team: 2 },
+        ],
+        manuallyAdjusted: false,
+      },
+    ])
+    // Matches start from the Manage screen, never at creation.
+    expect(matchesApi.createMatch).not.toHaveBeenCalled()
   })
 
   it('allows editing the first-match popup before confirming, marking it manually adjusted', async () => {
@@ -297,7 +286,6 @@ describe('CreateTournamentPage', () => {
       ],
     })
     vi.mocked(matchesApi.listMatches).mockResolvedValue([])
-    vi.mocked(matchesApi.createMatch).mockResolvedValue(firstMatch)
 
     const user = userEvent.setup()
     renderPage()
@@ -313,10 +301,7 @@ describe('CreateTournamentPage', () => {
     await user.type(screen.getByLabelText('Points per game'), '21')
     await user.click(screen.getByRole('button', { name: /create tournament/i }))
 
-    await screen.findByText(
-      (_, element) =>
-        element?.textContent === 'First match: Alice & Bob vs Carol & Dave',
-    )
+    await screen.findByRole('heading', { name: 'First 1 matches drawn' })
 
     await user.click(screen.getByRole('button', { name: 'Edit' }))
     await user.selectOptions(
@@ -327,20 +312,113 @@ describe('CreateTournamentPage', () => {
       screen.getByRole('button', { name: 'Go to Manage Tournament' }),
     )
 
-    await waitFor(() => {
-      expect(matchesApi.createMatch).toHaveBeenCalledWith(
-        't1',
-        1,
-        [
-          { player_id: 'p5', team: 1 },
-          { player_id: 'p2', team: 1 },
-          { player_id: 'p3', team: 2 },
-          { player_id: 'p4', team: 2 },
+    expect(await screen.findByText('Manage tournament t1')).toBeInTheDocument()
+    expect(getQueue('t1')).toEqual([
+      {
+        participants: [
+          { playerId: 'p5', team: 1 },
+          { playerId: 'p2', team: 1 },
+          { playerId: 'p3', team: 2 },
+          { playerId: 'p4', team: 2 },
         ],
+        manuallyAdjusted: true,
+      },
+    ])
+    expect(matchesApi.createMatch).not.toHaveBeenCalled()
+  })
+
+  it('courts stepper defaults to 1 and clamps to 1..8', async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue(
+      players.map((p) => makeStats(p.id)),
+    )
+    const user = userEvent.setup()
+    renderPage()
+
+    const courts = await screen.findByLabelText('Number of courts')
+    expect(courts).toHaveValue(1)
+
+    const decrease = screen.getAllByRole('button', { name: 'decrease' })[2]
+    const increase = screen.getAllByRole('button', { name: 'increase' })[2]
+    expect(decrease).toBeDisabled()
+
+    await user.clear(courts)
+    await user.type(courts, '12')
+    expect(courts).toHaveValue(8)
+    expect(increase).toBeDisabled()
+  })
+
+  it('draws one match per court: popup shows n rows, confirm queues them all and navigates', async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue(
+      players.map((p) => makeStats(p.id)),
+    )
+    vi.mocked(tournamentsApi.createTournament).mockResolvedValue({
+      ...tournament,
+      type: 'singles',
+      court_count: 2,
+    })
+    vi.mocked(tournamentsApi.addParticipant).mockResolvedValue({
+      tournament_id: 't1',
+      player_id: 'p1',
+      joined_at: '2026-01-01T00:00:00Z',
+      status: 'active',
+      match_count_offset: 0,
+    })
+    vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
+      candidates: [],
+      pairingHistory: { opponentPairs: new Set(), teammatePairs: new Set() },
+    })
+    vi.mocked(generateNextMatchModule.generateNextMatch)
+      .mockReturnValueOnce({
+        ok: true,
+        participants: [
+          { playerId: 'p1', team: 1 },
+          { playerId: 'p2', team: 2 },
+        ],
+      })
+      .mockReturnValueOnce({
+        ok: true,
+        participants: [
+          { playerId: 'p3', team: 1 },
+          { playerId: 'p4', team: 2 },
+        ],
+      })
+
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.type(await screen.findByLabelText(/name/i), 'Two Courts')
+    for (const name of ['Alice', 'Bob', 'Carol', 'Dave']) {
+      await user.click(screen.getByRole('checkbox', { name }))
+    }
+    await user.type(screen.getByLabelText('Games per match'), '3')
+    await user.type(screen.getByLabelText('Points per game'), '21')
+    await user.click(screen.getAllByRole('button', { name: 'increase' })[2])
+    expect(screen.getByLabelText('Number of courts')).toHaveValue(2)
+    await user.click(screen.getByRole('button', { name: /create tournament/i }))
+
+    await waitFor(() => {
+      expect(tournamentsApi.createTournament).toHaveBeenCalledWith(
+        expect.objectContaining({ court_count: 2 }),
         'test-passphrase',
-        true,
       )
     })
+
+    expect(
+      await screen.findByRole('heading', { name: 'First 2 matches drawn' }),
+    ).toBeInTheDocument()
+    const rows = within(screen.getByRole('dialog')).getAllByRole('listitem')
+    expect(rows[0]).toHaveTextContent('1.Alice vs Bob')
+    expect(rows[1]).toHaveTextContent('2.Carol vs Dave')
+
+    await user.click(
+      screen.getByRole('button', { name: 'Go to Manage Tournament' }),
+    )
+
+    expect(await screen.findByText('Manage tournament t1')).toBeInTheDocument()
+    expect(getQueue('t1')).toHaveLength(2)
+    expect(matchesApi.createMatch).not.toHaveBeenCalled()
   })
 
   it('tennis: disables the Points per game field at a fixed value of 4', async () => {
@@ -378,7 +456,6 @@ describe('CreateTournamentPage', () => {
       ],
     })
     vi.mocked(matchesApi.listMatches).mockResolvedValue([])
-    vi.mocked(matchesApi.createMatch).mockResolvedValue(firstMatch)
 
     const user = userEvent.setup()
     renderPage()
@@ -405,6 +482,7 @@ describe('CreateTournamentPage', () => {
           games_per_match: 3,
           points_per_game: 4,
           sport: 'tennis',
+          court_count: 1,
         },
         'test-passphrase',
       )

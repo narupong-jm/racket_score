@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Modal } from '../../components/Modal'
 import {
@@ -7,153 +7,166 @@ import {
 } from '../../components/DrawSlotSelect'
 import { isMixedDoublesRuleViolated } from '../matchmaking/isMixedDoublesRuleViolated'
 import type { GeneratedMatchParticipant } from '../matchmaking/generateNextMatch'
+import type { PlannedMatch } from '../matchmaking/plannedMatches'
+import type { QueuedMatch } from '../../lib/matchQueueStore'
 import type { MatchType } from '../matchmaking/types'
 
 interface FirstMatchDrawnPopupProps {
   open: boolean
-  drawParticipants: GeneratedMatchParticipant[] | null
+  /** The drawn matches in queue order; empty when nothing could be drawn. */
+  matches: PlannedMatch[]
+  /** Players appearing in more than one drawn match (roster too small). */
+  reusedPlayerIds: string[]
   matchType: MatchType
   rosterPlayers: RosterPlayer[]
-  onConfirm: (
-    participants: GeneratedMatchParticipant[],
-    manuallyAdjusted: boolean,
-  ) => void
+  onConfirm: (matches: QueuedMatch[]) => void
   onDismiss: () => void
-  isConfirming: boolean
-  confirmError: boolean
 }
 
 export function FirstMatchDrawnPopup({
   open,
-  drawParticipants,
+  matches,
+  reusedPlayerIds,
   matchType,
   rosterPlayers,
   onConfirm,
   onDismiss,
-  isConfirming,
-  confirmError,
 }: FirstMatchDrawnPopupProps) {
   const { t } = useTranslation()
-  const [draft, setDraft] = useState(drawParticipants)
-  const [editing, setEditing] = useState(false)
-  const [manuallyAdjusted, setManuallyAdjusted] = useState(false)
+  const [drafts, setDrafts] = useState<QueuedMatch[]>(() =>
+    matches.map((participants) => ({ participants, manuallyAdjusted: false })),
+  )
+  const [editingIndex, setEditingIndex] = useState<number | null>(null)
 
   const playerNameById = new Map(rosterPlayers.map((r) => [r.id, r.name]))
 
-  function handleSwap(oldPlayerId: string, newPlayerId: string) {
-    if (!draft || oldPlayerId === newPlayerId) return
-    setDraft(
-      draft.map((p) =>
-        p.playerId === oldPlayerId ? { ...p, playerId: newPlayerId } : p,
+  function handleSwap(index: number, oldPlayerId: string, newPlayerId: string) {
+    if (oldPlayerId === newPlayerId) return
+    setDrafts((prev) =>
+      prev.map((m, i) =>
+        i === index
+          ? {
+              participants: m.participants.map((p) =>
+                p.playerId === oldPlayerId
+                  ? { ...p, playerId: newPlayerId }
+                  : p,
+              ),
+              manuallyAdjusted: true,
+            }
+          : m,
       ),
     )
-    setManuallyAdjusted(true)
   }
 
-  function handleConfirmClick() {
-    if (!draft) {
-      onDismiss()
-      return
-    }
-    onConfirm(draft, manuallyAdjusted)
+  function violatesMixedDoubles(participants: PlannedMatch): boolean {
+    if (matchType !== 'doubles') return false
+    return isMixedDoublesRuleViolated(
+      participants.map((p) => {
+        const roster = rosterPlayers.find((r) => r.id === p.playerId)
+        return {
+          id: p.playerId,
+          gender: roster?.gender ?? 'male',
+          skillValue: 0,
+          matchesPlayedInTournament: 0,
+        }
+      }),
+      participants.filter((p) => p.team === 1).map((p) => p.playerId),
+    )
   }
 
-  const mixedDoublesViolation =
-    matchType === 'doubles' && draft
-      ? isMixedDoublesRuleViolated(
-          draft.map((p) => {
-            const roster = rosterPlayers.find((r) => r.id === p.playerId)
-            return {
-              id: p.playerId,
-              gender: roster?.gender ?? 'male',
-              skillValue: 0,
-              matchesPlayedInTournament: 0,
-            }
-          }),
-          draft.filter((p) => p.team === 1).map((p) => p.playerId),
-        )
-      : false
+  const reusedNames = reusedPlayerIds
+    .map((id) => playerNameById.get(id) ?? id)
+    .join(', ')
+
+  if (drafts.length === 0) {
+    return (
+      <Modal open={open} onClose={onDismiss}>
+        <h2>{t('tournaments.firstMatchPopup.heading')}</h2>
+        <p>{t('tournaments.firstMatchPopup.notDrawn')}</p>
+        <div className="modal-actions">
+          <button type="button" onClick={onDismiss}>
+            {t('tournaments.firstMatchPopup.confirm')}
+          </button>
+        </div>
+      </Modal>
+    )
+  }
 
   return (
     <Modal open={open} onClose={onDismiss}>
-      <h2>{t('tournaments.firstMatchPopup.heading')}</h2>
-      {draft ? (
-        <>
-          {!editing && (
-            <p>
-              {t('tournaments.firstMatchPopup.body')}{' '}
-              {t('matches.draw.matchup', {
-                team1: teamNames(draft, 1, playerNameById),
-                team2: teamNames(draft, 2, playerNameById),
-              })}
-            </p>
-          )}
-          {editing && (
-            <div className="draw-edit-teams">
-              <div className="draw-edit-team">
-                {draft
-                  .filter((p) => p.team === 1)
-                  .map((p, i) => (
-                    <DrawSlotSelect
-                      key={p.playerId}
-                      participant={p}
-                      index={i}
-                      draw={draft}
-                      rosterPlayers={rosterPlayers}
-                      onSwap={handleSwap}
-                    />
-                  ))}
+      <h2>
+        {t('tournaments.firstMatchPopup.titleMulti', { count: drafts.length })}
+      </h2>
+      <ol className="first-match-list">
+        {drafts.map((draft, index) => {
+          const isEditing = editingIndex === index
+          return (
+            <li key={index} className="first-match-row">
+              <div className="first-match-row-head">
+                <span className="first-match-number">{index + 1}.</span>
+                <span className="first-match-matchup">
+                  {t('matches.draw.matchup', {
+                    team1: teamNames(draft.participants, 1, playerNameById),
+                    team2: teamNames(draft.participants, 2, playerNameById),
+                  })}
+                </span>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => setEditingIndex(isEditing ? null : index)}
+                >
+                  {isEditing
+                    ? t('tournaments.firstMatchPopup.rowDone')
+                    : t('tournaments.firstMatchPopup.rowEdit')}
+                </button>
               </div>
-              <span className="round-vs">vs</span>
-              <div className="draw-edit-team">
-                {draft
-                  .filter((p) => p.team === 2)
-                  .map((p, i) => (
-                    <DrawSlotSelect
-                      key={p.playerId}
-                      participant={p}
-                      index={i}
-                      draw={draft}
-                      rosterPlayers={rosterPlayers}
-                      onSwap={handleSwap}
-                    />
+              {isEditing && (
+                <div className="draw-edit-teams">
+                  {([1, 2] as const).map((team) => (
+                    <Fragment key={team}>
+                      {team === 2 && <span className="round-vs">vs</span>}
+                      <div className="draw-edit-team">
+                        {draft.participants
+                          .filter((p) => p.team === team)
+                          .map((p, i) => (
+                            <DrawSlotSelect
+                              key={p.playerId}
+                              participant={p}
+                              index={i}
+                              draw={draft.participants}
+                              rosterPlayers={rosterPlayers}
+                              onSwap={(oldId, newId) =>
+                                handleSwap(index, oldId, newId)
+                              }
+                            />
+                          ))}
+                      </div>
+                    </Fragment>
                   ))}
-              </div>
-            </div>
-          )}
-          {manuallyAdjusted && mixedDoublesViolation && (
-            <p className="field-warning">{t('manage.mixedDoublesWarning')}</p>
-          )}
-          {confirmError && (
-            <p className="field-error">{t('manage.drawFailed')}</p>
-          )}
-          <div className="modal-actions">
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => setEditing((e) => !e)}
-            >
-              {editing ? t('manage.doneEditingDraw') : t('manage.editDraw')}
-            </button>
-            <button
-              type="button"
-              onClick={handleConfirmClick}
-              disabled={isConfirming}
-            >
-              {t('tournaments.firstMatchPopup.confirm')}
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <p>{t('tournaments.firstMatchPopup.notDrawn')}</p>
-          <div className="modal-actions">
-            <button type="button" onClick={onDismiss}>
-              {t('tournaments.firstMatchPopup.confirm')}
-            </button>
-          </div>
-        </>
+                </div>
+              )}
+              {draft.manuallyAdjusted &&
+                violatesMixedDoubles(draft.participants) && (
+                  <p className="field-warning">
+                    {t('manage.mixedDoublesWarning')}
+                  </p>
+                )}
+            </li>
+          )
+        })}
+      </ol>
+      {reusedPlayerIds.length > 0 && (
+        <p className="field-warning">
+          {t('tournaments.firstMatchPopup.reusedWarning', {
+            names: reusedNames,
+          })}
+        </p>
       )}
+      <div className="modal-actions">
+        <button type="button" onClick={() => onConfirm(drafts)}>
+          {t('tournaments.firstMatchPopup.confirm')}
+        </button>
+      </div>
     </Modal>
   )
 }

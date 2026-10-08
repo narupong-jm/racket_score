@@ -10,11 +10,8 @@ import {
   TOURNAMENT_TYPES,
   type TournamentType,
 } from '../features/tournaments/tournamentType'
-import {
-  getNeededPlayerCount,
-  type GeneratedMatchParticipant,
-} from '../features/matchmaking/generateNextMatch'
-import { useStartNextMatch } from '../features/matches/useMatchQueue'
+import { getNeededPlayerCount } from '../features/matchmaking/generateNextMatch'
+import { setQueue, type QueuedMatch } from '../lib/matchQueueStore'
 import { IconChoice } from '../components/IconChoice'
 import { NumberStepper } from '../components/NumberStepper'
 import { Avatar } from '../components/Avatar'
@@ -29,6 +26,8 @@ const TOURNAMENT_TYPE_ICONS: Record<TournamentType, string> = {
 }
 
 const TENNIS_POINTS_PER_GAME = 4
+const MIN_COURTS = 1
+const MAX_COURTS = 8
 
 export function CreateTournamentPage() {
   const { t } = useTranslation()
@@ -39,6 +38,7 @@ export function CreateTournamentPage() {
   const [type, setType] = useState<TournamentType>('singles')
   const [gamesPerMatch, setGamesPerMatch] = useState<number | ''>('')
   const [pointsPerGame, setPointsPerGame] = useState<number | ''>('')
+  const [courtCount, setCourtCount] = useState<number | ''>(MIN_COURTS)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [submittedType, setSubmittedType] = useState<TournamentType>('singles')
   const [submittedParticipantIds, setSubmittedParticipantIds] = useState<
@@ -48,7 +48,6 @@ export function CreateTournamentPage() {
   const { data: players } = usePlayers()
   const { data: statsList } = usePlayerStatsList(sport!)
   const { mutate, isPending, data: result } = useCreateTournamentWithFirstDraw()
-  const startFirstMatch = useStartNextMatch(result?.tournament.id ?? '')
 
   const statsByPlayerId = new Map(
     (statsList ?? []).map((s) => [s.player_id, s]),
@@ -63,11 +62,15 @@ export function CreateTournamentPage() {
   )
 
   const isTennis = sport === 'tennis'
-  const effectivePointsPerGame = isTennis ? TENNIS_POINTS_PER_GAME : pointsPerGame
+  const effectivePointsPerGame = isTennis
+    ? TENNIS_POINTS_PER_GAME
+    : pointsPerGame
 
   const trimmedName = name.trim()
   const cap =
-    effectivePointsPerGame === '' ? null : computePointCap(effectivePointsPerGame)
+    effectivePointsPerGame === ''
+      ? null
+      : computePointCap(effectivePointsPerGame)
   const neededCount = getNeededPlayerCount(type)
   const notEnoughSelected = selectedIds.size < neededCount
   const isValid =
@@ -76,6 +79,8 @@ export function CreateTournamentPage() {
     gamesPerMatch > 0 &&
     effectivePointsPerGame !== '' &&
     effectivePointsPerGame > 0 &&
+    courtCount !== '' &&
+    courtCount >= MIN_COURTS &&
     !notEnoughSelected
 
   function toggleParticipant(id: string) {
@@ -100,26 +105,16 @@ export function CreateTournamentPage() {
         games_per_match: gamesPerMatch,
         points_per_game: effectivePointsPerGame,
         sport,
+        court_count: courtCount,
       },
       participantIds: [...selectedIds],
     })
   }
 
-  function handleConfirmFirstMatch(
-    participants: GeneratedMatchParticipant[],
-    manuallyAdjusted: boolean,
-  ) {
+  function handleConfirmFirstMatches(matches: QueuedMatch[]) {
     if (!result) return
-    startFirstMatch.mutate(
-      {
-        participants: participants.map((p) => ({
-          player_id: p.playerId,
-          team: p.team,
-        })),
-        manuallyAdjusted,
-      },
-      { onSuccess: () => navigate(`/tournaments/${result.tournament.id}`) },
-    )
+    setQueue(result.tournament.id, matches)
+    navigate(`/tournaments/${result.tournament.id}`)
   }
 
   function handleDismissPopup() {
@@ -175,6 +170,19 @@ export function CreateTournamentPage() {
               disabled={isTennis}
             />
           </div>
+        </div>
+
+        <div className="field">
+          <label className="field-label" htmlFor="court-count">
+            {t('tournaments.form.courtsLabel')}
+          </label>
+          <NumberStepper
+            id="court-count"
+            value={courtCount}
+            onChange={setCourtCount}
+            min={MIN_COURTS}
+            max={MAX_COURTS}
+          />
         </div>
 
         {cap != null && (
@@ -234,13 +242,12 @@ export function CreateTournamentPage() {
       {result && (
         <FirstMatchDrawnPopup
           open
-          drawParticipants={result.drawParticipants}
+          matches={result.drawnMatches}
+          reusedPlayerIds={result.reusedPlayerIds}
           matchType={submittedType}
           rosterPlayers={rosterPlayers}
-          onConfirm={handleConfirmFirstMatch}
+          onConfirm={handleConfirmFirstMatches}
           onDismiss={handleDismissPopup}
-          isConfirming={startFirstMatch.isPending}
-          confirmError={startFirstMatch.isError}
         />
       )}
     </section>

@@ -80,6 +80,7 @@ describe('deletePlayer (real project, anon key)', () => {
         sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
+        court_count: 1,
       },
       testWritePassphrase,
     )

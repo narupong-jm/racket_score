@@ -5,6 +5,7 @@ interface NumberStepperProps {
   value: number | ''
   onChange: (value: number | '') => void
   min?: number
+  max?: number
   disabled?: boolean
 }
 
@@ -13,6 +14,7 @@ export function NumberStepper({
   value,
   onChange,
   min = 1,
+  max,
   disabled = false,
 }: NumberStepperProps) {
   const canDecrement = value !== '' && value > min
@@ -24,11 +26,14 @@ export function NumberStepper({
     onChange(next)
   }
 
+  const canIncrement = max === undefined || value === '' || value < max
+
   function increment() {
     if (value === '') {
       onChange(min)
       return
     }
+    if (max !== undefined && value >= max) return
     onChange(value + 1)
   }
 
@@ -40,7 +45,7 @@ export function NumberStepper({
     }
     const parsed = Number(raw)
     if (Number.isNaN(parsed)) return
-    onChange(parsed)
+    onChange(max !== undefined && parsed > max ? max : parsed)
   }
 
   return (
@@ -58,6 +63,7 @@ export function NumberStepper({
         id={id}
         type="number"
         min={min}
+        max={max}
         value={value}
         disabled={disabled}
         onChange={handleInputChange}
@@ -66,7 +72,7 @@ export function NumberStepper({
         type="button"
         className="number-stepper-btn"
         onClick={increment}
-        disabled={disabled}
+        disabled={disabled || !canIncrement}
         aria-label="increase"
       >
         +

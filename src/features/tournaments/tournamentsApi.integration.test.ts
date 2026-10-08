@@ -39,6 +39,7 @@ describe('tournamentsApi (real project, anon key)', () => {
         sport: 'badminton',
         games_per_match: 3,
         points_per_game: 21,
+        court_count: 1,
       },
       testWritePassphrase,
     )
@@ -93,6 +94,7 @@ describe('cancelTournament (real project, anon key)', () => {
         sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
+        court_count: 1,
       },
       testWritePassphrase,
     )
@@ -117,6 +119,7 @@ describe('cancelTournament (real project, anon key)', () => {
         sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
+        court_count: 1,
       },
       testWritePassphrase,
     )
@@ -203,6 +206,7 @@ describe('leaveParticipant (real project, anon key)', () => {
         sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
+        court_count: 1,
       },
       testWritePassphrase,
     )
@@ -247,6 +251,7 @@ describe('leaveParticipant (real project, anon key)', () => {
         sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
+        court_count: 1,
       },
       testWritePassphrase,
     )
@@ -320,6 +325,7 @@ describe('leaveParticipant (real project, anon key)', () => {
         sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
+        court_count: 1,
       },
       testWritePassphrase,
     )
@@ -354,7 +360,7 @@ describe('leaveParticipant (real project, anon key)', () => {
 describe('multi-court tournaments (real project, anon key)', () => {
   const runId = crypto.randomUUID()
 
-  async function makeTournament(label: string, courtCount?: number) {
+  async function makeTournament(label: string, courtCount = 1) {
     return createTournament(
       {
         name: `Multi-Court ${label} ${runId}`,
@@ -414,11 +420,11 @@ describe('multi-court tournaments (real project, anon key)', () => {
     )
   }
 
-  it('persists court_count and defaults to 1 when omitted', async () => {
+  it('persists court_count', async () => {
     const three = await makeTournament('Persist', 3)
     expect(three.court_count).toBe(3)
-    const defaulted = await makeTournament('Default')
-    expect(defaulted.court_count).toBe(1)
+    const single = await makeTournament('Single', 1)
+    expect(single.court_count).toBe(1)
   })
 
   it('rejects an out-of-range court_count with invalid_court_count', async () => {

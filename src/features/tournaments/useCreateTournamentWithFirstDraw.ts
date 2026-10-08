@@ -10,10 +10,7 @@ import {
   type Tournament,
 } from './tournamentsApi'
 import { assembleDrawInputs } from '../matches/useDrawInputs'
-import {
-  generateNextMatch,
-  type GeneratedMatchParticipant,
-} from '../matchmaking/generateNextMatch'
+import { drawMatches, type PlannedMatch } from '../matchmaking/plannedMatches'
 import { usePassphraseGate } from '../passphrase/usePassphraseGate'
 
 /**
@@ -43,13 +40,14 @@ export interface CreateTournamentWithFirstDrawInput {
 export interface CreateTournamentWithFirstDrawResult {
   tournament: Tournament
   /**
-   * The computed first-match draw, not yet persisted -- per the
-   * deferred-persistence design (mirroring the Next-match card), the
-   * organizer confirms (optionally editing it first) via the first-match
-   * popup before it's written as a real `matches` row. `null` means the draw
-   * itself failed (not enough players), so there's nothing to confirm.
+   * The computed first `court_count` matches, in queue order, not yet
+   * persisted -- the organizer confirms (optionally editing) via the popup,
+   * which writes them to the client-side queue. Empty means not even one
+   * match could be drawn (roster smaller than one match).
    */
-  drawParticipants: GeneratedMatchParticipant[] | null
+  drawnMatches: PlannedMatch[]
+  /** Players who appear in more than one drawn match (roster too small). */
+  reusedPlayerIds: string[]
 }
 
 function invalidateAll(queryClient: QueryClient, tournamentId: string) {
@@ -88,21 +86,15 @@ export function useCreateTournamentWithFirstDraw() {
         tournament.id,
         tournamentInput.sport,
       )
-      const drawResult = generateNextMatch(
+      const { matches, reusedPlayerIds } = drawMatches(
         tournamentInput.type,
         drawInputs.candidates,
         drawInputs.pairingHistory,
+        [],
+        tournamentInput.court_count,
       )
 
-      if (!drawResult.ok) {
-        // Unreachable in practice for an exactly-sized, freshly-added pool
-        // (verified against selectCandidatePool/pickDoublesQuartet/
-        // splitIntoTeams), but still handled defensively rather than assumed
-        // away -- the caller can show a "not drawn yet" state for this case.
-        return { tournament, drawParticipants: null }
-      }
-
-      return { tournament, drawParticipants: drawResult.participants }
+      return { tournament, drawnMatches: matches, reusedPlayerIds }
     },
     onSuccess: (result) => {
       invalidateAll(queryClient, result.tournament.id)

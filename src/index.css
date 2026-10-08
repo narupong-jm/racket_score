@@ -337,6 +337,26 @@ p {
   gap: 6px;
 }
 
+.first-match-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.first-match-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.first-match-matchup {
+  flex: 1;
+  min-width: 0;
+}
+
 .section-toggle-button {
   font-size: 13px;
   font-weight: 600;

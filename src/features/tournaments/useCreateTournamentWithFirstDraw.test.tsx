@@ -9,7 +9,7 @@ import {
 import * as tournamentsApi from './tournamentsApi'
 import * as useDrawInputsModule from '../matches/useDrawInputs'
 import * as matchesApi from '../matches/matchesApi'
-import * as generateNextMatchModule from '../matchmaking/generateNextMatch'
+import type { CandidatePlayer } from '../matchmaking/types'
 import type { Tournament } from './tournamentsApi'
 
 vi.mock('./tournamentsApi', async (importOriginal) => {
@@ -30,15 +30,6 @@ vi.mock('../matches/matchesApi', async (importOriginal) => {
   return {
     ...actual,
     createMatch: vi.fn(),
-  }
-})
-
-vi.mock('../matchmaking/generateNextMatch', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('../matchmaking/generateNextMatch')>()
-  return {
-    ...actual,
-    generateNextMatch: vi.fn(),
   }
 })
 
@@ -78,45 +69,60 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
+const participantRow = {
+  tournament_id: 't1',
+  player_id: 'p1',
+  joined_at: '2026-01-01T00:00:00Z',
+  status: 'active',
+  match_count_offset: 0,
+}
+
+function makeCandidates(count: number): CandidatePlayer[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `p${i + 1}`,
+    gender: i % 2 === 0 ? ('male' as const) : ('female' as const),
+    skillValue: 50,
+    matchesPlayedInTournament: 0,
+  }))
+}
+
+function setup(candidates: CandidatePlayer[], courtCount: number) {
+  vi.mocked(tournamentsApi.createTournament).mockResolvedValue({
+    ...tournament,
+    court_count: courtCount,
+  })
+  vi.mocked(tournamentsApi.addParticipant).mockResolvedValue(participantRow)
+  vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
+    candidates,
+    pairingHistory: { opponentPairs: new Set(), teammatePairs: new Set() },
+  })
+  const rendered = renderHook(() => useCreateTournamentWithFirstDraw(), {
+    wrapper: createWrapper(),
+  })
+  rendered.result.current.mutate({
+    tournament: {
+      name: 'Sunday Smash',
+      type: 'singles',
+      sport: 'badminton',
+      games_per_match: 3,
+      points_per_game: 21,
+      court_count: courtCount,
+    },
+    participantIds: candidates.map((c) => c.id),
+  })
+  return rendered
+}
+
 describe('useCreateTournamentWithFirstDraw', () => {
-  it('happy path: creates the tournament, adds every participant, and computes the first-match draw without persisting it', async () => {
-    vi.mocked(tournamentsApi.createTournament).mockResolvedValue(tournament)
-    vi.mocked(tournamentsApi.addParticipant).mockResolvedValue({
-      tournament_id: 't1',
-      player_id: 'p1',
-      joined_at: '2026-01-01T00:00:00Z',
-      status: 'active',
-      match_count_offset: 0,
-    })
-    vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
-      candidates: [],
-      pairingHistory: { opponentPairs: new Set(), teammatePairs: new Set() },
-    })
-    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
-      ok: true,
-      participants: [
-        { playerId: 'p1', team: 1 },
-        { playerId: 'p2', team: 2 },
-      ],
-    })
-
-    const { result } = renderHook(() => useCreateTournamentWithFirstDraw(), {
-      wrapper: createWrapper(),
-    })
-
-    result.current.mutate({
-      tournament: {
-        name: 'Sunday Smash',
-        type: 'singles',
-        sport: 'badminton',
-        games_per_match: 3,
-        points_per_game: 21,
-      },
-      participantIds: ['p1', 'p2'],
-    })
+  it('creates the tournament, adds every participant, and passes court_count to createTournament', async () => {
+    const { result } = setup(makeCandidates(2), 1)
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
+    expect(tournamentsApi.createTournament).toHaveBeenCalledWith(
+      expect.objectContaining({ court_count: 1 }),
+      'test-passphrase',
+    )
     expect(tournamentsApi.addParticipant).toHaveBeenNthCalledWith(
       1,
       't1',
@@ -129,67 +135,61 @@ describe('useCreateTournamentWithFirstDraw', () => {
       'p2',
       'test-passphrase',
     )
-    // The draw is computed, but persistence is deferred to the popup's Confirm
-    // action (useStartNextMatch) -- this hook must never call createMatch itself.
+    // Matches are only drawn into the client-side queue, never persisted here.
     expect(matchesApi.createMatch).not.toHaveBeenCalled()
     expect(result.current.data).toEqual({
       tournament,
-      drawParticipants: [
-        { playerId: 'p1', team: 1 },
-        { playerId: 'p2', team: 2 },
+      drawnMatches: [
+        [
+          { playerId: expect.any(String), team: 1 },
+          { playerId: expect.any(String), team: 2 },
+        ],
       ],
+      reusedPlayerIds: [],
     })
   })
 
-  it('reports a null draw when the pool is too small, without persisting anything', async () => {
-    vi.mocked(tournamentsApi.createTournament).mockResolvedValue(tournament)
-    vi.mocked(tournamentsApi.addParticipant).mockResolvedValue({
-      tournament_id: 't1',
-      player_id: 'p1',
-      joined_at: '2026-01-01T00:00:00Z',
-      status: 'active',
-      match_count_offset: 0,
-    })
-    vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
-      candidates: [],
-      pairingHistory: { opponentPairs: new Set(), teammatePairs: new Set() },
-    })
-    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
-      ok: false,
-      error: 'not_enough_players',
-    })
+  it('draws court_count matches with different players when the roster is big enough', async () => {
+    const { result } = setup(makeCandidates(6), 3)
 
-    const { result } = renderHook(() => useCreateTournamentWithFirstDraw(), {
-      wrapper: createWrapper(),
-    })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
-    result.current.mutate({
-      tournament: {
-        name: 'Sunday Smash',
-        type: 'singles',
-        sport: 'badminton',
-        games_per_match: 3,
-        points_per_game: 21,
-      },
-      participantIds: ['p1'],
-    })
+    const { drawnMatches, reusedPlayerIds } = result.current.data!
+    expect(drawnMatches).toHaveLength(3)
+    const ids = drawnMatches.flat().map((p) => p.playerId)
+    // Planned counts accumulate between draws, so 6 players fill 3 singles
+    // matches exactly once each.
+    expect(new Set(ids).size).toBe(6)
+    expect(reusedPlayerIds).toEqual([])
+  })
+
+  it('reuses players and reports them when the roster is too small for every court', async () => {
+    const { result } = setup(makeCandidates(2), 3)
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    const { drawnMatches, reusedPlayerIds } = result.current.data!
+    expect(drawnMatches).toHaveLength(3)
+    expect(reusedPlayerIds.sort()).toEqual(['p1', 'p2'])
+  })
+
+  it('returns no drawn matches when the roster is smaller than one match', async () => {
+    const { result } = setup(makeCandidates(1), 3)
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
 
     expect(matchesApi.createMatch).not.toHaveBeenCalled()
-    expect(result.current.data).toEqual({ tournament, drawParticipants: null })
+    expect(result.current.data).toEqual({
+      tournament: { ...tournament, court_count: 3 },
+      drawnMatches: [],
+      reusedPlayerIds: [],
+    })
   })
 
   it('partial-failure path: a mid-loop addParticipant failure throws a PartialTournamentCreationError carrying the created tournament', async () => {
     vi.mocked(tournamentsApi.createTournament).mockResolvedValue(tournament)
     vi.mocked(tournamentsApi.addParticipant)
-      .mockResolvedValueOnce({
-        tournament_id: 't1',
-        player_id: 'p1',
-        joined_at: '2026-01-01T00:00:00Z',
-        status: 'active',
-        match_count_offset: 0,
-      })
+      .mockResolvedValueOnce(participantRow)
       .mockRejectedValueOnce(new Error('network error'))
 
     const { result } = renderHook(() => useCreateTournamentWithFirstDraw(), {
@@ -203,6 +203,7 @@ describe('useCreateTournamentWithFirstDraw', () => {
         sport: 'badminton',
         games_per_match: 3,
         points_per_game: 21,
+        court_count: 1,
       },
       participantIds: ['p1', 'p2'],
     })

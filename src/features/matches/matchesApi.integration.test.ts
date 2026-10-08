@@ -27,6 +27,7 @@ describe('matchesApi: manually_adjusted flag (real project, anon key)', () => {
         sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
+        court_count: 1,
       },
       testWritePassphrase,
     )
@@ -138,6 +139,7 @@ describe('matchesApi (real project, anon key)', () => {
         sport: 'badminton',
         games_per_match: 3,
         points_per_game: 21,
+        court_count: 1,
       },
       testWritePassphrase,
     )
@@ -292,6 +294,7 @@ describe('matchesApi: deleteMatchResult (real project, anon key)', () => {
         sport: 'badminton',
         games_per_match: 1,
         points_per_game: 21,
+        court_count: 1,
       },
       testWritePassphrase,
     )
