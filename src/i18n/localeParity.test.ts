@@ -17,6 +17,7 @@ function flatten(obj: unknown, prefix = ''): Record<string, unknown> {
 const PHASE_24_KEYS = [
   'tournaments.form.courtsLabel',
   'tournaments.firstMatchPopup.titleMulti',
+  'tournaments.firstMatchPopup.titleSingle',
   'tournaments.firstMatchPopup.rowEdit',
   'tournaments.firstMatchPopup.rowDone',
   'tournaments.firstMatchPopup.reusedWarning',

@@ -50,8 +50,31 @@ describe('FirstMatchDrawnPopup', () => {
     expect(rows).toHaveLength(2)
     expect(rows[0]).toHaveTextContent('1.Alice vs Bob')
     expect(rows[1]).toHaveTextContent('2.Carol vs Dave')
-    expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(2)
+    expect(screen.getAllByRole('button', { name: /^Edit/ })).toHaveLength(2)
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+  })
+
+  it('uses the singular title for one match and the counted title otherwise', () => {
+    const { unmount } = renderPopup({ matches: [match1] })
+    expect(
+      screen.getByRole('heading', { name: 'First match drawn' }),
+    ).toBeInTheDocument()
+    unmount()
+
+    renderPopup({ matches: [match1, match2, match1] })
+    expect(
+      screen.getByRole('heading', { name: 'First 3 matches drawn' }),
+    ).toBeInTheDocument()
+  })
+
+  it('gives each row Edit button a distinct accessible name', () => {
+    renderPopup()
+    expect(
+      screen.getByRole('button', { name: 'Edit 1. Alice vs Bob' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Edit 2. Carol vs Dave' }),
+    ).toBeInTheDocument()
   })
 
   it('shows the fallback message and calls onDismiss when no match could be drawn', async () => {
@@ -90,7 +113,7 @@ describe('FirstMatchDrawnPopup', () => {
     const user = userEvent.setup()
     renderPopup()
 
-    const edits = screen.getAllByRole('button', { name: 'Edit' })
+    const edits = screen.getAllByRole('button', { name: /^Edit/ })
     await user.click(edits[0])
     expect(screen.getAllByRole('combobox')).toHaveLength(2)
     expect(
@@ -98,7 +121,7 @@ describe('FirstMatchDrawnPopup', () => {
     ).toHaveLength(2)
 
     // Opening row 2 collapses row 1.
-    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.click(screen.getByRole('button', { name: /^Edit/ }))
     expect(screen.getAllByRole('combobox')).toHaveLength(2)
     expect(
       within(screen.getAllByRole('listitem')[1]).getAllByRole('combobox'),
@@ -107,7 +130,7 @@ describe('FirstMatchDrawnPopup', () => {
       within(screen.getAllByRole('listitem')[0]).queryByRole('combobox'),
     ).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Done' }))
+    await user.click(screen.getByRole('button', { name: /^Done/ }))
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   })
 
@@ -116,12 +139,12 @@ describe('FirstMatchDrawnPopup', () => {
     const user = userEvent.setup()
     renderPopup({ onConfirm })
 
-    await user.click(screen.getAllByRole('button', { name: 'Edit' })[1])
+    await user.click(screen.getAllByRole('button', { name: /^Edit/ })[1])
     await user.selectOptions(
       screen.getByRole('combobox', { name: 'Team 1 player 1' }),
       'p5',
     )
-    await user.click(screen.getByRole('button', { name: 'Done' }))
+    await user.click(screen.getByRole('button', { name: /^Done/ }))
     expect(screen.getAllByRole('listitem')[1]).toHaveTextContent(
       '2.Eve vs Dave',
     )
@@ -179,7 +202,7 @@ describe('FirstMatchDrawnPopup', () => {
 
     expect(screen.queryByText(warningText)).toBeNull()
 
-    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.click(screen.getByRole('button', { name: /^Edit/ }))
     await user.selectOptions(
       screen.getByRole('combobox', { name: 'Team 1 player 2' }),
       'p5',

@@ -95,7 +95,11 @@ export function FirstMatchDrawnPopup({
   return (
     <Modal open={open} onClose={onDismiss}>
       <h2>
-        {t('tournaments.firstMatchPopup.titleMulti', { count: drafts.length })}
+        {drafts.length === 1
+          ? t('tournaments.firstMatchPopup.titleSingle')
+          : t('tournaments.firstMatchPopup.titleMulti', {
+              count: drafts.length,
+            })}
       </h2>
       <ol className="first-match-list">
         {drafts.map((draft, index) => {
@@ -113,6 +117,14 @@ export function FirstMatchDrawnPopup({
                 <button
                   type="button"
                   className="secondary"
+                  aria-label={`${t(
+                    isEditing
+                      ? 'tournaments.firstMatchPopup.rowDone'
+                      : 'tournaments.firstMatchPopup.rowEdit',
+                  )} ${index + 1}. ${t('matches.draw.matchup', {
+                    team1: teamNames(draft.participants, 1, playerNameById),
+                    team2: teamNames(draft.participants, 2, playerNameById),
+                  })}`}
                   onClick={() => setEditingIndex(isEditing ? null : index)}
                 >
                   {isEditing

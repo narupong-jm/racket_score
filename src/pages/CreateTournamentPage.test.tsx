@@ -229,7 +229,7 @@ describe('CreateTournamentPage', () => {
     })
 
     expect(
-      await screen.findByRole('heading', { name: 'First 1 matches drawn' }),
+      await screen.findByRole('heading', { name: 'First match drawn' }),
     ).toBeInTheDocument()
     expect(
       within(screen.getByRole('dialog')).getByRole('listitem'),
@@ -301,9 +301,9 @@ describe('CreateTournamentPage', () => {
     await user.type(screen.getByLabelText('Points per game'), '21')
     await user.click(screen.getByRole('button', { name: /create tournament/i }))
 
-    await screen.findByRole('heading', { name: 'First 1 matches drawn' })
+    await screen.findByRole('heading', { name: 'First match drawn' })
 
-    await user.click(screen.getByRole('button', { name: 'Edit' }))
+    await user.click(screen.getByRole('button', { name: /^Edit/ }))
     await user.selectOptions(
       screen.getByRole('combobox', { name: 'Team 1 player 1' }),
       'p5',

@@ -160,6 +160,7 @@
       "body": "First match:",
       "notDrawn": "The first match couldn't be drawn automatically -- draw it from Manage Tournament.",
       "confirm": "Go to Manage Tournament",
+      "titleSingle": "First match drawn",
       "titleMulti": "First {{count}} matches drawn",
       "rowEdit": "Edit",
       "rowDone": "Done",
