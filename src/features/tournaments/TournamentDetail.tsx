@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useTournaments } from './useTournaments'
 import { useEndTournament } from './useEndTournament'
@@ -9,42 +9,20 @@ import { useAddParticipant } from './useAddParticipant'
 import type { TournamentParticipant } from './tournamentsApi'
 import { computePointCap } from './computePointCap'
 import { formatDate } from '../../i18n/formatDate'
-import {
-  getCachedNextDraw,
-  setCachedNextDraw,
-  clearCachedNextDraw,
-} from '../../lib/nextDrawStore'
 import { Modal } from '../../components/Modal'
 import { Avatar } from '../../components/Avatar'
 import { usePlayers } from '../players/usePlayers'
 import { usePlayerStatsList } from '../players/usePlayerStatsList'
 import type { Player } from '../players/playersApi'
 import type { Sport } from '../sport/sportTypes'
-import { useDrawInputs } from '../matches/useDrawInputs'
 import {
   useTournamentMatches,
-  useStartNextMatch,
+  useStartMatchOnCourt,
 } from '../matches/useMatchQueue'
-import { useRecordMatchResult } from '../matches/useRecordMatchResult'
-import {
-  validateGameScore,
-  type GameScoreRules,
-} from '../matches/validateGameScore'
-import {
-  validateMatchGames,
-  type GameScore,
-} from '../matches/validateMatchGames'
+import { useMatchQueueDrafts } from '../matches/useMatchQueueDrafts'
 import { teamNames, summarizeGamesWon } from '../matches/matchFormatting'
-import {
-  generateNextMatch,
-  getNeededPlayerCount,
-  type GeneratedMatchParticipant,
-} from '../matchmaking/generateNextMatch'
-import { isMixedDoublesRuleViolated } from '../matchmaking/isMixedDoublesRuleViolated'
-import {
-  DrawSlotSelect,
-  type RosterPlayer,
-} from '../../components/DrawSlotSelect'
+import type { PlannedMatch } from '../matchmaking/plannedMatches'
+import type { RosterPlayer } from '../../components/DrawSlotSelect'
 import type { MatchType } from '../matchmaking/types'
 import type {
   Match,
@@ -54,6 +32,8 @@ import type {
 } from '../matches/matchesApi'
 import { DeleteMatchConfirmModal } from '../matches/DeleteMatchConfirmModal'
 import { TournamentScoreboardSection } from './TournamentScoreboardSection'
+import { CourtCard } from './CourtCard'
+import { QueueCard } from './QueueCard'
 
 interface TournamentDetailProps {
   tournamentId: string
@@ -77,18 +57,8 @@ export function TournamentDetail({
   const [endModalOpen, setEndModalOpen] = useState(false)
   const cancelTournament = useCancelTournament()
   const [cancelModalOpen, setCancelModalOpen] = useState(false)
-  const [nextDraw, setNextDrawState] = useState<
-    GeneratedMatchParticipant[] | null
-  >(() => getCachedNextDraw(tournamentId))
-
-  function handleNextDrawChange(draw: GeneratedMatchParticipant[] | null) {
-    setNextDrawState(draw)
-    if (draw) {
-      setCachedNextDraw(tournamentId, draw)
-    } else {
-      clearCachedNextDraw(tournamentId)
-    }
-  }
+  const queueDrafts = useMatchQueueDrafts(tournamentId)
+  const startMatch = useStartMatchOnCourt(tournamentId)
 
   if (!tournament) return <p>{t('tournaments.detail.notFound')}</p>
 
@@ -97,6 +67,8 @@ export function TournamentDetail({
   const sport = tournament.sport as Sport
   const cap =
     tournament.point_cap ?? computePointCap(tournament.points_per_game)
+  const courtCount = tournament.court_count
+  const maxQueue = courtCount + 1
 
   const playerNameById = new Map((players ?? []).map((p) => [p.id, p.name]))
   const rosterPlayers: RosterPlayer[] = (participants ?? []).flatMap(
@@ -111,14 +83,27 @@ export function TournamentDetail({
   const matchParticipants = tournamentMatches?.participants ?? []
   const games = tournamentMatches?.games ?? []
 
-  const currentMatch = matches.find((m) => m.status === 'queued') ?? null
+  const inProgress = matches.filter((m) => m.status === 'queued')
   const completedMatches = matches
     .filter((m) => m.status === 'completed')
     .sort((a, b) => b.sequence_number - a.sequence_number)
   const hasConfirmedResult = completedMatches.length > 0
-  const currentMatchParticipantIds = currentMatch
-    ? participantsFor(currentMatch.id).map((p) => p.player_id)
-    : []
+  const inProgressRosters: PlannedMatch[] = inProgress.map((m) =>
+    participantsFor(m.id).map((p) => ({
+      playerId: p.player_id,
+      team: p.team as 1 | 2,
+    })),
+  )
+  const inProgressPlayerIds = new Set(
+    inProgressRosters.flatMap((roster) => roster.map((p) => p.playerId)),
+  )
+
+  const queue = queueDrafts.queue
+  const queueHead = queue[0]
+  const headBlockedNames = (queueHead?.participants ?? [])
+    .filter((p) => inProgressPlayerIds.has(p.playerId))
+    .map((p) => playerNameById.get(p.playerId) ?? p.playerId)
+  const courtNumbers = Array.from({ length: courtCount }, (_, i) => i + 1)
 
   function participantsFor(matchId: string): MatchHistoryEntry[] {
     return matchParticipants.filter((p) => p.match_id === matchId)
@@ -126,6 +111,18 @@ export function TournamentDetail({
 
   function gamesFor(matchId: string): MatchGame[] {
     return games.filter((g) => g.match_id === matchId)
+  }
+
+  function handleStart(courtNumber: number) {
+    if (!queueHead) return
+    startMatch.mutate({
+      participants: queueHead.participants.map((p) => ({
+        player_id: p.playerId,
+        team: p.team,
+      })),
+      manuallyAdjusted: queueHead.manuallyAdjusted,
+      courtNumber,
+    })
   }
 
   function handleConfirmEnd() {
@@ -172,30 +169,50 @@ export function TournamentDetail({
         )}
       </header>
 
-      <CurrentMatchCard
-        tournamentId={tournamentId}
-        currentMatch={currentMatch}
-        participants={currentMatch ? participantsFor(currentMatch.id) : []}
-        playerNameById={playerNameById}
-        gamesPerMatch={tournament.games_per_match}
-        pointsPerGame={tournament.points_per_game}
-        winBy={tournament.win_by}
-        cap={cap}
-        isActive={isActive}
-        hasNextMatchDrawn={nextDraw !== null}
-      />
+      <ol className="court-list" aria-label={t('manage.courtsHeading')}>
+        {courtNumbers.map((courtNumber) => {
+          const match =
+            inProgress.find((m) => (m.court_number ?? 1) === courtNumber) ??
+            null
+          return (
+            <CourtCard
+              key={courtNumber}
+              tournamentId={tournamentId}
+              courtNumber={courtNumber}
+              match={match}
+              matchParticipants={match ? participantsFor(match.id) : []}
+              playerNameById={playerNameById}
+              isActive={isActive}
+              scoring={{
+                gamesPerMatch: tournament.games_per_match,
+                pointsPerGame: tournament.points_per_game,
+                winBy: tournament.win_by,
+                cap,
+              }}
+              queueHead={queueHead}
+              blockedNames={headBlockedNames}
+              startPending={startMatch.isPending}
+              startFailed={
+                startMatch.isError &&
+                startMatch.variables?.courtNumber === courtNumber
+              }
+              onStart={() => handleStart(courtNumber)}
+            />
+          )
+        })}
+      </ol>
 
-      <NextMatchCard
+      <QueueCard
         tournamentId={tournamentId}
         sport={sport}
         matchType={matchType}
         isActive={isActive}
-        hasCurrentMatch={currentMatch !== null}
-        currentMatchParticipantIds={currentMatchParticipantIds}
+        maxQueue={maxQueue}
+        drafts={queueDrafts}
+        inProgressRosters={inProgressRosters}
         rosterPlayers={rosterPlayers}
         playerNameById={playerNameById}
-        nextDraw={nextDraw}
-        onNextDrawChange={handleNextDrawChange}
+        busy={startMatch.isPending}
       />
 
       <RoundsPlayedList
@@ -214,9 +231,8 @@ export function TournamentDetail({
         players={players}
         playerNameById={playerNameById}
         isActive={isActive}
-        currentMatchParticipantIds={currentMatchParticipantIds}
-        nextDraw={nextDraw}
-        onNextDrawChange={handleNextDrawChange}
+        inProgressPlayerIds={inProgressPlayerIds}
+        onParticipantLeft={queueDrafts.removeContaining}
       />
 
       <section className="card">
@@ -305,9 +321,10 @@ interface ParticipantsCardProps {
   players: Player[] | undefined
   playerNameById: Map<string, string>
   isActive: boolean
-  currentMatchParticipantIds: string[]
-  nextDraw: GeneratedMatchParticipant[] | null
-  onNextDrawChange: (draw: GeneratedMatchParticipant[] | null) => void
+  /** Players in an in-progress match on any court (can't Leave). */
+  inProgressPlayerIds: Set<string>
+  /** Drops queued matches containing the player who just left. */
+  onParticipantLeft: (playerId: string) => void
 }
 
 function ParticipantsCard({
@@ -317,9 +334,8 @@ function ParticipantsCard({
   players,
   playerNameById,
   isActive,
-  currentMatchParticipantIds,
-  nextDraw,
-  onNextDrawChange,
+  inProgressPlayerIds,
+  onParticipantLeft,
 }: ParticipantsCardProps) {
   const { t } = useTranslation()
   const { data: stats } = usePlayerStatsList(sport)
@@ -337,8 +353,7 @@ function ParticipantsCard({
     leaveParticipant.mutate(playerId, {
       onSuccess: () => {
         setLeavingParticipant(null)
-        if (nextDraw?.some((p) => p.playerId === playerId))
-          onNextDrawChange(null)
+        onParticipantLeft(playerId)
       },
     })
   }
@@ -448,9 +463,8 @@ function ParticipantsCard({
                         })
                       }
                       disabled={
-                        currentMatchParticipantIds.includes(
-                          participant.player_id,
-                        ) || leaveParticipant.isPending
+                        inProgressPlayerIds.has(participant.player_id) ||
+                        leaveParticipant.isPending
                       }
                     >
                       {t('manage.leave')}
@@ -491,548 +505,6 @@ function ParticipantsCard({
           </button>
         </div>
       </Modal>
-    </section>
-  )
-}
-
-interface CurrentMatchCardProps {
-  tournamentId: string
-  currentMatch: Match | null
-  participants: MatchHistoryEntry[]
-  playerNameById: Map<string, string>
-  gamesPerMatch: number
-  pointsPerGame: number
-  winBy: number
-  cap: number
-  isActive: boolean
-  hasNextMatchDrawn: boolean
-}
-
-function CurrentMatchCard({
-  tournamentId,
-  currentMatch,
-  participants,
-  playerNameById,
-  gamesPerMatch,
-  pointsPerGame,
-  winBy,
-  cap,
-  isActive,
-  hasNextMatchDrawn,
-}: CurrentMatchCardProps) {
-  const { t } = useTranslation()
-
-  return (
-    <section className="card">
-      <h3>{t('manage.currentMatchHeading')}</h3>
-      {!currentMatch ? (
-        <p className="empty-state">{t('manage.noCurrentMatch')}</p>
-      ) : (
-        <>
-          <p className="matchup-line">
-            {t('matches.draw.matchup', {
-              team1: teamNames(participants, 1, playerNameById),
-              team2: teamNames(participants, 2, playerNameById),
-            })}
-          </p>
-          {isActive && (
-            <CurrentMatchForm
-              key={currentMatch.id}
-              tournamentId={tournamentId}
-              matchId={currentMatch.id}
-              team1Name={teamNames(participants, 1, playerNameById)}
-              team2Name={teamNames(participants, 2, playerNameById)}
-              gamesPerMatch={gamesPerMatch}
-              pointsPerGame={pointsPerGame}
-              winBy={winBy}
-              cap={cap}
-              hasNextMatchDrawn={hasNextMatchDrawn}
-            />
-          )}
-        </>
-      )}
-    </section>
-  )
-}
-
-interface RowState {
-  team1: string
-  team2: string
-}
-
-function emptyRows(count: number): RowState[] {
-  return Array.from({ length: count }, () => ({ team1: '', team2: '' }))
-}
-
-interface CurrentMatchFormProps {
-  tournamentId: string
-  matchId: string
-  team1Name: string
-  team2Name: string
-  gamesPerMatch: number
-  pointsPerGame: number
-  winBy: number
-  cap: number
-  hasNextMatchDrawn: boolean
-}
-
-function CurrentMatchForm({
-  tournamentId,
-  matchId,
-  team1Name,
-  team2Name,
-  gamesPerMatch,
-  pointsPerGame,
-  winBy,
-  cap,
-  hasNextMatchDrawn,
-}: CurrentMatchFormProps) {
-  const { t } = useTranslation()
-  const [rows, setRows] = useState<RowState[]>(() => emptyRows(gamesPerMatch))
-  const [confirmOpen, setConfirmOpen] = useState(false)
-  const [isLastMatch, setIsLastMatch] = useState(false)
-  const recordResult = useRecordMatchResult(tournamentId)
-
-  function updateRow(index: number, field: 'team1' | 'team2', value: string) {
-    setRows((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)),
-    )
-  }
-
-  const rules: GameScoreRules = { pointsPerGame, winBy, cap }
-  const rowErrors: (string | null)[] = []
-  const games: GameScore[] = []
-  let seenEmpty = false
-
-  for (let i = 0; i < gamesPerMatch; i++) {
-    const row = rows[i]
-    const t1Empty = row.team1.trim() === ''
-    const t2Empty = row.team2.trim() === ''
-
-    if (t1Empty && t2Empty) {
-      rowErrors.push(null)
-      seenEmpty = true
-      continue
-    }
-    if (seenEmpty) {
-      rowErrors.push(t('matches.result.gapError'))
-      continue
-    }
-    if (t1Empty || t2Empty) {
-      rowErrors.push(t('matches.result.missingScoreError'))
-      continue
-    }
-
-    const team1_score = Number(row.team1)
-    const team2_score = Number(row.team2)
-    if (
-      !Number.isInteger(team1_score) ||
-      !Number.isInteger(team2_score) ||
-      team1_score < 0 ||
-      team2_score < 0
-    ) {
-      rowErrors.push(t('matches.result.invalidNumberError'))
-      continue
-    }
-
-    if (!validateGameScore(team1_score, team2_score, rules)) {
-      rowErrors.push(
-        t('matches.result.ruleViolationError', { pointsPerGame, winBy, cap }),
-      )
-      continue
-    }
-
-    rowErrors.push(null)
-    games.push({ team1_score, team2_score })
-  }
-
-  const hasRowError = rowErrors.some((e) => e !== null)
-  const matchLevelError =
-    !hasRowError &&
-    games.length > 0 &&
-    !validateMatchGames(games, gamesPerMatch)
-      ? t('matches.result.notDecidedError')
-      : null
-
-  const isValid = !hasRowError && games.length > 0 && matchLevelError === null
-  const canSave = isValid && (hasNextMatchDrawn || isLastMatch)
-
-  function handleSaveResultClick(event: FormEvent) {
-    event.preventDefault()
-    if (!canSave) return
-    setConfirmOpen(true)
-  }
-
-  function handleConfirm() {
-    recordResult.mutate(
-      {
-        matchId,
-        games: games.map((g, i) => ({
-          game_number: i + 1,
-          team1_score: g.team1_score,
-          team2_score: g.team2_score,
-        })),
-      },
-      { onSuccess: () => setConfirmOpen(false) },
-    )
-  }
-
-  return (
-    <form className="score-form" onSubmit={handleSaveResultClick}>
-      {rows.map((row, i) => (
-        <div key={i} className="score-row">
-          <label className="score-field">
-            <span className="score-field-name">{team1Name}</span>
-            <input
-              type="number"
-              className="score-input"
-              aria-label={t('manage.gameTeamLabel', {
-                team: team1Name,
-                n: i + 1,
-              })}
-              value={row.team1}
-              onChange={(event) => updateRow(i, 'team1', event.target.value)}
-            />
-          </label>
-          <label className="score-field">
-            <span className="score-field-name">{team2Name}</span>
-            <input
-              type="number"
-              className="score-input"
-              aria-label={t('manage.gameTeamLabel', {
-                team: team2Name,
-                n: i + 1,
-              })}
-              value={row.team2}
-              onChange={(event) => updateRow(i, 'team2', event.target.value)}
-            />
-          </label>
-          {rowErrors[i] && (
-            <p className="field-error" role="alert">
-              {rowErrors[i]}
-            </p>
-          )}
-        </div>
-      ))}
-      {matchLevelError && (
-        <p className="field-error" role="alert">
-          {matchLevelError}
-        </p>
-      )}
-      <label className="checkbox-row">
-        <input
-          type="checkbox"
-          checked={isLastMatch}
-          onChange={(event) => setIsLastMatch(event.target.checked)}
-        />
-        {t('manage.isLastMatch')}
-      </label>
-      <button type="submit" disabled={!canSave}>
-        {t('manage.saveResult')}
-      </button>
-      {isValid && !hasNextMatchDrawn && !isLastMatch && (
-        <p className="field-hint">{t('manage.saveResultLockedHint')}</p>
-      )}
-
-      <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-        <h3>{t('manage.confirmResultTitle')}</h3>
-        <p>{t('manage.confirmResultBody')}</p>
-        <ul className="review-list">
-          {games.map((g, i) => (
-            <li key={i}>
-              {t('manage.gameScoreLine', {
-                n: i + 1,
-                team1: team1Name,
-                team1Score: g.team1_score,
-                team2: team2Name,
-                team2Score: g.team2_score,
-              })}
-            </li>
-          ))}
-        </ul>
-        <div className="modal-actions">
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => setConfirmOpen(false)}
-          >
-            {t('manage.cancel')}
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={recordResult.isPending}
-          >
-            {t('manage.confirmResultButton')}
-          </button>
-        </div>
-      </Modal>
-    </form>
-  )
-}
-
-interface NextMatchCardProps {
-  tournamentId: string
-  sport: Sport
-  matchType: MatchType
-  isActive: boolean
-  hasCurrentMatch: boolean
-  currentMatchParticipantIds: string[]
-  rosterPlayers: RosterPlayer[]
-  playerNameById: Map<string, string>
-  nextDraw: GeneratedMatchParticipant[] | null
-  onNextDrawChange: (draw: GeneratedMatchParticipant[] | null) => void
-}
-
-function NextMatchCard({
-  tournamentId,
-  sport,
-  matchType,
-  isActive,
-  hasCurrentMatch,
-  currentMatchParticipantIds,
-  rosterPlayers,
-  playerNameById,
-  nextDraw,
-  onNextDrawChange,
-}: NextMatchCardProps) {
-  const { t } = useTranslation()
-  const { data: drawInputs } = useDrawInputs(tournamentId, sport)
-  const startNextMatch = useStartNextMatch(tournamentId)
-  const [drawFailed, setDrawFailed] = useState(false)
-  const [usedCurrentMatchFallback, setUsedCurrentMatchFallback] =
-    useState(false)
-  const [editing, setEditing] = useState(false)
-  const [manuallyAdjusted, setManuallyAdjusted] = useState(false)
-
-  const neededCount = getNeededPlayerCount(matchType)
-  const participantCount = drawInputs?.candidates.length ?? 0
-  const notEnoughPlayers =
-    drawInputs !== undefined && participantCount < neededCount
-
-  function handleRandomize() {
-    if (!drawInputs) return
-    const excludingCurrent = drawInputs.candidates.filter(
-      (c) => !currentMatchParticipantIds.includes(c.id),
-    )
-    const usedFallback = excludingCurrent.length < neededCount
-    const candidates = usedFallback ? drawInputs.candidates : excludingCurrent
-
-    const result = generateNextMatch(
-      matchType,
-      candidates,
-      drawInputs.pairingHistory,
-    )
-    if (result.ok) {
-      onNextDrawChange(result.participants)
-      setDrawFailed(false)
-      setUsedCurrentMatchFallback(usedFallback)
-    } else {
-      onNextDrawChange(null)
-      setDrawFailed(true)
-      setUsedCurrentMatchFallback(false)
-    }
-    setEditing(false)
-    setManuallyAdjusted(false)
-  }
-
-  function handleSwap(oldPlayerId: string, newPlayerId: string) {
-    if (!nextDraw || oldPlayerId === newPlayerId) return
-    onNextDrawChange(
-      nextDraw.map((p) =>
-        p.playerId === oldPlayerId ? { ...p, playerId: newPlayerId } : p,
-      ),
-    )
-    setManuallyAdjusted(true)
-  }
-
-  function handleStartMatch() {
-    if (!nextDraw) return
-    startNextMatch.mutate(
-      {
-        participants: nextDraw.map((p) => ({
-          player_id: p.playerId,
-          team: p.team,
-        })),
-        manuallyAdjusted,
-      },
-      {
-        onSuccess: () => {
-          onNextDrawChange(null)
-          setEditing(false)
-          setManuallyAdjusted(false)
-        },
-      },
-    )
-  }
-
-  const team1 = nextDraw
-    ? nextDraw
-        .filter((p) => p.team === 1)
-        .map((p) => playerNameById.get(p.playerId) ?? p.playerId)
-        .join(' & ')
-    : ''
-  const team2 = nextDraw
-    ? nextDraw
-        .filter((p) => p.team === 2)
-        .map((p) => playerNameById.get(p.playerId) ?? p.playerId)
-        .join(' & ')
-    : ''
-
-  const mixedDoublesViolation =
-    matchType === 'doubles' && nextDraw
-      ? isMixedDoublesRuleViolated(
-          nextDraw.map((p) => {
-            const roster = rosterPlayers.find((r) => r.id === p.playerId)
-            return {
-              id: p.playerId,
-              gender: roster?.gender ?? 'male',
-              skillValue: 0,
-              matchesPlayedInTournament: 0,
-            }
-          }),
-          nextDraw.filter((p) => p.team === 1).map((p) => p.playerId),
-        )
-      : false
-
-  const matchesPlayedById = new Map(
-    (drawInputs?.candidates ?? []).map((c) => [
-      c.id,
-      c.matchesPlayedInTournament,
-    ]),
-  )
-  const gamesPlayedRows = rosterPlayers
-    .map((r) => ({
-      id: r.id,
-      name: r.name,
-      gamesPlayed:
-        (matchesPlayedById.get(r.id) ?? 0) +
-        (currentMatchParticipantIds.includes(r.id) ? 1 : 0),
-    }))
-    .sort((a, b) => a.gamesPlayed - b.gamesPlayed)
-
-  return (
-    <section className="card">
-      <h3>{t('manage.nextMatchHeading')}</h3>
-      {!nextDraw && <p className="empty-state">{t('manage.notPickedYet')}</p>}
-      {nextDraw && (
-        <p className="matchup-line">
-          {t('matches.draw.matchup', { team1, team2 })}
-        </p>
-      )}
-      {nextDraw && (
-        <Modal open={editing} onClose={() => setEditing(false)}>
-          <h3>{t('manage.editDrawPopupHeading')}</h3>
-          <div className="draw-edit-teams">
-            <div className="draw-edit-team">
-              {nextDraw
-                .filter((p) => p.team === 1)
-                .map((p, i) => (
-                  <DrawSlotSelect
-                    key={p.playerId}
-                    participant={p}
-                    index={i}
-                    draw={nextDraw}
-                    rosterPlayers={rosterPlayers}
-                    onSwap={handleSwap}
-                  />
-                ))}
-            </div>
-            <span className="round-vs">vs</span>
-            <div className="draw-edit-team">
-              {nextDraw
-                .filter((p) => p.team === 2)
-                .map((p, i) => (
-                  <DrawSlotSelect
-                    key={p.playerId}
-                    participant={p}
-                    index={i}
-                    draw={nextDraw}
-                    rosterPlayers={rosterPlayers}
-                    onSwap={handleSwap}
-                  />
-                ))}
-            </div>
-          </div>
-
-          <h4>{t('manage.editDrawGamesTableHeading')}</h4>
-          <div className="games-played-table-wrap">
-            <table className="games-played-table">
-              <thead>
-                <tr>
-                  <th>{t('manage.editDrawGamesTablePlayer')}</th>
-                  <th>{t('manage.editDrawGamesTableGamesPlayed')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {gamesPlayedRows.map((row) => (
-                  <tr key={row.id}>
-                    <td>{row.name}</td>
-                    <td>{row.gamesPlayed}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="modal-actions">
-            <button type="button" onClick={() => setEditing(false)}>
-              {t('manage.doneEditingDraw')}
-            </button>
-          </div>
-        </Modal>
-      )}
-
-      <div className="button-row">
-        <button
-          type="button"
-          className="secondary"
-          onClick={handleRandomize}
-          disabled={!isActive || notEnoughPlayers || startNextMatch.isPending}
-        >
-          {t('manage.randomize')}
-        </button>
-        {nextDraw && (
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => setEditing(true)}
-            disabled={!isActive}
-          >
-            {t('manage.editDraw')}
-          </button>
-        )}
-        {nextDraw && (
-          <button
-            type="button"
-            onClick={handleStartMatch}
-            disabled={!isActive || hasCurrentMatch || startNextMatch.isPending}
-          >
-            {t('manage.startMatch')}
-          </button>
-        )}
-      </div>
-
-      {notEnoughPlayers && (
-        <p className="field-error">
-          {t('manage.notEnoughPlayersWithCount', {
-            needed: neededCount,
-            have: participantCount,
-          })}
-        </p>
-      )}
-      {drawFailed && (
-        <p className="field-error">{t('matches.draw.notEnoughPlayers')}</p>
-      )}
-      {startNextMatch.isError && (
-        <p className="field-error">{t('manage.drawFailed')}</p>
-      )}
-      {nextDraw && usedCurrentMatchFallback && (
-        <p className="field-warning">{t('manage.currentMatchReusedWarning')}</p>
-      )}
-      {nextDraw && manuallyAdjusted && mixedDoublesViolation && (
-        <p className="field-warning">{t('manage.mixedDoublesWarning')}</p>
-      )}
     </section>
   )
 }
