@@ -13,15 +13,15 @@ export interface MatchParticipantInput {
 
 export async function createMatch(
   tournamentId: string,
-  sequenceNumber: number,
+  courtNumber: number,
   participants: MatchParticipantInput[],
   passphrase: string,
   manuallyAdjusted = false,
 ): Promise<Match> {
   const { data, error } = await supabase.rpc('create_match', {
     p_tournament_id: tournamentId,
-    p_sequence_number: sequenceNumber,
     p_participants: participants as unknown as Json,
+    p_court_number: courtNumber,
     p_passphrase: passphrase,
     p_manually_adjusted: manuallyAdjusted,
   })

@@ -65,13 +65,11 @@ describe('useStartNextMatch', () => {
     let resolveRefetch: (() => void) | null = null
     vi.mocked(matchesApi.listMatches).mockImplementation(() => {
       listMatchesCallCount += 1
-      // Call 1: initial query mount. Call 2: inside useStartNextMatch's
-      // mutationFn (computing the next sequence number). Both resolve
-      // immediately with an empty roster. Call 3 is the post-mutation
-      // refetch triggered by invalidateQueries -- held pending until the
-      // test explicitly releases it, so we can observe mutation/onSuccess
-      // ordering relative to it.
-      if (listMatchesCallCount < 3) return Promise.resolve([])
+      // Call 1: initial query mount, resolves immediately with an empty
+      // roster. Call 2 is the post-mutation refetch triggered by
+      // invalidateQueries -- held pending until the test explicitly releases
+      // it, so we can observe mutation/onSuccess ordering relative to it.
+      if (listMatchesCallCount < 2) return Promise.resolve([])
       return new Promise<Match[]>((resolve) => {
         resolveRefetch = () => resolve([makeMatch('m-new', 1)])
       })

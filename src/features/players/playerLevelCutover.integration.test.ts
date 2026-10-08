@@ -71,10 +71,10 @@ describe('effective_level cutover at exactly 3 matches (real project, anon key)'
     await addParticipant(tournamentId, player.id, testWritePassphrase)
     await addParticipant(tournamentId, opponent.id, testWritePassphrase)
 
-    async function playAndWin(sequenceNumber: number) {
+    async function playAndWin() {
       const match = await createMatch(
         tournamentId!,
-        sequenceNumber,
+        1,
         [
           { player_id: player.id, team: 1 },
           { player_id: opponent.id, team: 2 },
@@ -88,17 +88,17 @@ describe('effective_level cutover at exactly 3 matches (real project, anon key)'
       )
     }
 
-    await playAndWin(1)
+    await playAndWin()
     const statsAfter1 = await getPlayerStats(player.id, 'badminton')
     expect(statsAfter1?.total_matches).toBe(1)
     expect(statsAfter1?.effective_level).toBe('beginner') // still self-selected
 
-    await playAndWin(2)
+    await playAndWin()
     const statsAfter2 = await getPlayerStats(player.id, 'badminton')
     expect(statsAfter2?.total_matches).toBe(2)
     expect(statsAfter2?.effective_level).toBe('beginner') // still self-selected below the threshold
 
-    await playAndWin(3)
+    await playAndWin()
     const statsAfter3 = await getPlayerStats(player.id, 'badminton')
     expect(statsAfter3?.total_matches).toBe(3)
     expect(statsAfter3?.win_rate).toBe(100)

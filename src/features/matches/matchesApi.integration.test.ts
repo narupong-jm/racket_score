@@ -7,8 +7,10 @@ import {
   recordMatchResult,
 } from './matchesApi'
 import {
-  createTournament,
   addParticipant,
+  cancelTournament,
+  createTournament,
+  endTournament,
   leaveParticipant,
 } from '../tournaments/tournamentsApi'
 import { createPlayer, deletePlayer } from '../players/playersApi'
@@ -60,10 +62,15 @@ describe('matchesApi: manually_adjusted flag (real project, anon key)', () => {
         testWritePassphrase,
       )
       expect(defaultMatch.manually_adjusted).toBe(false)
+      await recordMatchResult(
+        defaultMatch.id,
+        [{ game_number: 1, team1_score: 21, team2_score: 15 }],
+        testWritePassphrase,
+      )
 
       const adjustedMatch = await createMatch(
         tournament.id,
-        2,
+        1,
         [
           { player_id: playerA.id, team: 1 },
           { player_id: playerB.id, team: 2 },
@@ -151,6 +158,38 @@ describe('matchesApi (real project, anon key)', () => {
     }
   })
 
+  it('rolls back the whole match on a partial failure (no orphan matches row)', async () => {
+    if (!tournamentId) throw new Error('tournamentId not set')
+    const [a, b, c] = playerIds
+    const bogusPlayerId = '00000000-0000-0000-0000-000000000000'
+
+    const { count: beforeCount } = await supabase
+      .from('matches')
+      .select('id', { count: 'exact', head: true })
+      .eq('tournament_id', tournamentId)
+
+    await expect(
+      createMatch(
+        tournamentId,
+        1,
+        [
+          { player_id: a, team: 1 },
+          { player_id: b, team: 1 },
+          { player_id: c, team: 2 },
+          { player_id: bogusPlayerId, team: 2 }, // violates FK -> whole call must fail
+        ],
+        testWritePassphrase,
+      ),
+    ).rejects.toThrow()
+
+    const { count: afterCount } = await supabase
+      .from('matches')
+      .select('id', { count: 'exact', head: true })
+      .eq('tournament_id', tournamentId)
+
+    expect(afterCount).toBe(beforeCount) // no orphan `matches` row left behind
+  })
+
   it('creates a doubles match via the atomic RPC', async () => {
     if (!tournamentId) throw new Error('tournamentId not set')
     const [a, b, c, d] = playerIds
@@ -173,38 +212,6 @@ describe('matchesApi (real project, anon key)', () => {
     // must not count as a pairing/repeat yet.
     const history = await getMatchHistory(tournamentId)
     expect(history).toHaveLength(0)
-  })
-
-  it('rolls back the whole match on a partial failure (no orphan matches row)', async () => {
-    if (!tournamentId) throw new Error('tournamentId not set')
-    const [a, b, c] = playerIds
-    const bogusPlayerId = '00000000-0000-0000-0000-000000000000'
-
-    const { count: beforeCount } = await supabase
-      .from('matches')
-      .select('id', { count: 'exact', head: true })
-      .eq('tournament_id', tournamentId)
-
-    await expect(
-      createMatch(
-        tournamentId,
-        2,
-        [
-          { player_id: a, team: 1 },
-          { player_id: b, team: 1 },
-          { player_id: c, team: 2 },
-          { player_id: bogusPlayerId, team: 2 }, // violates FK -> whole call must fail
-        ],
-        testWritePassphrase,
-      ),
-    ).rejects.toThrow()
-
-    const { count: afterCount } = await supabase
-      .from('matches')
-      .select('id', { count: 'exact', head: true })
-      .eq('tournament_id', tournamentId)
-
-    expect(afterCount).toBe(beforeCount) // no orphan `matches` row left behind
   })
 
   it('records a match result and reflects it in match history', async () => {
@@ -330,7 +337,7 @@ describe('matchesApi: deleteMatchResult (real project, anon key)', () => {
 
     const matchToKeep = await createMatch(
       tournamentId,
-      2,
+      1,
       [
         { player_id: playerA.id, team: 1 },
         { player_id: playerB.id, team: 2 },
@@ -349,16 +356,16 @@ describe('matchesApi: deleteMatchResult (real project, anon key)', () => {
     if (!matchToDeleteId) throw new Error('matchToDeleteId not set')
 
     const beforeDelete = await listRecentCompletedMatches('badminton')
-    expect(beforeDelete.some((entry) => entry.match.id === matchToDeleteId)).toBe(
-      true,
-    )
+    expect(
+      beforeDelete.some((entry) => entry.match.id === matchToDeleteId),
+    ).toBe(true)
 
     await deleteMatchResult(matchToDeleteId, testWritePassphrase)
 
     const afterDelete = await listRecentCompletedMatches('badminton')
-    expect(afterDelete.some((entry) => entry.match.id === matchToDeleteId)).toBe(
-      false,
-    )
+    expect(
+      afterDelete.some((entry) => entry.match.id === matchToDeleteId),
+    ).toBe(false)
   })
 
   it('rejects a wrong passphrase and leaves the match unaffected', async () => {
@@ -375,5 +382,152 @@ describe('matchesApi: deleteMatchResult (real project, anon key)', () => {
       .single()
     expect(error).toBeNull()
     expect(stillThere?.status).toBe('completed')
+  })
+})
+
+describe('matchesApi: multi-court createMatch (real project, anon key)', () => {
+  const runId = crypto.randomUUID()
+  let tournamentId: string
+  let a: string, b: string, c: string, d: string
+  let court1MatchId: string
+  let court2MatchId: string
+
+  const pair = (x: string, y: string) => [
+    { player_id: x, team: 1 as const },
+    { player_id: y, team: 2 as const },
+  ]
+  const win = [{ game_number: 1, team1_score: 21, team2_score: 15 }]
+
+  it('sets up a 2-court singles tournament with 4 players', async () => {
+    const tournament = await createTournament(
+      {
+        name: `Multi-Court Match ${runId}`,
+        type: 'singles',
+        sport: 'badminton',
+        games_per_match: 1,
+        points_per_game: 21,
+        court_count: 2,
+      },
+      testWritePassphrase,
+    )
+    tournamentId = tournament.id
+    const ids: string[] = []
+    for (const [i, label] of ['A', 'B', 'C', 'D'].entries()) {
+      const player = await createPlayer(
+        {
+          name: `Multi-Court Match ${label} ${runId}`,
+          gender: i % 2 === 0 ? 'male' : 'female',
+          sport: 'badminton',
+          self_selected_level: 'beginner',
+        },
+        testWritePassphrase,
+      )
+      ids.push(player.id)
+      await addParticipant(tournamentId, player.id, testWritePassphrase)
+    }
+    ;[a, b, c, d] = ids
+  })
+
+  it('rejects a wrong passphrase before any other validation', async () => {
+    await expect(
+      createMatch(tournamentId, 0, pair(a, b), `${testWritePassphrase}-wrong`),
+    ).rejects.toMatchObject({ message: 'invalid_passphrase' })
+  })
+
+  it('rejects a court outside 1..court_count with invalid_court', async () => {
+    for (const court of [0, 3]) {
+      await expect(
+        createMatch(tournamentId, court, pair(a, b), testWritePassphrase),
+      ).rejects.toMatchObject({ message: 'invalid_court' })
+    }
+  })
+
+  it('starts two courts back to back with sequence numbers 1 and 2', async () => {
+    const m1 = await createMatch(
+      tournamentId,
+      1,
+      pair(a, b),
+      testWritePassphrase,
+    )
+    const m2 = await createMatch(
+      tournamentId,
+      2,
+      pair(c, d),
+      testWritePassphrase,
+    )
+    court1MatchId = m1.id
+    court2MatchId = m2.id
+    expect([m1.court_number, m1.sequence_number]).toEqual([1, 1])
+    expect([m2.court_number, m2.sequence_number]).toEqual([2, 2])
+    expect(m1.status).toBe('queued')
+    expect(m2.status).toBe('queued')
+  })
+
+  it('rejects starting on an occupied court with court_occupied', async () => {
+    await expect(
+      createMatch(tournamentId, 1, pair(a, b), testWritePassphrase),
+    ).rejects.toMatchObject({ message: 'court_occupied' })
+  })
+
+  it('rejects a player already on another court with participant_on_court', async () => {
+    await recordMatchResult(court2MatchId, win, testWritePassphrase)
+    // court 2 is free again, but A is still playing on court 1
+    await expect(
+      createMatch(tournamentId, 2, pair(a, c), testWritePassphrase),
+    ).rejects.toMatchObject({ message: 'participant_on_court' })
+  })
+
+  it('lets a player start again once their previous match has a result', async () => {
+    await recordMatchResult(court1MatchId, win, testWritePassphrase)
+    const same = await createMatch(
+      tournamentId,
+      1,
+      pair(a, b),
+      testWritePassphrase,
+    )
+    expect([same.court_number, same.sequence_number]).toEqual([1, 3])
+    const other = await createMatch(
+      tournamentId,
+      2,
+      pair(c, d),
+      testWritePassphrase,
+    )
+    expect([other.court_number, other.sequence_number]).toEqual([2, 4])
+  })
+
+  it('rejects starting a match on a cancelled tournament with tournament_not_active', async () => {
+    const cancelled = await createTournament(
+      {
+        name: `Multi-Court Match Cancelled ${runId}`,
+        type: 'singles',
+        sport: 'badminton',
+        games_per_match: 1,
+        points_per_game: 21,
+        court_count: 2,
+      },
+      testWritePassphrase,
+    )
+    await cancelTournament(cancelled.id, testWritePassphrase)
+    await expect(
+      createMatch(cancelled.id, 1, pair(a, b), testWritePassphrase),
+    ).rejects.toMatchObject({ message: 'tournament_not_active' })
+  })
+
+  it('rejects starting a match on an ended tournament with tournament_not_active', async () => {
+    const ended = await createTournament(
+      {
+        name: `Multi-Court Match Ended ${runId}`,
+        type: 'singles',
+        sport: 'badminton',
+        games_per_match: 1,
+        points_per_game: 21,
+        court_count: 2,
+      },
+      testWritePassphrase,
+    )
+    await endTournament(ended.id, testWritePassphrase)
+    await expect(
+      createMatch(ended.id, 1, pair(a, b), testWritePassphrase),
+    ).rejects.toMatchObject({ message: 'tournament_not_active' })
   })
 })

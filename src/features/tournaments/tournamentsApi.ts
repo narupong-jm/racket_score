@@ -13,6 +13,8 @@ export interface CreateTournamentInput {
   points_per_game: number
   sport: Sport
   win_by?: number
+  /** 1..8; defaults to 1 until the create form supplies it (Phase 24 step 8). */
+  court_count?: number
 }
 
 export async function createTournament(
@@ -25,6 +27,7 @@ export async function createTournament(
     p_games_per_match: input.games_per_match,
     p_points_per_game: input.points_per_game,
     p_sport: input.sport,
+    p_court_count: input.court_count ?? 1,
     p_win_by: input.win_by,
     p_passphrase: passphrase,
   })

@@ -350,3 +350,113 @@ describe('leaveParticipant (real project, anon key)', () => {
     }
   })
 })
+
+describe('multi-court tournaments (real project, anon key)', () => {
+  const runId = crypto.randomUUID()
+
+  async function makeTournament(label: string, courtCount?: number) {
+    return createTournament(
+      {
+        name: `Multi-Court ${label} ${runId}`,
+        type: 'singles',
+        sport: 'badminton',
+        games_per_match: 1,
+        points_per_game: 21,
+        court_count: courtCount,
+      },
+      testWritePassphrase,
+    )
+  }
+
+  async function makePlayers(label: string, count: number) {
+    const players = []
+    for (let i = 0; i < count; i++) {
+      players.push(
+        await createPlayer(
+          {
+            name: `Multi-Court ${label} P${i} ${runId}`,
+            gender: i % 2 === 0 ? 'male' : 'female',
+            sport: 'badminton',
+            self_selected_level: 'beginner',
+          },
+          testWritePassphrase,
+        ),
+      )
+    }
+    return players
+  }
+
+  async function startTwoCourts(
+    tournamentId: string,
+    players: Awaited<ReturnType<typeof makePlayers>>,
+  ) {
+    const [a, b, c, d] = players
+    for (const p of [a, b, c, d]) {
+      await addParticipant(tournamentId, p.id, testWritePassphrase)
+    }
+    await createMatch(
+      tournamentId,
+      1,
+      [
+        { player_id: a.id, team: 1 },
+        { player_id: b.id, team: 2 },
+      ],
+      testWritePassphrase,
+    )
+    await createMatch(
+      tournamentId,
+      2,
+      [
+        { player_id: c.id, team: 1 },
+        { player_id: d.id, team: 2 },
+      ],
+      testWritePassphrase,
+    )
+  }
+
+  it('persists court_count and defaults to 1 when omitted', async () => {
+    const three = await makeTournament('Persist', 3)
+    expect(three.court_count).toBe(3)
+    const defaulted = await makeTournament('Default')
+    expect(defaulted.court_count).toBe(1)
+  })
+
+  it('rejects an out-of-range court_count with invalid_court_count', async () => {
+    await expect(makeTournament('Zero', 0)).rejects.toMatchObject({
+      message: 'invalid_court_count',
+    })
+    await expect(makeTournament('Nine', 9)).rejects.toMatchObject({
+      message: 'invalid_court_count',
+    })
+  })
+
+  it('blocks leaving from a match on court 2 as well as court 1', async () => {
+    const tournament = await makeTournament('Leave', 2)
+    const players = await makePlayers('Leave', 4)
+    await startTwoCourts(tournament.id, players)
+
+    for (const p of [players[0], players[2]]) {
+      await expect(
+        leaveParticipant(tournament.id, p.id, testWritePassphrase),
+      ).rejects.toMatchObject({ message: 'participant_in_current_match' })
+    }
+    const participants = await listParticipants(tournament.id)
+    expect(participants.every((p) => p.status === 'active')).toBe(true)
+  })
+
+  it('cancelling a 2-court tournament deletes the started match on every court', async () => {
+    const tournament = await makeTournament('Cancel', 2)
+    const players = await makePlayers('Cancel', 4)
+    await startTwoCourts(tournament.id, players)
+
+    const cancelled = await cancelTournament(tournament.id, testWritePassphrase)
+    expect(cancelled.status).toBe('cancelled')
+
+    const { data: matches, error } = await supabase
+      .from('matches')
+      .select('id')
+      .eq('tournament_id', tournament.id)
+    expect(error).toBeNull()
+    expect(matches).toEqual([])
+  })
+})

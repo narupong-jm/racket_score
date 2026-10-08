@@ -55,12 +55,11 @@ export function useStartNextMatch(tournamentId: string) {
       manuallyAdjusted = false,
     }: StartNextMatchInput) => {
       const passphrase = await getPassphrase()
-      const matches = await listMatches(tournamentId)
-      const nextSequenceNumber =
-        matches.reduce((max, m) => Math.max(max, m.sequence_number), 0) + 1
+      // Single-court for now; the server assigns sequence_number. Phase 24
+      // step 7 replaces this with a court-aware hook.
       return createMatch(
         tournamentId,
-        nextSequenceNumber,
+        1,
         participants,
         passphrase,
         manuallyAdjusted,

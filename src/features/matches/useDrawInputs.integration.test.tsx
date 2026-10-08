@@ -142,7 +142,7 @@ describe('useDrawInputs (real project, anon key)', () => {
     // match 2 (completed): team1={A,C} vs team2={B,D}
     const match2 = await createMatch(
       tournamentId,
-      2,
+      1,
       [
         { player_id: A, team: 1 },
         { player_id: C, team: 1 },
@@ -164,7 +164,7 @@ describe('useDrawInputs (real project, anon key)', () => {
     // match 3 (still queued): team1={A,D} vs team2={B,C} -- must NOT count
     await createMatch(
       tournamentId,
-      3,
+      1,
       [
         { player_id: A, team: 1 },
         { player_id: D, team: 1 },
