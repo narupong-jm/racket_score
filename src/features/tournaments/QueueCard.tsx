@@ -9,10 +9,15 @@ import { useDrawInputs } from '../matches/useDrawInputs'
 import type { MatchQueueDrafts } from '../matches/useMatchQueueDrafts'
 import { getNeededPlayerCount } from '../matchmaking/generateNextMatch'
 import { isMixedDoublesRuleViolated } from '../matchmaking/isMixedDoublesRuleViolated'
-import { drawMatches, type PlannedMatch } from '../matchmaking/plannedMatches'
+import {
+  drawMatches,
+  findReusedPlayerIds,
+  type PlannedMatch,
+} from '../matchmaking/plannedMatches'
 import type { MatchType } from '../matchmaking/types'
 import type { Sport } from '../sport/sportTypes'
 import { queuedTeamNames } from './queuedMatchup'
+import { getPlayerNow } from './playerNow'
 
 interface QueueCardProps {
   tournamentId: string
@@ -22,8 +27,8 @@ interface QueueCardProps {
   /** courts + 1 */
   maxQueue: number
   drafts: MatchQueueDrafts
-  /** Rosters of every match in progress on a court. */
-  inProgressRosters: PlannedMatch[]
+  /** Every match in progress, with the court it is being played on. */
+  inProgress: { courtNumber: number; roster: PlannedMatch }[]
   rosterPlayers: RosterPlayer[]
   playerNameById: Map<string, string>
   /** A Start is in flight; its success shifts the queue head. */
@@ -42,7 +47,7 @@ export function QueueCard({
   isActive,
   maxQueue,
   drafts,
-  inProgressRosters,
+  inProgress,
   rosterPlayers,
   playerNameById,
   busy,
@@ -51,7 +56,6 @@ export function QueueCard({
   const { data: drawInputs } = useDrawInputs(tournamentId, sport)
   const { queue, add, remove, update } = drafts
   const [drawFailed, setDrawFailed] = useState(false)
-  const [reusedPlayerIds, setReusedPlayerIds] = useState<string[]>([])
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
 
   const neededCount = getNeededPlayerCount(matchType)
@@ -59,6 +63,7 @@ export function QueueCard({
   const notEnoughPlayers =
     drawInputs !== undefined && participantCount < neededCount
   const isFull = queue.length >= maxQueue
+  const inProgressRosters = inProgress.map((m) => m.roster)
   const drawDisabled = !isActive || notEnoughPlayers || isFull || busy
 
   function handleDraw(count: number) {
@@ -74,12 +79,10 @@ export function QueueCard({
       add({ participants, manuallyAdjusted: false })
     }
     setDrawFailed(result.matches.length === 0)
-    setReusedPlayerIds(result.reusedPlayerIds)
   }
 
   function handleRemove(index: number) {
     remove(index)
-    setReusedPlayerIds([])
   }
 
   const editingEntry = editingIndex === null ? undefined : queue[editingIndex]
@@ -136,9 +139,35 @@ export function QueueCard({
     }))
     .sort((a, b) => a.gamesPlayed - b.gamesPlayed)
 
+  // Derived every render (not cached): a queued match's players that already
+  // appear in an in-progress match or an earlier queue entry.
+  const reusedPlayerIds: string[] = []
+  queue.forEach((entry, i) => {
+    const planned = [
+      ...inProgressRosters,
+      ...queue.slice(0, i).map((m) => m.participants),
+    ]
+    for (const id of findReusedPlayerIds(entry.participants, planned)) {
+      if (!reusedPlayerIds.includes(id)) reusedPlayerIds.push(id)
+    }
+  })
   const reusedNames = reusedPlayerIds
     .map((id) => playerNameById.get(id) ?? id)
     .join(', ')
+
+  function nowLabel(playerId: string, editing: number): string {
+    const now = getPlayerNow(
+      playerId,
+      inProgress,
+      queue.map((m) => m.participants),
+      editing,
+    )
+    const parts = [
+      ...(now.court === null ? [] : [t('manage.nowCourt', { n: now.court })]),
+      ...now.queuePositions.map((n) => t('manage.nowQueue', { n })),
+    ]
+    return parts.length === 0 ? t('manage.nowFree') : parts.join(', ')
+  }
 
   return (
     <section className="card">
@@ -191,9 +220,14 @@ export function QueueCard({
         </ol>
       )}
 
-      {editingEntry && (
+      {editingEntry && editingIndex !== null && (
         <Modal open onClose={() => setEditingIndex(null)}>
-          <h3>{t('manage.editDrawPopupHeading')}</h3>
+          <h3>
+            {t('manage.editQueueTitle', {
+              n: editingIndex + 1,
+              total: queue.length,
+            })}
+          </h3>
           <div className="draw-edit-teams">
             {([1, 2] as const).map((team) => (
               <Fragment key={team}>
@@ -223,6 +257,7 @@ export function QueueCard({
                 <tr>
                   <th>{t('manage.editDrawGamesTablePlayer')}</th>
                   <th>{t('manage.editDrawGamesTableGamesPlayed')}</th>
+                  <th>{t('manage.nowColumn')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -230,6 +265,7 @@ export function QueueCard({
                   <tr key={row.id}>
                     <td>{row.name}</td>
                     <td>{row.gamesPlayed}</td>
+                    <td>{nowLabel(row.id, editingIndex)}</td>
                   </tr>
                 ))}
               </tbody>

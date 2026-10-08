@@ -29,6 +29,7 @@ const PHASE_24_KEYS = [
   'manage.startOnCourtWith',
   'manage.startNeedsQueue',
   'manage.startBlocked',
+  'manage.startFailed',
   'manage.queueHeading',
   'manage.queueEmpty',
   'manage.queueFull',

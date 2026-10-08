@@ -110,7 +110,7 @@ export function CourtCard({
           {t('manage.startBlocked', { names: blockedNames.join(', ') })}
         </p>
       )}
-      {startFailed && <p className="field-error">{t('manage.drawFailed')}</p>}
+      {startFailed && <p className="field-error">{t('manage.startFailed')}</p>}
     </li>
   )
 }

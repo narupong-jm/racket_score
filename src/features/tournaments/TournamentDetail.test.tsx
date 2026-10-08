@@ -876,7 +876,7 @@ describe('TournamentDetail: Queue entry inline edit', () => {
     expect(await screen.findByText(warningText)).toBeInTheDocument()
   })
 
-  it('opens the Edit draw popup on Edit and closes it via Done editing', async () => {
+  it('opens the Edit queue popup on Edit and closes it via Done editing', async () => {
     vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
       activeTournament,
     ])
@@ -891,11 +891,13 @@ describe('TournamentDetail: Queue entry inline edit', () => {
     await user.click(
       await screen.findByRole('button', { name: 'Edit 1. Alice vs Bob' }),
     )
-    expect(await screen.findByText('Edit draw')).toBeInTheDocument()
+    expect(
+      await screen.findByText('Edit queue match 1 of 1'),
+    ).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Done editing' }))
     await waitFor(() => {
-      expect(screen.queryByText('Edit draw')).toBeNull()
+      expect(screen.queryByText('Edit queue match 1 of 1')).toBeNull()
     })
   })
 
@@ -943,7 +945,7 @@ describe('TournamentDetail: Queue entry inline edit', () => {
     await user.click(
       await screen.findByRole('button', { name: 'Edit 1. Erin vs Bob' }),
     )
-    await screen.findByText('Edit draw')
+    await screen.findByText('Edit queue match 1 of 1')
 
     const table = screen.getByRole('table')
     const rowTexts = within(table)
@@ -954,12 +956,14 @@ describe('TournamentDetail: Queue entry inline edit', () => {
           .getAllByRole('cell')
           .map((cell) => cell.textContent),
       )
+    // Erin & Bob are in the entry being edited, so it is not listed as their
+    // queue position.
     expect(rowTexts).toEqual([
-      ['Erin', '0'],
-      ['Bob', '1'],
-      ['Carol', '1'],
-      ['Dave', '1'],
-      ['Alice', '2'],
+      ['Erin', '0', '—'],
+      ['Bob', '1', 'Court 1'],
+      ['Carol', '1', 'Court 2'],
+      ['Dave', '1', 'Court 2'],
+      ['Alice', '2', 'Court 1'],
     ])
   })
 })
@@ -1400,6 +1404,11 @@ describe('TournamentDetail: Cancel tournament confirm dialog', () => {
 
     expect(
       await screen.findByText('Cancel this tournament?'),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        "This can't be undone. Any drawn-but-unplayed matches will be discarded.",
+      ),
     ).toBeInTheDocument()
     expect(tournamentsApi.cancelTournament).not.toHaveBeenCalled()
     expect(onCancelled).not.toHaveBeenCalled()
@@ -1856,9 +1865,9 @@ describe('TournamentDetail: Rounds played -- delete last match', () => {
 
     renderWithClient(<TournamentDetail tournamentId="t1" />)
 
-    // Rounds are sorted newest-first, so "Round 2" (m2) is the first row.
-    await screen.findByText('Round 2')
-    expect(screen.getByText('Round 1')).toBeInTheDocument()
+    // Matches are sorted newest-first, so "Match 2" (m2) is the first row.
+    await screen.findByText('Match 2')
+    expect(screen.getByText('Match 1')).toBeInTheDocument()
 
     expect(
       screen.getAllByRole('button', { name: 'Delete last match' }),
@@ -1872,7 +1881,7 @@ describe('TournamentDetail: Rounds played -- delete last match', () => {
     const user = userEvent.setup()
     renderWithClient(<TournamentDetail tournamentId="t1" />)
 
-    await screen.findByText('Round 2')
+    await screen.findByText('Match 2')
     await user.click(screen.getByRole('button', { name: 'Delete last match' }))
 
     expect(
@@ -1897,5 +1906,370 @@ describe('TournamentDetail: Rounds played -- delete last match', () => {
         screen.queryByRole('heading', { name: 'Delete this match result?' }),
       ).not.toBeInTheDocument()
     })
+  })
+})
+
+describe('TournamentDetail: Queue Edit popup -- title and Now column', () => {
+  function setUpNowScenario() {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      twoCourtTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([
+      ...fourPlayers,
+      makePlayer('p5', 'Erin', 'female'),
+      makePlayer('p6', 'Frank', 'male'),
+      makePlayer('p7', 'Gina', 'female'),
+    ])
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue(
+      ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7'].map((id) =>
+        makeParticipant(id),
+      ),
+    )
+    vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
+      candidates: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7'].map((id) => ({
+        id,
+        gender: 'female' as const,
+        skillValue: 50,
+        matchesPlayedInTournament: id === 'p7' ? 2 : 0,
+      })),
+      pairingHistory: { opponentPairs: new Set(), teammatePairs: new Set() },
+    })
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([
+      makeMatch('m1', 1, 'queued', 1),
+    ])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([
+      { match_id: 'm1', player_id: 'p1', team: 1 },
+      { match_id: 'm1', player_id: 'p2', team: 2 },
+    ])
+    seedQueue([singles('p3', 'p1'), singles('p4', 'p5'), singles('p3', 'p6')])
+  }
+
+  function nowByName(): Record<string, string[]> {
+    const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1)
+    return Object.fromEntries(
+      rows.map((row) => {
+        const cells = within(row)
+          .getAllByRole('cell')
+          .map((c) => c.textContent ?? '')
+        return [cells[0], [cells[1], cells[2]]]
+      }),
+    )
+  }
+
+  it('titles the popup with the entry position and the queue length', async () => {
+    setUpNowScenario()
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Edit 2. Dave vs Erin' }),
+    )
+    expect(
+      await screen.findByRole('heading', { name: 'Edit queue match 2 of 3' }),
+    ).toBeInTheDocument()
+  })
+
+  it('has a Now column: court, other queue positions, both (court first), or a dash', async () => {
+    setUpNowScenario()
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Edit 2. Dave vs Erin' }),
+    )
+    await screen.findByRole('heading', { name: 'Edit queue match 2 of 3' })
+
+    expect(
+      within(screen.getByRole('table'))
+        .getAllByRole('columnheader')
+        .map((h) => h.textContent),
+    ).toEqual(['Player', 'Games played', 'Now'])
+
+    expect(nowByName()).toEqual({
+      // on Court 1 AND in queue match 1
+      Alice: ['1', 'Court 1, Queue #1'],
+      // on Court 1 only
+      Bob: ['1', 'Court 1'],
+      // in queue matches 1 and 3
+      Carol: ['0', 'Queue #1, Queue #3'],
+      // Dave & Erin are only in the entry being edited: not its own "Queue #"
+      Dave: ['0', '—'],
+      Erin: ['0', '—'],
+      Frank: ['0', 'Queue #3'],
+      Gina: ['2', '—'],
+    })
+  })
+
+  it('updates the Now column when a slot is swapped in the open popup', async () => {
+    setUpNowScenario()
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Edit 2. Dave vs Erin' }),
+    )
+    await screen.findByRole('heading', { name: 'Edit queue match 2 of 3' })
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Team 1 player 1' }),
+      'p7',
+    )
+
+    // Gina joined the entry being edited, so it is not listed as her queue slot.
+    expect(nowByName().Gina).toEqual(['2', '—'])
+    expect(nowByName().Dave).toEqual(['0', '—'])
+  })
+})
+
+describe('TournamentDetail: Matches played', () => {
+  it('shows the Matches played heading and the empty state', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    expect(
+      await screen.findByRole('heading', { name: 'Matches played' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('No matches played yet')).toBeInTheDocument()
+  })
+
+  function setUpTwoCourtResults() {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      twoCourtTournament,
+    ])
+    setupCommonMocks()
+    // m2 (higher sequence number, court 2) was confirmed FIRST; m1 (court 1)
+    // was confirmed later, so m1 is the most recent result.
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([
+      {
+        ...makeMatch('m1', 1, 'completed', 1),
+        completed_at: '2026-01-01T10:30:00Z',
+      },
+      {
+        ...makeMatch('m2', 2, 'completed', 2),
+        completed_at: '2026-01-01T10:10:00Z',
+      },
+    ])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([
+      { match_id: 'm1', player_id: 'p1', team: 1 },
+      { match_id: 'm1', player_id: 'p2', team: 2 },
+      { match_id: 'm2', player_id: 'p1', team: 1 },
+      { match_id: 'm2', player_id: 'p2', team: 2 },
+    ])
+    vi.mocked(matchesApi.listGamesForMatches).mockResolvedValue([
+      { match_id: 'm1', game_number: 1, team1_score: 21, team2_score: 15 },
+      { match_id: 'm2', game_number: 1, team1_score: 21, team2_score: 18 },
+    ])
+  }
+
+  it('orders rows by confirmation time and labels them with the court on a multi-court tournament', async () => {
+    setUpTwoCourtResults()
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    const first = (await screen.findByText('Match 1 · Court 1')).closest('li')!
+    const second = screen.getByText('Match 2 · Court 2').closest('li')!
+    expect(
+      first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it('puts "Delete last match" on the most recently CONFIRMED row, not the highest sequence number', async () => {
+    setUpTwoCourtResults()
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    const first = (await screen.findByText('Match 1 · Court 1')).closest('li')!
+    const second = screen.getByText('Match 2 · Court 2').closest('li')!
+    expect(
+      within(first).getByRole('button', { name: 'Delete last match' }),
+    ).toBeInTheDocument()
+    expect(
+      within(second).queryByRole('button', { name: 'Delete last match' }),
+    ).toBeNull()
+  })
+
+  it('breaks completed_at ties by the higher sequence number first', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      twoCourtTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([
+      makeMatch('m1', 1, 'completed', 1),
+      makeMatch('m2', 2, 'completed', 2),
+    ])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    const first = (await screen.findByText('Match 2 · Court 2')).closest('li')!
+    expect(
+      within(first).getByRole('button', { name: 'Delete last match' }),
+    ).toBeInTheDocument()
+  })
+})
+
+describe('TournamentDetail: Queue reuse warning is derived', () => {
+  const overlapWarning = 'Alice already in another queued or in-progress match'
+
+  function setUpOverlap() {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      twoCourtTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(playersApi.listPlayers).mockResolvedValue(fourPlayers)
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue(
+      ['p1', 'p2', 'p3', 'p4'].map((id) => makeParticipant(id)),
+    )
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    // Entry 2 reuses Alice (also in entry 1) -- present on the FIRST render.
+    seedQueue([singles('p1', 'p2'), singles('p1', 'p3')])
+  }
+
+  it('shows on the first render of a pre-filled queue with overlap', async () => {
+    setUpOverlap()
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    expect(await screen.findByText(overlapWarning)).toBeInTheDocument()
+  })
+
+  it('is not shown when nothing overlaps', async () => {
+    setUpOverlap()
+    seedQueue([singles('p1', 'p2'), singles('p3', 'p4')])
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await screen.findByRole('heading', { name: 'Queue (2/3)' })
+    expect(screen.queryByText(/already in another queued/)).toBeNull()
+  })
+
+  it('disappears once the offending entry is removed', async () => {
+    setUpOverlap()
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await screen.findByText(overlapWarning)
+    await user.click(
+      within(queueCard()).getByRole('button', {
+        name: 'Remove 2. Alice vs Carol',
+      }),
+    )
+
+    await waitFor(() => {
+      expect(screen.queryByText(overlapWarning)).toBeNull()
+    })
+  })
+
+  it('disappears once an edit swaps the reused player out', async () => {
+    setUpOverlap()
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await screen.findByText(overlapWarning)
+    await user.click(
+      within(queueCard()).getByRole('button', {
+        name: 'Edit 2. Alice vs Carol',
+      }),
+    )
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Team 1 player 1' }),
+      'p4',
+    )
+
+    await waitFor(() => {
+      expect(screen.queryByText(overlapWarning)).toBeNull()
+    })
+  })
+
+  it('stays correct after Start: the queued overlap becomes an in-progress overlap', async () => {
+    setUpOverlap()
+    stubStatefulMatches()
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await screen.findByText(overlapWarning)
+    const court1Strip = screen.getByText('Court 1 · free').closest('li')!
+    await user.click(
+      within(court1Strip).getByRole('button', { name: /^Start/ }),
+    )
+
+    await screen.findByRole('heading', { name: 'Court 1 · Match 1' })
+    // Alice is now on court 1 and in the remaining queued entry: still reused.
+    expect(screen.getAllByText(/already in another queued/)).toHaveLength(1)
+    expect(screen.getByText(overlapWarning)).toBeInTheDocument()
+  })
+})
+
+describe('TournamentDetail: Start failure and pending state', () => {
+  it('shows the start-failed message on THAT court only and leaves the queue untouched', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      twoCourtTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.createMatch).mockRejectedValue(new Error('boom'))
+    seedQueue([singles('p1', 'p2')])
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    const court2Strip = (await screen.findByText('Court 2 · free')).closest(
+      'li',
+    )!
+    await user.click(
+      within(court2Strip).getByRole('button', { name: /^Start/ }),
+    )
+
+    const message = "Couldn't start the match. Please try again."
+    expect(await within(court2Strip).findByText(message)).toBeInTheDocument()
+    const court1Strip = screen.getByText('Court 1 · free').closest('li')!
+    expect(within(court1Strip).queryByText(message)).toBeNull()
+    expect(screen.queryByText('Failed to draw a match.')).toBeNull()
+    expect(getQueue('t1')).toEqual([singles('p1', 'p2')])
+  })
+
+  it('disables Start on the other free court while a Start is pending', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      twoCourtTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.createMatch).mockReturnValue(new Promise(() => {}))
+    seedQueue([singles('p1', 'p2')])
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    const court1Strip = (await screen.findByText('Court 1 · free')).closest(
+      'li',
+    )!
+    const court2Strip = screen.getByText('Court 2 · free').closest('li')!
+    await user.click(
+      within(court1Strip).getByRole('button', { name: /^Start/ }),
+    )
+
+    await waitFor(() => {
+      expect(
+        within(court2Strip).getByRole('button', { name: /^Start/ }),
+      ).toBeDisabled()
+    })
+    expect(
+      within(court1Strip).getByRole('button', { name: /^Start/ }),
+    ).toBeDisabled()
   })
 })

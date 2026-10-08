@@ -1,4 +1,23 @@
+import type { TFunction } from 'i18next'
 import type { MatchGame, MatchHistoryEntry } from './matchesApi'
+
+/**
+ * Label for a completed match on the Manage screen: "Match 3 · Court 2" on a
+ * multi-court tournament, plain "Match 3" on a single-court one.
+ */
+export function formatMatchLabel(
+  t: TFunction,
+  match: { sequence_number: number; court_number: number | null },
+  courtCount: number,
+): string {
+  if (courtCount > 1) {
+    return t('manage.matchLabelCourt', {
+      n: match.sequence_number,
+      court: match.court_number ?? 1,
+    })
+  }
+  return t('manage.matchLabel', { n: match.sequence_number })
+}
 
 /** Joins the names of every player on the given team, e.g. "Alice & Bob". */
 export function teamNames(

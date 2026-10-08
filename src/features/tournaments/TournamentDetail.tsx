@@ -20,7 +20,11 @@ import {
   useStartMatchOnCourt,
 } from '../matches/useMatchQueue'
 import { useMatchQueueDrafts } from '../matches/useMatchQueueDrafts'
-import { teamNames, summarizeGamesWon } from '../matches/matchFormatting'
+import {
+  formatMatchLabel,
+  teamNames,
+  summarizeGamesWon,
+} from '../matches/matchFormatting'
 import type { PlannedMatch } from '../matchmaking/plannedMatches'
 import type { RosterPlayer } from '../../components/DrawSlotSelect'
 import type { MatchType } from '../matchmaking/types'
@@ -86,7 +90,11 @@ export function TournamentDetail({
   const inProgress = matches.filter((m) => m.status === 'queued')
   const completedMatches = matches
     .filter((m) => m.status === 'completed')
-    .sort((a, b) => b.sequence_number - a.sequence_number)
+    .sort(
+      (a, b) =>
+        (b.completed_at ?? '').localeCompare(a.completed_at ?? '') ||
+        b.sequence_number - a.sequence_number,
+    )
   const hasConfirmedResult = completedMatches.length > 0
   const inProgressRosters: PlannedMatch[] = inProgress.map((m) =>
     participantsFor(m.id).map((p) => ({
@@ -209,7 +217,10 @@ export function TournamentDetail({
         isActive={isActive}
         maxQueue={maxQueue}
         drafts={queueDrafts}
-        inProgressRosters={inProgressRosters}
+        inProgress={inProgress.map((m, i) => ({
+          courtNumber: m.court_number ?? 1,
+          roster: inProgressRosters[i],
+        }))}
         rosterPlayers={rosterPlayers}
         playerNameById={playerNameById}
         busy={startMatch.isPending}
@@ -217,6 +228,7 @@ export function TournamentDetail({
 
       <RoundsPlayedList
         matches={completedMatches}
+        courtCount={courtCount}
         participantsFor={participantsFor}
         gamesFor={gamesFor}
         playerNameById={playerNameById}
@@ -289,7 +301,7 @@ export function TournamentDetail({
             onClose={() => setCancelModalOpen(false)}
           >
             <h3>{t('manage.confirmCancelTitle')}</h3>
-            <p>{t('manage.confirmCancelBody')}</p>
+            <p>{t('manage.confirmCancelBodyMulti')}</p>
             <div className="modal-actions">
               <button
                 type="button"
@@ -511,6 +523,7 @@ function ParticipantsCard({
 
 interface RoundsPlayedListProps {
   matches: Match[]
+  courtCount: number
   participantsFor: (matchId: string) => MatchHistoryEntry[]
   gamesFor: (matchId: string) => MatchGame[]
   playerNameById: Map<string, string>
@@ -520,6 +533,7 @@ interface RoundsPlayedListProps {
 
 function RoundsPlayedList({
   matches,
+  courtCount,
   participantsFor,
   gamesFor,
   playerNameById,
@@ -533,9 +547,9 @@ function RoundsPlayedList({
 
   return (
     <section className="card">
-      <h3>{t('manage.roundsPlayedHeading')}</h3>
+      <h3>{t('manage.matchesPlayedHeading')}</h3>
       {matches.length === 0 ? (
-        <p className="empty-state">{t('manage.noRoundsPlayed')}</p>
+        <p className="empty-state">{t('manage.noMatchesPlayed')}</p>
       ) : (
         <ul className="round-list">
           {matches.map((match, index) => {
@@ -549,7 +563,7 @@ function RoundsPlayedList({
             return (
               <li key={match.id} className="round-row">
                 <span className="round-label">
-                  {t('manage.roundLabel', { n: match.sequence_number })}
+                  {formatMatchLabel(t, match, courtCount)}
                 </span>
                 <span className="round-matchup">
                   <span className={team1Won ? 'round-winner' : undefined}>
