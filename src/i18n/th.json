@@ -45,7 +45,8 @@
     "loading": "กำลังโหลดทัวร์นาเมนต์...",
     "loadError": "โหลดทัวร์นาเมนต์ไม่สำเร็จ",
     "empty": "ยังไม่มีทัวร์นาเมนต์ที่กำลังแข่ง",
-    "roundLabel": "รอบที่ {{n}}"
+    "roundLabel": "รอบที่ {{n}}",
+    "matchLabel": "แมตช์ที่ {{n}}"
   },
   "history": {
     "byMatchHeading": "ตามแมตช์",
@@ -116,6 +117,7 @@
       "typeLabel": "ประเภท",
       "gamesPerMatchLabel": "จำนวนเกมต่อแมตช์",
       "pointsPerGameLabel": "คะแนนต่อเกม",
+      "courtsLabel": "จำนวนสนาม",
       "deuceCap": "เพดานดิวซ์: {{cap}}",
       "participantsLegend": "ผู้เข้าร่วม",
       "notEnoughSelected": "เลือกผู้เล่นอย่างน้อย {{needed}} คน (เลือกแล้ว {{selected}} คน)",
@@ -157,7 +159,11 @@
       "heading": "สร้างทัวร์นาเมนต์แล้ว",
       "body": "แมตช์แรก:",
       "notDrawn": "จับคู่แมตช์แรกอัตโนมัติไม่สำเร็จ -- ไปจับคู่ที่หน้าจัดการทัวร์นาเมนต์",
-      "confirm": "ไปที่หน้าจัดการทัวร์นาเมนต์"
+      "confirm": "ไปที่หน้าจัดการทัวร์นาเมนต์",
+      "titleMulti": "จับคู่ {{count}} แมตช์แรกแล้ว",
+      "rowEdit": "แก้ไข",
+      "rowDone": "เสร็จสิ้น",
+      "reusedWarning": "{{names}} อยู่ในมากกว่าหนึ่งแมตช์ (ผู้เล่นไม่พอ)"
     }
   },
   "scoreboard": {
@@ -229,7 +235,33 @@
     "addParticipantButton": "เพิ่ม",
     "noPlayersToAdd": "สมาชิกทั้งหมดอยู่ในทัวร์นาเมนต์นี้แล้ว",
     "addParticipantFailed": "เพิ่มผู้เล่นไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
-    "deleteLastMatchButton": "ลบแมตช์ล่าสุด"
+    "deleteLastMatchButton": "ลบแมตช์ล่าสุด",
+    "courtsHeading": "สนาม",
+    "courtHeading": "สนาม {{n}}",
+    "courtMatchHeading": "สนาม {{n}} · แมตช์ที่ {{match}}",
+    "courtFree": "สนาม {{n}} · ว่าง",
+    "startOnCourt": "เริ่ม",
+    "startOnCourtWith": "เริ่ม ▶ {{matchup}}",
+    "startNeedsQueue": "จับคู่แมตช์เข้าคิวก่อน",
+    "startBlocked": "{{names}} ยังเล่นอยู่ที่สนามอื่น",
+    "queueHeading": "คิว ({{count}}/{{max}})",
+    "queueEmpty": "ยังไม่มีแมตช์ในคิว",
+    "queueFull": "คิวเต็มแล้ว",
+    "fillQueue": "เติมคิวให้เต็ม",
+    "removeFromQueue": "นำออก",
+    "queueReusedWarning": "{{names}} อยู่ในแมตช์อื่นที่รอคิวหรือกำลังเล่นอยู่แล้ว",
+    "editQueueTitle": "แก้ไขแมตช์ในคิว {{n}} จาก {{total}}",
+    "nowColumn": "ตอนนี้",
+    "nowCourt": "สนาม {{n}}",
+    "nowQueue": "คิวที่ {{n}}",
+    "nowFree": "—",
+    "done": "เสร็จสิ้น",
+    "matchLabel": "แมตช์ที่ {{n}}",
+    "matchLabelCourt": "แมตช์ที่ {{n}} · สนาม {{court}}",
+    "matchesPlayedHeading": "แมตช์ที่เล่นแล้ว",
+    "noMatchesPlayed": "ยังไม่มีแมตช์ที่เล่นเสร็จ",
+    "saveResultNeedsQueue": "จับคู่แมตช์เข้าคิวอย่างน้อยหนึ่งแมตช์ก่อนบันทึกผลนี้ (หรือติ๊ก “เป็นแมตช์สุดท้าย”)",
+    "confirmCancelBodyMulti": "การกระทำนี้ย้อนกลับไม่ได้ แมตช์ที่จับคู่ไว้แต่ยังไม่ได้เล่นจะถูกยกเลิกไปด้วย"
   },
   "matches": {
     "draw": {

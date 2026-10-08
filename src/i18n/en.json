@@ -45,7 +45,8 @@
     "loading": "Loading tournaments...",
     "loadError": "Failed to load tournaments.",
     "empty": "No active tournaments",
-    "roundLabel": "Round {{n}}"
+    "roundLabel": "Round {{n}}",
+    "matchLabel": "Match {{n}}"
   },
   "history": {
     "byMatchHeading": "By match",
@@ -116,6 +117,7 @@
       "typeLabel": "Type",
       "gamesPerMatchLabel": "Games per match",
       "pointsPerGameLabel": "Points per game",
+      "courtsLabel": "Number of courts",
       "deuceCap": "Deuce cap: {{cap}}",
       "participantsLegend": "Participants",
       "notEnoughSelected": "Select at least {{needed}} players ({{selected}} selected).",
@@ -157,7 +159,11 @@
       "heading": "Tournament created",
       "body": "First match:",
       "notDrawn": "The first match couldn't be drawn automatically -- draw it from Manage Tournament.",
-      "confirm": "Go to Manage Tournament"
+      "confirm": "Go to Manage Tournament",
+      "titleMulti": "First {{count}} matches drawn",
+      "rowEdit": "Edit",
+      "rowDone": "Done",
+      "reusedWarning": "{{names}} appear in more than one match (not enough players)"
     }
   },
   "scoreboard": {
@@ -229,7 +235,33 @@
     "addParticipantButton": "Add",
     "noPlayersToAdd": "Everyone in the member pool is already active in this tournament.",
     "addParticipantFailed": "Couldn't add that participant. Please try again.",
-    "deleteLastMatchButton": "Delete last match"
+    "deleteLastMatchButton": "Delete last match",
+    "courtsHeading": "Courts",
+    "courtHeading": "Court {{n}}",
+    "courtMatchHeading": "Court {{n}} · Match {{match}}",
+    "courtFree": "Court {{n}} · free",
+    "startOnCourt": "Start",
+    "startOnCourtWith": "Start ▶ {{matchup}}",
+    "startNeedsQueue": "Draw a match into the queue first",
+    "startBlocked": "{{names}} still playing on another court",
+    "queueHeading": "Queue ({{count}}/{{max}})",
+    "queueEmpty": "No matches in the queue",
+    "queueFull": "Queue is full",
+    "fillQueue": "Fill queue",
+    "removeFromQueue": "Remove",
+    "queueReusedWarning": "{{names}} already in another queued or in-progress match",
+    "editQueueTitle": "Edit queue match {{n}} of {{total}}",
+    "nowColumn": "Now",
+    "nowCourt": "Court {{n}}",
+    "nowQueue": "Queue #{{n}}",
+    "nowFree": "—",
+    "done": "Done",
+    "matchLabel": "Match {{n}}",
+    "matchLabelCourt": "Match {{n}} · Court {{court}}",
+    "matchesPlayedHeading": "Matches played",
+    "noMatchesPlayed": "No matches played yet",
+    "saveResultNeedsQueue": "Draw at least one match into the queue before saving this result (or tick “Is last match”)",
+    "confirmCancelBodyMulti": "This can't be undone. Any drawn-but-unplayed matches will be discarded."
   },
   "matches": {
     "draw": {
