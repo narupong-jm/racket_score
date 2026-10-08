@@ -2822,3 +2822,123 @@ confirming it against the live project via a disposable fixture write.
     scope: the flaky test could use a `testTimeout` bump in an unrelated
     future pass; the live project carries unrelated leftover fixture rows
     from past sessions, predating and untouched by Phase 23.
+
+## Phase 24 — Multi-Court Tournaments
+
+`docs/SPEC.md` (Updated 2026-10-08) replaces the single-court model with **n courts (1-8, fixed at
+creation) and one shared queue of up to n+1 pre-drawn matches**: each court runs its own in-progress match
+with its own Save result; the organizer manually taps Start match on a freed court to move the head of the
+queue onto it; the Match Generator's fairness inputs become *planned* match counts (completed + in-progress +
+already-queued); match labels change from "Round N" to "Match N · Court X". A tournament created before this
+phase is a 1-court tournament.
+
+**Findings that shape this phase (from exploration, 2026-10-08):**
+- There are no migration files in the repo; all DDL is applied through the Supabase MCP `apply_migration`
+  against project `racket-score` (ref `ceaisqynlsrqgiabegvv`), types via `generate_typescript_types`.
+- `matches.status` is only `'queued' | 'completed'`, and **`'queued'` currently means "in progress"** (the row is
+  created at Start match). The SPEC's *queue* of drawn-but-unstarted matches is **not** in the DB — it is
+  client-side `localStorage` (the Phase 22 mechanism). So no new status is needed: in-progress = `status='queued'`
+  rows, now up to n of them, each carrying a `court_number`.
+- `create_match` currently validates nothing (active tournament, court, player overlap) and the sequence number is
+  computed client-side by read-then-write, which is race-prone once several courts start matches. No unique index
+  exists on `(tournament_id, sequence_number)`.
+- Already fine for n courts, no change needed: `leave_participant` (blocks a player in *any* `queued` match),
+  `cancel_tournament` (deletes *all* `queued` rows), `record_match_result`, `delete_match_result`, and the views
+  `player_stats` / `tournament_standings` / `player_match_history` (all filter `status='completed'`).
+- Client single-match assumptions to remove: `TournamentDetail.tsx` (`matches.find(queued)`, single `nextDraw`
+  state, `CurrentMatchCard`/`NextMatchCard`, the `canSave` lock, the games-played table's +1, the index-0
+  quick-undo), `src/lib/nextDrawStore.ts` (one draw), `useStartNextMatch` (computes the sequence number),
+  `useCreateTournamentWithFirstDraw` (draws one match), `FirstMatchDrawnPopup` (one draw),
+  `ActivePage.tsx` (`active.roundLabel` uses `matches.length`, which counts completed + in-progress), `HistoryPage.tsx`.
+- The matchmaking core (`generateNextMatch`, `selectCandidatePool`, the pickers) is reusable as-is; only its
+  *inputs* change, through a new pure helper, so the module stays framework- and DB-free.
+
+**Execution suggestion:** isolated git worktree + `superpowers:subagent-driven-development`, like Phase 23. Build
+order: 1-4 (data), 5-7 (pure logic + store + hooks), **10 (i18n) before 8-9** (their tests assert real rendered
+copy, per the Phase 23 ordering lesson), then 8, 9, 11, 12. The checkbox numbering below is unchanged by that order.
+
+1. [ ] **Migration A — schema.** Via Supabase MCP `apply_migration`: `tournaments.court_count smallint not null
+   default 1 check (court_count between 1 and 8)`; `matches.court_number smallint null check (court_number >= 1)`;
+   backfill existing `status='queued'` rows to `court_number = 1`; partial unique index on
+   `(tournament_id, court_number) where status = 'queued'`. First check with `execute_sql` that no duplicate
+   `(tournament_id, sequence_number)` pairs exist, then add a unique index on that pair. _Test:_ `execute_sql` on
+   disposable fixtures — inserting a second `queued` match on the same court is rejected; two `queued` matches on
+   different courts are allowed; completed matches may share a `court_number`; existing tournaments read back
+   `court_count = 1`.
+2. [ ] **Migration B — RPCs.** `create_tournament` gains `p_court_count int default 1` (validates 1..8; **drop the
+   old overload**, following the `drop_old_rpc_overloads_pre_sport` precedent so PostgREST never sees an ambiguous
+   pair). `create_match` gains `p_court_number` and **drops the client-supplied `p_sequence_number`** — the server
+   computes max+1 while holding `FOR UPDATE` on the tournament row (old overload dropped). It raises
+   `tournament_not_active`, `invalid_court` (outside `1..court_count`), `court_occupied`, and
+   `participant_on_court` (any participant already in another `queued` match); still atomic across `matches` +
+   `match_participants`, still passphrase-checked first. `leave_participant`, `cancel_tournament`,
+   `record_match_result`, `delete_match_result` stay unchanged. _Test:_ `execute_sql` per error code, two courts
+   started back to back get sequence numbers 1 and 2 with no collision, then `get_advisors` (security) — expect only
+   the same anon-executable `SECURITY DEFINER` advisories as the other write RPCs.
+3. [ ] **Regenerate `src/lib/database.types.ts`** via Supabase MCP `generate_typescript_types`. _Test:_ `npx tsc -b` —
+   errors only at the call sites that later steps change.
+4. [ ] **API layer.** `tournamentsApi.createTournament` / `CreateTournamentInput` gain `court_count`;
+   `matchesApi.createMatch(tournamentId, courtNumber, participants, passphrase, manuallyAdjusted)` (no sequence
+   argument); `Match` type exposes `court_number`. _Test:_ extend `tournamentsApi.integration.test.ts` and
+   `matchesApi.integration.test.ts` — court range validation, occupied court rejected, a player on two courts
+   rejected, leave blocked from a match on any court, cancel clears queued matches on every court. Update the
+   existing `leaveParticipant` and `create_match` assertions that assumed one current match.
+5. [ ] **Pure planned-match helper.** New `src/features/matchmaking/plannedMatches.ts`:
+   `applyPlannedMatches(inputs, plannedMatches)` adds +1 to `matchesPlayedInTournament` per appearance and adds the
+   planned matches' opponent/teammate pairs to `PairingHistory`; `findReusedPlayerIds(drawn, plannedMatches)` returns
+   drawn players already in a planned match (drives the reuse warning). `selectCandidatePool` and the pickers are
+   untouched. _Test:_ new unit tests (counts, pairs, reuse detection) plus a sequential-draw case in
+   `fairnessInvariant.test.ts` — drawing a full queue one match at a time keeps the max-min planned-count gap <= 1.
+6. [ ] **Queue store.** Replace `src/lib/nextDrawStore.ts` with `src/lib/matchQueueStore.ts`: per-tournament
+   `QueuedMatch[]` (`{ participants, manuallyAdjusted }`), new storage key, and a one-time migration of a legacy
+   single-draw key into a one-entry queue. _Test:_ rewrite `nextDrawStore.test.ts` as `matchQueueStore.test.ts` —
+   get/set/clear, legacy migration, corrupt JSON returns an empty queue.
+7. [ ] **Hooks.** New `useMatchQueueDrafts(tournamentId)` (add / remove / update / `removeContaining(playerId)` /
+   clear; callers enforce the n+1 cap). `useStartNextMatch` becomes `useStartMatchOnCourt` — no sequence calculation,
+   passes the court, and on success removes the started entry from the stored queue and invalidates `['matches']`
+   and `['drawInputs']`. Correct the stale "at most one queued row" docblock in `useMatchQueue.ts`. _Test:_ update
+   `useMatchQueue.test.tsx`.
+8. [ ] **Create flow.** `CreateTournamentPage` gets a courts `NumberStepper` (1-8, default 1, locked after creation);
+   `useCreateTournamentWithFirstDraw` draws **n** matches sequentially (accumulating planned counts between draws,
+   reusing players with the §5 warning when the roster is too small, still requiring at least one match's worth of
+   players) and returns an array; `FirstMatchDrawnPopup` lists the n matches as compact one-line rows, where Edit expands only that row in place into
+   the pickers (with a Done button) and the reuse warning sits under the list (layout "B" from the mockup comparison); Confirm writes them to
+   the queue store (no `createMatch` call) and navigates to Manage. _Test:_ update `CreateTournamentPage.test.tsx`,
+   `useCreateTournamentWithFirstDraw.test.tsx`, `FirstMatchDrawnPopup.test.tsx`.
+9. [ ] **Manage screen.** In `TournamentDetail.tsx`: `CurrentMatchCard` becomes a per-court `CourtCard` (a court in
+   progress is a full card with its own score inputs, Save result and "Is last match"; a **free court collapses to a
+   one-line strip** with a Start match button that names the queue head, disabled with a hint when the queue is
+   empty and blocked with an explanation if a player is in another court's match; courts stay in court-number order
+   and the Queue renders below all courts — layout "C", chosen from a mockup comparison); `NextMatchCard` becomes `QueueCard` (ordered list,
+   Randomize, Fill queue, per-entry Edit and Remove, both draw buttons disabled at n+1, reuse warning from
+   `findReusedPlayerIds`, games-played table counting +1 per in-progress match, with a "Now" column — "Court N" / "Queue #k" / "—" — and a
+   title "Edit queue match k of m"; layout "A" from the mockup comparison); Save is enabled when the queue is
+   non-empty or that court's "Is last match" is checked; Leave is disabled when the player is in any court and
+   removes any queued entries containing them; `RoundsPlayedList` is ordered by `completed_at` descending with the
+   quick-undo on the first row (the most recently confirmed result); add `formatMatchLabel(seq, court, courtCount)`
+   to `matchFormatting.ts`. _Test:_ rework the affected `describe` blocks in `TournamentDetail.test.tsx`
+   (Current/Next, Edit popup, persistence, save-lock, Leave, delete-last) and add multi-court cases (two courts,
+   start-blocked, queue cap, Fill queue, per-court Save).
+10. [ ] **Labels + i18n.** `ActivePage.tsx` shows the highest started match number instead of `matches.length`;
+    `HistoryPage.tsx` uses `formatMatchLabel`; `en.json` / `th.json` gain "Match N · Court X", Court N / Court free,
+    Queue, Fill queue, Remove, the courts label, queue-full, start-blocked, and reused-warning wording, and the
+    cancel-body text stops saying "Next or Current". Real Thai translations, not machine-translated. _Test:_
+    `npx tsc -b`; en/th key sets identical; update `ActivePage.test.tsx` and `HistoryPage.test.tsx`.
+11. [ ] **Docs.** Flip `docs/SPEC.md`'s 2026-10-08 note to implemented; update `README.md` Features; sync
+    `CLAUDE.md` project status and domain-model bullets (single-court -> multi-court, queue in `localStorage`,
+    planned counts); tick this phase's boxes with outcomes. _Test:_ none (docs-only).
+12. [ ] **Full regression + live verification.** `npm run build`, `npm run lint`, `npx vitest run`. Then a Playwright
+    pass on the dev server against the real Supabase project using a disposable tournament: 2-court create shows two
+    drawn matches in the popup; Start on each court; Save is disabled on a court while the queue is empty and enabled
+    with that court's "Is last match"; Fill queue reaches n+1; Start is blocked when a player is on the other court;
+    Leave is blocked on either court and discards queued entries containing the leaver; Match/Court labels in Manage,
+    Active and History; quick-undo targets the most recently confirmed result; a 1-court tournament still works.
+    Finish with the integration-test fixture cleanup from the operational note at the top of this file (UUID-regex
+    pass over all six tables, re-queried to zero).
+
+**Known limitations carried into this phase (deliberate):**
+- The queue is browser-local (SPEC §9), so a second device won't see it.
+- `add_participant`'s fairness offset still reads completed matches only (`player_match_history`); queued and
+  in-progress matches are not counted. Revisit if late joiners are over-drawn on multi-court nights.
+- The reuse warning fires whenever a drawn player is already in an in-progress or queued match, which can be
+  expected on small rosters.
