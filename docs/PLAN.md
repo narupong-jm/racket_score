@@ -2898,12 +2898,25 @@ copy, per the Phase 23 ordering lesson), then 8, 9, 11, 12. The checkbox numberi
    `create_tournament` as two-overload unions). Existing call sites compile unchanged because the old overloads are
    still present; only 13 test fixtures needed the new required `court_count` / `court_number` fields. `tsc -b` clean,
    non-integration suite 251/251.
-4. [ ] **API layer.** `tournamentsApi.createTournament` / `CreateTournamentInput` gain `court_count`;
+4. [x] **API layer.** `tournamentsApi.createTournament` / `CreateTournamentInput` gain `court_count`;
    `matchesApi.createMatch(tournamentId, courtNumber, participants, passphrase, manuallyAdjusted)` (no sequence
    argument); `Match` type exposes `court_number`. _Test:_ extend `tournamentsApi.integration.test.ts` and
    `matchesApi.integration.test.ts` — court range validation, occupied court rejected, a player on two courts
    rejected, leave blocked from a match on any court, cancel clears queued matches on every court. Update the
    existing `leaveParticipant` and `create_match` assertions that assumed one current match.
+   **Done (2026-10-08, commit a0a07e2, built via subagent-driven-development):** `createTournament` calls the new
+   overload with `p_court_count = input.court_count ?? 1` (optional until step 8, ruled); `createMatch(tournamentId,
+   courtNumber, participants, passphrase, manuallyAdjusted)` calls the new overload; `useStartNextMatch` no longer
+   computes a sequence number and passes court 1 (shim until step 7, ruled). Integration tests assert exact server error
+   codes (`invalid_court_count`, `invalid_court`, `court_occupied`, `participant_on_court`, `tournament_not_active`,
+   `participant_in_current_match` on court 1 and 2), server-side sequencing across courts, and cancel clearing both
+   courts; wrong-passphrase is checked before court validation. Two files outside the brief needed the new signature
+   (`useDrawInputs.integration.test.tsx`, `playerLevelCutover.integration.test.ts`) and were run live. Task review:
+   spec compliant, quality approved, no Critical/Important. `tsc -b` + eslint clean, non-integration suite 251/251, all four
+   changed integration files green against the live project; fixtures cleaned up by the controller (twice) and the
+   live counts re-verified (9 tournaments / 106 matches / 0 queued / 0 fixture rows). Parked minors: the rollback test
+   in `matchesApi.integration.test.ts` uses a bare `.rejects.toThrow()` and could assert the FK error code (23503); the
+   `deleteMatchResult` assertions there were only re-wrapped by Prettier.
 5. [ ] **Pure planned-match helper.** New `src/features/matchmaking/plannedMatches.ts`:
    `applyPlannedMatches(inputs, plannedMatches)` adds +1 to `matchesPlayedInTournament` per appearance and adds the
    planned matches' opponent/teammate pairs to `PairingHistory`; `findReusedPlayerIds(drawn, plannedMatches)` returns
