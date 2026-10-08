@@ -1,8 +1,13 @@
-import { describe, expect, it, vi, afterEach } from 'vitest'
+import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { useTournamentMatches, useStartNextMatch } from './useMatchQueue'
+import {
+  useTournamentMatches,
+  useStartNextMatch,
+  useStartMatchOnCourt,
+} from './useMatchQueue'
+import { getQueue, setQueue, type QueuedMatch } from '../../lib/matchQueueStore'
 import * as matchesApi from './matchesApi'
 import type { Match } from './matchesApi'
 
@@ -43,6 +48,10 @@ function makeMatch(id: string, sequenceNumber: number): Match {
     manually_adjusted: true,
   }
 }
+
+beforeEach(() => {
+  localStorage.clear()
+})
 
 afterEach(() => {
   vi.clearAllMocks()
@@ -127,5 +136,100 @@ describe('useStartNextMatch', () => {
       queryClient.getQueryData<{ matches: Match[] }>(['matches', 't1'])
         ?.matches,
     ).toEqual([makeMatch('m-new', 1)])
+  })
+})
+
+describe('useStartMatchOnCourt', () => {
+  const entryA: QueuedMatch = {
+    participants: [
+      { playerId: 'p1', team: 1 },
+      { playerId: 'p2', team: 2 },
+    ],
+    manuallyAdjusted: false,
+  }
+  const entryB: QueuedMatch = {
+    participants: [
+      { playerId: 'p3', team: 1 },
+      { playerId: 'p4', team: 2 },
+    ],
+    manuallyAdjusted: true,
+  }
+
+  it('calls createMatch with the court, shifts the queue head and invalidates matches + drawInputs', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+    vi.mocked(matchesApi.createMatch).mockResolvedValue(makeMatch('m-new', 1))
+    setQueue('t1', [entryA, entryB])
+
+    const { result } = renderHook(() => useStartMatchOnCourt('t1'), {
+      wrapper: createWrapper(queryClient),
+    })
+    act(() => {
+      result.current.mutate({
+        participants: [
+          { player_id: 'p1', team: 1 },
+          { player_id: 'p2', team: 2 },
+        ],
+        manuallyAdjusted: true,
+        courtNumber: 2,
+      })
+    })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    expect(matchesApi.createMatch).toHaveBeenCalledWith(
+      't1',
+      2,
+      [
+        { player_id: 'p1', team: 1 },
+        { player_id: 'p2', team: 2 },
+      ],
+      'test-passphrase',
+      true,
+    )
+    expect(getQueue('t1')).toEqual([entryB])
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['matches', 't1'] })
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['drawInputs', 't1'] })
+  })
+
+  it('defaults manuallyAdjusted to false', async () => {
+    const queryClient = new QueryClient()
+    vi.mocked(matchesApi.createMatch).mockResolvedValue(makeMatch('m-new', 1))
+    const { result } = renderHook(() => useStartMatchOnCourt('t1'), {
+      wrapper: createWrapper(queryClient),
+    })
+    act(() => {
+      result.current.mutate({
+        participants: [{ player_id: 'p1', team: 1 }],
+        courtNumber: 1,
+      })
+    })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(matchesApi.createMatch).toHaveBeenCalledWith(
+      't1',
+      1,
+      [{ player_id: 'p1', team: 1 }],
+      'test-passphrase',
+      false,
+    )
+  })
+
+  it('leaves the queue untouched when createMatch fails', async () => {
+    const queryClient = new QueryClient()
+    vi.mocked(matchesApi.createMatch).mockRejectedValue(new Error('boom'))
+    setQueue('t1', [entryA, entryB])
+
+    const { result } = renderHook(() => useStartMatchOnCourt('t1'), {
+      wrapper: createWrapper(queryClient),
+    })
+    act(() => {
+      result.current.mutate({
+        participants: [{ player_id: 'p1', team: 1 }],
+        courtNumber: 1,
+      })
+    })
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect(getQueue('t1')).toEqual([entryA, entryB])
   })
 })

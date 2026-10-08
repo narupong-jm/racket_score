@@ -11,6 +11,7 @@ import {
 } from './matchesApi'
 import { usePassphraseGate } from '../passphrase/usePassphraseGate'
 import { clearCachedNextDraw } from '../../lib/nextDrawStore'
+import { shiftQueue } from '../../lib/matchQueueStore'
 
 export interface TournamentMatches {
   matches: Match[]
@@ -20,10 +21,11 @@ export interface TournamentMatches {
 
 /**
  * All of a tournament's matches plus their participants/game scores, in one
- * query -- the current match (at most one 'queued' row, per the single-court
- * model) and the completed "rounds played" history are both derived from
- * this by the caller, since "next match" is ephemeral client-side state
- * (not persisted) until "Start match" promotes it via useStartNextMatch.
+ * query. Multi-court model: a row with status 'queued' is IN PROGRESS on a
+ * court (up to tournament.court_count of them at once, each with a
+ * court_number); completed rows form the "rounds played" history. The
+ * not-yet-started queue of drawn matches is not in the database -- it lives
+ * client-side in matchQueueStore until useStartMatchOnCourt promotes its head.
  */
 export function useTournamentMatches(tournamentId: string) {
   return useQuery<TournamentMatches>({
@@ -45,6 +47,7 @@ export interface StartNextMatchInput {
   manuallyAdjusted?: boolean
 }
 
+/** @deprecated Use useStartMatchOnCourt (court-aware, queue-backed). */
 export function useStartNextMatch(tournamentId: string) {
   const queryClient = useQueryClient()
   const { getPassphrase } = usePassphraseGate()
@@ -80,6 +83,47 @@ export function useStartNextMatch(tournamentId: string) {
       return queryClient.invalidateQueries({
         queryKey: ['matches', tournamentId],
       })
+    },
+  })
+}
+
+export interface StartMatchOnCourtInput {
+  participants: MatchParticipantInput[]
+  manuallyAdjusted?: boolean
+  courtNumber: number
+}
+
+export function useStartMatchOnCourt(tournamentId: string) {
+  const queryClient = useQueryClient()
+  const { getPassphrase } = usePassphraseGate()
+
+  return useMutation({
+    mutationFn: async ({
+      participants,
+      manuallyAdjusted = false,
+      courtNumber,
+    }: StartMatchOnCourtInput) => {
+      const passphrase = await getPassphrase()
+      return createMatch(
+        tournamentId,
+        courtNumber,
+        participants,
+        passphrase,
+        manuallyAdjusted,
+      )
+    },
+    // Mutation-level (not per-mutate) so it still runs if the component
+    // unmounts mid-flight. The started match is always the queue head. The
+    // returned promise makes React Query wait for the refetches before any
+    // call-site onSuccess, so callers see fresh in-progress rosters.
+    onSuccess: () => {
+      shiftQueue(tournamentId)
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['matches', tournamentId] }),
+        queryClient.invalidateQueries({
+          queryKey: ['drawInputs', tournamentId],
+        }),
+      ])
     },
   })
 }
