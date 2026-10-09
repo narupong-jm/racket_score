@@ -2857,24 +2857,30 @@ phase is a 1-court tournament.
 order: 1-4 (data), 5-7 (pure logic + store + hooks), **10 (i18n) before 8-9** (their tests assert real rendered
 copy, per the Phase 23 ordering lesson), then 8, 9, 11, 12. The checkbox numbering below is unchanged by that order.
 
-**Implementation status (2026-10-08, end of session 2):** being built via `superpowers:subagent-driven-development` in an
+**Implementation status (2026-10-09, end of session 3):** being built via `superpowers:subagent-driven-development` in an
 isolated worktree at `.claude/worktrees/phase-24-multi-court` (branch `worktree-phase-24-multi-court`, based on `main` @
-`17af775`) — **not merged to `main`**. Steps 1-8 are complete and independently reviewed; step 9 is split in three
-dispatches: 9a (court cards + queue core) is complete and reviewed, 9b+9c (queue-Edit popup "Now" column, Matches played
-ordering/labels, derived reuse warning, `manage.startFailed`, dead-key cleanup) is **implemented and committed (`e8d93de`)
-but NOT yet task-reviewed**; step 10 is half done (i18n keys added; the Active/History label switch, "10b", is not started);
-steps 11-12 and the merge-time migration 2b are not started. Branch state at the stop: `tsc -b` clean, non-integration
-suite 53 files / 373 tests passing, worktree clean. The live database already carries migrations A and B (additive);
+`17af775`) — **not merged to `main`**. Steps 1-11 are complete and each was independently task-reviewed (9a by an opus
+reviewer); the only thing left in the plan is **step 12** (full regression + live verification), then the final
+whole-branch review and merge. Branch state at the stop: `tsc -b` clean, non-integration suite 53 files / 377 tests
+passing, worktree clean. The live database carries migrations A and B (additive, old overloads still present);
 fixtures from integration runs were cleaned and re-verified (9 tournaments / 106 matches / 0 queued / 0 UUID-named rows).
+Note for step 12: `matchesApi.integration.test.ts` hit its 5 s default timeout on its first test once (16/17 passing;
+suspected network latency, not re-run) — re-run it and consider a `testTimeout` bump if it recurs.
 
 **To resume:** `cd` into the worktree (or `EnterWorktree` with `path: .claude/worktrees/phase-24-multi-court`), read the
 git-ignored SDD workspace `.superpowers/sdd/phase24/` — `progress.md` (ledger: every task outcome, all rulings and deferred
-minors), `contracts.md` (binding cross-task interfaces C1-C6), `task-<N>-brief.md` / `-report.md` per task — then continue in
-this order: (1) task-review of commit `e8d93de` (BASE = `44caeef`; use a diff file + a reviewer on at least a mid-tier model),
-(2) task 10b (brief already written at `.superpowers/sdd/phase24/task-10b-brief.md`), (3) step 11 docs, (4) step 12 regression +
-live verification, (5) final whole-branch review on the most capable model, (6) `superpowers:finishing-a-development-branch`
-and, only at merge time, migration 2b. If `.superpowers/` is gone, rebuild from `git log` (one commit per step, subjects
-"Phase 24 step N: ...") and this section.
+minors), `contracts.md` (binding cross-task interfaces C1-C6), `task-<N>-brief.md` / `-report.md` per task — then: (1) step 12:
+`npm run build`, `npm run lint`, the whole vitest suite including integration files (clean fixtures with the UUID-regex
+`execute_sql` pass afterwards — controller only), then a Playwright pass on the dev server against the real project using a
+disposable UUID-named tournament (2-court create shows 2 drawn matches; Start on each court; per-court Save lock; Fill queue
+to n+1; start-blocked when a player is on the other court; Leave blocked on either court and discards queued entries;
+Match/Court labels in Manage, Active and History; quick-undo targets the most recently confirmed result; a 1-court
+tournament still works; also check the deferred `useRecordMatchResult` invalidation race), (2) final whole-branch review on
+the most capable model with the ledger's deferred minors as its triage list, (3) `superpowers:finishing-a-development-branch`,
+discarding the duplicate uncommitted SPEC/PLAN edits left in the main checkout first, and, only at merge time, migration 2b
+(drop the old `create_tournament`/`create_match` overloads, add the unique index on `(tournament_id, sequence_number)`),
+then edit CLAUDE.md to say Phase 24 shipped. If `.superpowers/` is gone, rebuild from `git log` (one commit per step,
+subjects "Phase 24 step N: ...") and this section.
 
 **Rulings made during execution (all recorded in the ledger as `Ruling:`; cost if wrong in parentheses):**
 - Supabase branching is Pro-only and the org is on the free plan, so migrations A/B were applied **additively to the live
@@ -2989,7 +2995,7 @@ Thai wording nits (`reusedWarning`, `removeFromQueue`); `manage.done` is kept on
    `useCreateTournamentWithFirstDraw.test.tsx`, `FirstMatchDrawnPopup.test.tsx`.
    **Done (2026-10-08, commits 990d01b + 6d89849):** courts stepper (1-8, default 1), `drawMatches`-based first draw of n matches, compact one-line popup rows with in-place Edit/Done,
    confirm writes the queue (no `createMatch`) and navigates. Review found one Important (1-court title "First 1 matches drawn"); fixed with a `titleSingle` key; re-review clean.
-9. [ ] **Manage screen.** In `TournamentDetail.tsx`: `CurrentMatchCard` becomes a per-court `CourtCard` (a court in
+9. [x] **Manage screen.** In `TournamentDetail.tsx`: `CurrentMatchCard` becomes a per-court `CourtCard` (a court in
    progress is a full card with its own score inputs, Save result and "Is last match"; a **free court collapses to a
    one-line strip** with a Start match button that names the queue head, disabled with a hint when the queue is
    empty and blocked with an explanation if a player is in another court's match; courts stay in court-number order
@@ -3003,21 +3009,26 @@ Thai wording nits (`reusedWarning`, `removeFromQueue`); `manage.done` is kept on
    to `matchFormatting.ts`. _Test:_ rework the affected `describe` blocks in `TournamentDetail.test.tsx`
    (Current/Next, Edit popup, persistence, save-lock, Leave, delete-last) and add multi-court cases (two courts,
    start-blocked, queue cap, Fill queue, per-court Save).
-   **Partly done (2026-10-08):** 9a (commit 44caeef) — `CourtCard`/`CourtMatchForm`/`QueueCard`, `TournamentDetail.tsx` 1123 -> 595 lines, `nextDrawStore` and `useStartNextMatch`
+   **Done (2026-10-08):** 9a (commit 44caeef) — `CourtCard`/`CourtMatchForm`/`QueueCard`, `TournamentDetail.tsx` 1123 -> 595 lines, `nextDrawStore` and `useStartNextMatch`
    deleted — implemented by an opus agent and reviewed clean by an opus reviewer (no Critical/Important). 9b+9c (commit e8d93de) — queue Edit popup titled "Edit queue match k of m"
    with a "Now" column (`playerNow.ts`), Matches played ordered by `completed_at` desc with `formatMatchLabel`, cancel body `confirmCancelBodyMulti`, reuse warning derived each
-   render, `manage.startFailed`, 20 dead locale keys removed — **implemented, tests green, awaiting its task review**. Leave on any court and `removeContaining` are covered by 9a.
-10. [ ] **Labels + i18n.** `ActivePage.tsx` shows the highest started match number instead of `matches.length`;
+   render, `manage.startFailed`, 20 dead locale keys removed — reviewed clean (no Critical/Important; 20 deleted locale keys verified unreferenced). Leave on any court and `removeContaining` are covered by 9a.
+10. [x] **Labels + i18n.** `ActivePage.tsx` shows the highest started match number instead of `matches.length`;
     `HistoryPage.tsx` uses `formatMatchLabel`; `en.json` / `th.json` gain "Match N · Court X", Court N / Court free,
     Queue, Fill queue, Remove, the courts label, queue-full, start-blocked, and reused-warning wording, and the
     cancel-body text stops saying "Next or Current". Real Thai translations, not machine-translated. _Test:_
     `npx tsc -b`; en/th key sets identical; update `ActivePage.test.tsx` and `HistoryPage.test.tsx`.
-   **Half done (2026-10-08, commit 597c853):** all 32 new keys (+ `titleSingle`, `startFailed`) exist in en/th with a locale-parity test (`src/i18n/localeParity.test.ts`);
-   review clean. **Remaining = task 10b:** `ActivePage.tsx` shows `active.matchLabel` with the highest started `sequence_number`; `HistoryPage.tsx` uses `formatMatchLabel` (needs
-   `courtCount` added to `RecentCompletedMatch` / `listRecentCompletedMatches`); then delete `active.roundLabel` / `manage.roundLabel` if unreferenced. Brief ready in the SDD workspace.
-11. [ ] **Docs.** Flip `docs/SPEC.md`'s 2026-10-08 note to implemented; update `README.md` Features; sync
+   **Done (2026-10-08, commits 597c853 + bf2056a):** all 32 new keys (+ `titleSingle`, `startFailed`) exist in en/th with a locale-parity test (`src/i18n/localeParity.test.ts`);
+   review clean. **Task 10b (commit bf2056a, review clean):** `ActivePage.tsx` shows `active.matchLabel` with the highest started `sequence_number`; `HistoryPage.tsx` uses `formatMatchLabel` (`courtCount` added to
+   `RecentCompletedMatch` / `listRecentCompletedMatches`); `active.roundLabel` / `manage.roundLabel` deleted as unreferenced.
+11. [x] **Docs.** Flip `docs/SPEC.md`'s 2026-10-08 note to implemented; update `README.md` Features; sync
     `CLAUDE.md` project status and domain-model bullets (single-court -> multi-court, queue in `localStorage`,
     planned counts); tick this phase's boxes with outcomes. _Test:_ none (docs-only).
+   **Done (2026-10-09, commits 5da24ad + 2ae98ef):** `docs/SPEC.md` (2026-10-08 note flipped to implemented; stale Next/Current wording reconciled; singular popup title, derived reuse
+   warning and "Match 0" documented), `README.md` (multi-court + shared-queue feature bullets, Match N labels, queue-per-browser limitation) and `CLAUDE.md` (Phases 1-23 shipped, Phase 24
+   paragraph, architecture and domain-model bullets) updated. The review's one Important finding — CLAUDE.md's headline claimed Phase 24 was shipped/complete — was fixed to say it is built on
+   the branch but not merged or fully verified; **after merge + migration 2b, CLAUDE.md must be edited again to say "shipped"** (the file says so itself). The controller read the 14-line
+   fix diff directly instead of dispatching a second reviewer (recorded as a ruling in the ledger).
 12. [ ] **Full regression + live verification.** `npm run build`, `npm run lint`, `npx vitest run`. Then a Playwright
     pass on the dev server against the real Supabase project using a disposable tournament: 2-court create shows two
     drawn matches in the popup; Start on each court; Save is disabled on a court while the queue is empty and enabled
