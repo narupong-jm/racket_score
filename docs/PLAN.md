@@ -2860,9 +2860,9 @@ copy, per the Phase 23 ordering lesson), then 8, 9, 11, 12. The checkbox numberi
 **Implementation status (2026-10-09, end of session 3):** being built via `superpowers:subagent-driven-development` in an
 isolated worktree at `.claude/worktrees/phase-24-multi-court` (branch `worktree-phase-24-multi-court`, based on `main` @
 `17af775`) — **not merged to `main`**. Steps 1-11 are complete and each was independently task-reviewed (9a by an opus
-reviewer); the only thing left in the plan is **step 12** (full regression + live verification), then the final
-whole-branch review and merge. Branch state at the stop: `tsc -b` clean, non-integration suite 53 files / 377 tests
-passing, worktree clean. The live database carries migrations A and B (additive, old overloads still present);
+reviewer); step 12 (full regression + live verification) is **also done** (see its note); what is left is the final
+whole-branch review and the merge. Branch state at the stop of session 3: `tsc -b` clean, non-integration suite
+53 files / 377 tests passing, worktree clean (step 12 later added one test, 378). The live database carries migrations A and B (additive, old overloads still present);
 fixtures from integration runs were cleaned and re-verified (9 tournaments / 106 matches / 0 queued / 0 UUID-named rows).
 Note for step 12: `matchesApi.integration.test.ts` hit its 5 s default timeout on its first test once (16/17 passing;
 suspected network latency, not re-run) — re-run it and consider a `testTimeout` bump if it recurs.
@@ -3029,7 +3029,7 @@ Thai wording nits (`reusedWarning`, `removeFromQueue`); `manage.done` is kept on
    paragraph, architecture and domain-model bullets) updated. The review's one Important finding — CLAUDE.md's headline claimed Phase 24 was shipped/complete — was fixed to say it is built on
    the branch but not merged or fully verified; **after merge + migration 2b, CLAUDE.md must be edited again to say "shipped"** (the file says so itself). The controller read the 14-line
    fix diff directly instead of dispatching a second reviewer (recorded as a ruling in the ledger).
-12. [ ] **Full regression + live verification.** `npm run build`, `npm run lint`, `npx vitest run`. Then a Playwright
+12. [x] **Full regression + live verification.** `npm run build`, `npm run lint`, `npx vitest run`. Then a Playwright
     pass on the dev server against the real Supabase project using a disposable tournament: 2-court create shows two
     drawn matches in the popup; Start on each court; Save is disabled on a court while the queue is empty and enabled
     with that court's "Is last match"; Fill queue reaches n+1; Start is blocked when a player is on the other court;
@@ -3037,6 +3037,17 @@ Thai wording nits (`reusedWarning`, `removeFromQueue`); `manage.done` is kept on
     Active and History; quick-undo targets the most recently confirmed result; a 1-court tournament still works.
     Finish with the integration-test fixture cleanup from the operational note at the top of this file (UUID-regex
     pass over all six tables, re-queried to zero).
+    **Done (2026-10-09, commit 4153cd7):** `npm run build` and `npm run lint` clean; full vitest 61 files / 415 tests
+    passing including all integration files (the earlier `matchesApi` timeout did not recur). Live Playwright pass on the
+    dev server against the real project, all as specified: 2-court create popup "First 2 matches drawn"; Start on each
+    court (labels "Court 1 · Match 1", "Court 2 · Match 2"); Save locked per court with an empty queue and unlocked only
+    on the court whose "last match" is ticked; Fill queue reaches 3/3 with "Queue is full" and the reuse warning;
+    Start blocked with "A, B still playing on another court"; Leave disabled for all four on-court players; Leave on a
+    queued-only player removed their queue entry; the queue survived a reload; "Matches played" ordered by confirmation
+    with "Delete last match" on the newest only; Active "Match 2"; History "Match 2 · Court 2" vs. "Match 19" for 1-court;
+    1-court create "First match drawn". The deferred `useRecordMatchResult` race was real (invalidations were not awaited)
+    and is fixed with a failing-first test. Fixtures cleaned (9 tournaments / 16 players / 106 matches / 0 queued / 0 UUID rows).
+    **Remaining:** final whole-branch review, then merge + migration 2b + CLAUDE.md "shipped".
 
 **Known limitations carried into this phase (deliberate):**
 - The queue is browser-local (SPEC §9), so a second device won't see it.
