@@ -4,30 +4,52 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Phases 1-23 of `docs/PLAN.md` are complete and shipped, including Phase 13's 5-tab bottom-nav
+Phases 1-24 of `docs/PLAN.md` are complete (Phase 24 per the note below), including Phase 13's 5-tab bottom-nav
 overhaul (Create / Active / Scoreboard / History / Member) and every IMPROVEMENT-doc-driven patch
 (`docs/IMPROVEMENT.md` through `docs/IMPROVEMENT4.md` — all four are fully absorbed into shipped
 phases: IMPROVEMENT.md → Phase 13, IMPROVEMENT2.md → Phase 14, IMPROVEMENT3.md → Phase 18,
-IMPROVEMENT4.md → Phase 20; nothing in any of them is still outstanding). Phases 21-23 then shipped
+IMPROVEMENT4.md → Phase 20; nothing in any of them is still outstanding). Phases 21-24 then shipped
 without a numbered IMPROVEMENT doc of their own (driven directly by `docs/SPEC.md`'s dated "Updated"
 notes instead). Do not assume from old conversation history or partial doc reads that any of this
 is still in flight — check `docs/PLAN.md`'s phase checkboxes (all `[x]`) and `src/` directly if in
 doubt.
 
-**Most recent phase — Phase 23, delete a confirmed match result:** reverses the previous
+**Most recent phase — Phase 24, multi-court tournaments:** replaces the single-court model.
+A tournament now has `court_count` (1-8, chosen on the Create form, fixed afterward; pre-existing
+tournaments = 1) and `matches.court_number`; `matches.status = 'queued'` still means *in progress*
+(at most one per court, via a partial unique index). RPCs: `create_tournament(... p_court_count ...)`
+and `create_match(p_tournament_id, p_participants, p_court_number, p_passphrase,
+p_manually_adjusted)`, which computes `sequence_number` server-side and raises
+`tournament_not_active` / `invalid_court` / `court_occupied` / `participant_on_court`. The drawn-but-
+not-started **queue** (max `court_count + 1`) is client-side, in `localStorage` per tournament
+(`src/lib/matchQueueStore.ts`, key `racket-score.matchQueue.<id>`, the legacy single-draw key is
+migrated), read via `useMatchQueueDrafts` (`useSyncExternalStore`); `useStartMatchOnCourt` starts the
+queue head on a free court. The queue is per browser. Matchmaking feeds the unchanged
+`generateNextMatch` with *planned* match counts via `src/features/matchmaking/plannedMatches.ts`
+(`applyPlannedMatches`, `findReusedPlayerIds`, `drawMatches`). **Migration state to check:**
+`phase24_multi_court_schema` and `phase24_multi_court_rpcs` were applied additively (the OLD
+`create_tournament`/`create_match` overloads still exist in the live DB); the cleanup migration
+("2b" in `docs/PLAN.md` Phase 24 — drops the old overloads, adds a unique index on
+`(tournament_id, sequence_number)`) is to be applied at merge time, so run `list_migrations` first
+thing to see whether it has landed. PLAN.md's step 12 (full regression + live Playwright pass) is the
+remaining verification. The integration-test fixture cleanup rule (controller runs the UUID-regex
+`execute_sql` pass; subagents never do) still applies. `docs/SPEC.md` §4-§6/§9 and its "Updated:
+2026-10-08" note describe the built behavior.
+
+**Phase 23, delete a confirmed match result:** reverses the previous
 "permanently locked, no admin-override" rule for whole-match deletion only (in-place score editing
 is still unsupported). A passphrase-gated confirm dialog previews per-player stat impact before
 deleting; reachable from History (any match, any tournament, active or ended) or as a "delete last
-match" quick-undo on the Manage screen's newest Rounds-played row immediately after confirming a
+match" quick-undo on the Manage screen's newest Matches-played row immediately after confirming a
 result. Hard delete of the match + games + participants — doesn't renumber `sequence_number` or
-restore Current/Next state. `docs/SPEC.md` §6 and its "Updated: 2026-09-14" note describe this as
+restore court/queue state. `docs/SPEC.md` §6 and its "Updated: 2026-09-14" note describe this as
 the current target state and are accurate as of this note.
 
 Two intermediate phases, for context: **Phase 21** (Create Tournament form refinements — blank-by-
 default stepper inputs for games/match and points/game, Tennis's points-per-game fixed at 4 and
 shown disabled rather than hidden) and **Phase 22** (Next-match Edit popup gained a read-only
 games-played reference table, and an un-started Next-match draw now persists to `localStorage` per
-tournament so navigating away doesn't lose it).
+tournament so navigating away doesn't lose it — both since carried over into Phase 24's queue).
 
 **Node version note:** the local Node is v20.13.1, below what several current package majors
 require (`vite@8`+/rolldown, `eslint@10`'s dependency chain declares `^20.19`, `jsdom@30`+). Where
@@ -116,12 +138,16 @@ surfaced real pre-existing errors once actually run.
   layer; `sport/` is new as of Phase 20 — `SportContext`/`SportProvider`/`useSport`, mirroring the
   `features/passphrase/` context/provider/hook shape, backed by `src/lib/sportStore.ts`
   (`localStorage`, unlike the passphrase gate's `sessionStorage`, since the chosen sport persists
-  across restarts))
+  across restarts); as of Phase 24 the multi-court queue lives in `src/lib/matchQueueStore.ts`
+  (`localStorage`, per tournament) with its hooks in `features/matches/` — `useMatchQueueDrafts`,
+  `useStartMatchOnCourt`)
 - `src/features/matchmaking/` — **the core algorithm, framework- and DB-free (pure TypeScript)**.
   This is explicitly the highest-risk, most heavily tested part of the codebase; its test suite
   (`generateNextMatch` and helpers) is called out in the plan as "the most important test asset in
   the project." Keep this module free of React/Supabase dependencies so it stays independently
-  unit-testable.
+  unit-testable. `plannedMatches.ts` (Phase 24 — `applyPlannedMatches`, `findReusedPlayerIds`,
+  `drawMatches`) lives here too: pure helpers that turn in-progress + queued rosters into planned
+  match counts/pairings before calling `generateNextMatch`.
 - `src/i18n/` — `en.json`/`th.json`, locale toggle persisted to `localStorage`
 - `src/components/` — shared UI components
 - Supabase migrations + SQL views (`player_stats`, `tournament_standings`, and — as of Phase 13 —
@@ -149,7 +175,7 @@ surfaced real pre-existing errors once actually run.
   18 (`docs/IMPROVEMENT3.md`), a **deliberate reversal** of the original "never after" rule that
   Phase 13 had introduced — the roster can change mid-tournament via two guarded actions: an active
   participant can **Leave** (soft-remove, reversible, blocked while they're in the in-progress
-  Current match or once the tournament has ended/been cancelled; immediately excluded from the
+  match on any court or once the tournament has ended/been cancelled; immediately excluded from the
   Match Generator's candidate pool, but History/Scoreboard are untouched since those read
   completed-match data, not the roster) and the organizer can **Add participant** to bring in a late
   arrival or rejoin someone who left (reuses the same `tournament_participants` row rather than
@@ -161,7 +187,8 @@ surfaced real pre-existing errors once actually run.
 - A tournament is singles OR doubles (not both), with its own games-per-match, points-per-game, and
   a deuce cap **auto-computed from the BWF 21→30 ratio**: `cap = round(pointsPerGame * 30 / 21)`.
   There is **no fixed total round/match count** — a tournament runs until the organizer manually
-  ends it; UI showing round progress must say "Round N", never "Round N of M".
+  ends it; UI showing progress must say "Match N", never "Match N of M" (the pre-Phase-24 "Round N"
+  labels are gone).
 - Best-of-N match results that include more games than needed to decide the match (e.g. a 3rd game
   after a 2-0 sweep in best-of-3) must be **rejected** at validation, not silently accepted.
 - Once a match **result** is confirmed (via the confirm-before-save dialog), its **scores are
@@ -171,18 +198,20 @@ surfaced real pre-existing errors once actually run.
   reachable from History (any match, any tournament) or as a "delete last match" quick-undo on the
   Manage screen right after confirming a result (see "Project status" above for the full picture).
   Separately (per `docs/IMPROVEMENT2.md` §2, Phase 14), a match that's been drawn but **not yet
-  started** — the auto-drawn first match's creation-time confirmation popup, or the Manage screen's Next match card
-  before Start match is tapped — can have its players edited inline, swapping a drawn player for
+  started** — one of the auto-drawn first matches in the creation-time confirmation popup, or any
+  entry in the Manage screen's queue before it is started — can have its players edited inline, swapping a drawn player for
   someone else in the tournament's roster. This only touches the *draw*, never a confirmed *result*;
   the UI warns but does not block if the edited lineup violates the gender-balance rule below, and
   the edited match is flagged as manually-adjusted (visible later in History).
-- Single-court model: matches are drawn one at a time. As of Phase 13, drawing is split into two
-  explicit, independently-managed slots in the Manage Tournament screen — **Next match** (filled
-  only by an explicit "Randomize" tap, one match type's needed-player-count via
-  `getNeededPlayerCount`) and **Current match** (only populated by an explicit "Start match" tap
-  that promotes whatever's in Next; never auto-promoted when a result is confirmed). The
-  tournament's very first match is the one exception — it's auto-drawn immediately at creation
-  time, with a confirmation popup, before the organizer ever sees the Manage screen.
+- Multi-court model (Phase 24, replacing the Phase 13 single-court Next/Current slots): a tournament
+  has 1-8 courts, each with at most one in-progress match; drawn-but-not-started matches wait in one
+  shared **queue** (max courts + 1) filled only by explicit "Randomize"/"Fill queue" taps (each draw
+  is one match's `getNeededPlayerCount`). "Start match" on a free court moves the queue head onto it
+  — never auto-started or auto-promoted when a result is confirmed. The tournament's first n matches
+  (n = courts) are the one exception: they are drawn at creation time, shown in a confirmation
+  popup, and placed in the queue (still not auto-started). Per-court Save is locked while the queue
+  is empty unless that court's "Is last match" is ticked; Start is blocked if a head player is on
+  another court. Labels are "Match N" (plus "· Court X" when courts > 1), never "Round N".
 - Matchmaking priority order (highest to lowest): **equal match count** (per `docs/IMPROVEMENT2.md`
   §1.1, implemented in Phase 14, this is a **hard invariant** — the gap between the most- and
   least-played participant must never exceed 1; when the lowest-count tier is short of the needed
@@ -193,10 +222,12 @@ surfaced real pre-existing errors once actually run.
   `docs/IMPROVEMENT2.md` §1.2, implemented in Phase 14): gender balance (2-male-2-female quartets/team
   splits over any unbalanced alternative) is promoted to a **hard filter above skill balance**, not
   a tiebreak — so for doubles the effective order is equal match count → gender balance (hard) →
-  skill balance → avoid repeat pairings; singles is unaffected. **Current-match exclusion** (per
-  `docs/IMPROVEMENT2.md` §1.3, implemented in Phase 14): while a Current match is in progress, its
-  participants are excluded from the Next-match candidate pool, with a reuse fallback + UI warning
-  if too few other players remain.
+  skill balance → avoid repeat pairings; singles is unaffected. **Planned counts** (Phase 24, replacing
+  `docs/IMPROVEMENT2.md` §1.3's Current-match exclusion): the fairness count is completed +
+  in-progress (any court) + already-queued matches, so committed players are drawn later; a player
+  is only reused across queued/in-progress matches when too few others remain, with a UI warning
+  derived from the queue each render. Leave/Add participant offsets still use completed matches
+  only (known limitation).
 - **Two distinct scoreboards, both win-rate-based** (as of Phase 13 — the earlier games-won/
   point-diff "Standings" screen was deleted): a **per-tournament Scoreboard** (match win rate within
   one tournament, tiebreak by point differential) that works identically whether the tournament is

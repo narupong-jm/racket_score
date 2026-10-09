@@ -39,6 +39,16 @@ works identically per sport.
   never affect each other. A member with no level yet in the active sport
   can't be selected as a tournament participant until one is set on the
   Member tab.
+- **Multi-court tournaments** — pick 1-8 courts when creating a tournament
+  (fixed afterward). Each court runs its own in-progress match and saves its
+  own result independently; a free court shows a one-tap Start button for
+  the next queued match. Matches are labelled "Match N", with "· Court X"
+  added when the tournament has more than one court
+- **Shared match queue** — drawn-but-not-started matches wait in one queue
+  (up to courts + 1), filled with Randomize or Fill queue. The Create flow
+  draws the first n matches into it; each entry can be edited or removed
+  before it starts. The queue lives in `localStorage` per tournament, so it
+  survives navigating away but stays on that one browser
 - Balanced random matchmaking (not round-robin) — see [Matchmaking
   algorithm](#matchmaking-algorithm) below
 - Singles **or** doubles per tournament, with configurable games-per-match
@@ -55,9 +65,8 @@ works identically per sport.
   doubles' gender-balance rule; edited matches are flagged in History. The
   edit popup shows a read-only games-played reference table for every
   roster player, sorted fewest-to-most, so the organizer can see who's
-  behind while swapping; a randomized-but-not-started Next match also
-  survives navigating away (persisted per tournament in `localStorage`
-  until Start match promotes it)
+  behind while swapping, with a "Now" column showing which court or queue
+  slot each player is currently in
 - Mid-tournament roster changes: a participant can leave (soft-removed,
   reversible, immediately excluded from future draws) and the organizer
   can add a late arrival or bring a left participant back — either way a
@@ -109,8 +118,10 @@ These are deliberate design choices, not missing features:
 - **Cancelling a tournament is permanent.** It's only available before the
   tournament's first match result is confirmed, and there's no path back
   to active once cancelled.
-- **No fixed round count.** The UI always shows "Round N", never "Round N of
+- **No fixed match count.** The UI always shows "Match N", never "Match N of
   M" — a tournament runs until the organizer manually ends it.
+- **The queue is per browser.** It is not shared between devices, and the
+  number of courts can't be changed after a tournament is created.
 - **No real-time sync.** Data updates via polling/manual refresh only.
 - **No photo upload.** Player avatars are always a generated placeholder.
 - **Doubles pairs are never persisted as an entity.** Every tournament
@@ -137,9 +148,12 @@ above skill balance — a 2-male/2-female quartet split into two mixed-gender
 teams is always preferred over an unbalanced alternative, not just used to
 break a tie. Singles is unaffected.
 
-While a match is in progress, its participants are excluded from the next
-draw's candidate pool (falling back to reusing one, with a UI warning, only
-if too few other players remain).
+Fairness is computed on each player's _planned_ match count — completed
+matches plus matches in progress on any court plus matches already queued
+ahead — so someone already committed to a court or queue slot is drawn after
+those who aren't. If too few other players remain, a player may be drawn into
+a second queued match, with a UI warning; a match still can't be started
+while any of its players is in another in-progress match.
 
 Random tie-breaking in step 5 never overrides a higher-priority criterion —
 it only chooses among players/pairings that are already equivalent on every
@@ -313,16 +327,16 @@ client-side routing.
 
 ## Documentation map
 
-| File                                           | Purpose                                                                           |
-| ---------------------------------------------- | --------------------------------------------------------------------------------- |
-| [`docs/SPEC.md`](docs/SPEC.md)                 | Normative product requirements — source of truth for what to build                |
-| [`docs/IMPROVEMENT.md`](docs/IMPROVEMENT.md)   | UX rationale behind the 5-tab navigation rework                                   |
-| [`docs/IMPROVEMENT2.md`](docs/IMPROVEMENT2.md) | Post-launch patch: matchmaking corrections, manual draw editing, History collapse |
-| [`docs/IMPROVEMENT3.md`](docs/IMPROVEMENT3.md) | Post-launch patch: mid-tournament Leave / Add participant, fairness offset        |
+| File                                           | Purpose                                                                            |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [`docs/SPEC.md`](docs/SPEC.md)                 | Normative product requirements — source of truth for what to build                 |
+| [`docs/IMPROVEMENT.md`](docs/IMPROVEMENT.md)   | UX rationale behind the 5-tab navigation rework                                    |
+| [`docs/IMPROVEMENT2.md`](docs/IMPROVEMENT2.md) | Post-launch patch: matchmaking corrections, manual draw editing, History collapse  |
+| [`docs/IMPROVEMENT3.md`](docs/IMPROVEMENT3.md) | Post-launch patch: mid-tournament Leave / Add participant, fairness offset         |
 | [`docs/IMPROVEMENT4.md`](docs/IMPROVEMENT4.md) | Multi-sport support (Badminton + Tennis): schema, sport workspace, per-sport level |
-| [`docs/PLAN.md`](docs/PLAN.md)                 | Phased implementation plan and stack decisions                                    |
-| [`docs/RESEARCH.md`](docs/RESEARCH.md)         | Point-in-time snapshot of environment/account state at planning time              |
-| [`CLAUDE.md`](CLAUDE.md)                       | Instructions for AI coding agents working in this repo                            |
+| [`docs/PLAN.md`](docs/PLAN.md)                 | Phased implementation plan and stack decisions                                     |
+| [`docs/RESEARCH.md`](docs/RESEARCH.md)         | Point-in-time snapshot of environment/account state at planning time               |
+| [`CLAUDE.md`](CLAUDE.md)                       | Instructions for AI coding agents working in this repo                             |
 
 ## License
 

@@ -78,8 +78,8 @@ concurrently, and a shared pre-drawn queue of up to **courts + 1** matches
 feeds whichever court frees up first. The Match Generator's fairness inputs
 now count planned matches (§5), and match labels change from "Round N" to
 "Match N" with a court name (§9). A tournament created before this change
-is a 1-court tournament and behaves as before. Not yet implemented as of
-this note.
+is a 1-court tournament and behaves as before. Implemented (Phase 24 in
+`docs/PLAN.md`).
 
 ## 1. Overview
 
@@ -285,9 +285,9 @@ sport (§3).
   **Cancel** action instead of End Tournament (§9); once a first result
   is confirmed, Cancel disappears for good and the normal End Tournament
   flow takes over. Cancelling sets the tournament's status to
-  **cancelled**, discards any drawn-but-unconfirmed match (Next or
-  Current — §9), and cannot be undone; there is no reactivation path back
-  to active. Because it's only available pre-first-result, a cancelled
+  **cancelled**, discards any drawn-but-unconfirmed match (queued or
+  in progress on any court — §9), and cannot be undone; there is no
+  reactivation path back to active. Because it's only available pre-first-result, a cancelled
   tournament never has any confirmed match data, so it cannot affect
   `player_stats` or scoreboard views.
 
@@ -361,8 +361,11 @@ slot when too few other players remain to fill the match (for example, 12
 players on 2 doubles courts leaves only 4 free players for a queue that
 can hold 3 matches). In that case the draw is allowed anyway, with a
 visible warning in the UI that someone was reused — the same fallback the
-former single-court rule used. The reuse is only ever about *queued*
-matches: a match cannot be started while any of its players is in another
+former single-court rule used. The warning is derived from the current
+queue and in-progress rosters rather than remembered from the draw, so it
+stays visible for as long as an overlap exists (including after a reload or
+an edit) and disappears once it is resolved. The reuse is only ever about
+*queued* matches: a match cannot be started while any of its players is in another
 in-progress match (§4, §9).
 
 The planned-count inputs must always reflect each in-progress and queued
@@ -371,7 +374,7 @@ match's **actual, up-to-date roster** — including any inline edit made via
 
 **Excluding participants who left:** a participant marked as **left**
 (§4) is removed from the candidate pool entirely, unconditionally — unlike
-the Current-match exclusion above, there is no fallback that reuses a left
+the soft reuse fallback above, there is no fallback that reuses a left
 participant, since they've told the organizer they're not available. A
 participant added mid-tournament (§4, late arrival or rejoin) enters the
 pool with their **fairness offset** already folded into the
@@ -536,8 +539,9 @@ at every screen size (not a responsive top-nav on wider viewports):
    tournament and its participants are created, the **first n matches**
    (n = number of courts) are drawn immediately per the Match Generator
    (§5), one after another so each counts toward the next's planned counts,
-   and shown together in a confirmation popup; on confirm they are placed in
-   the queue (not auto-started — the organizer taps Start match per court,
+   and shown together in a confirmation popup (titled "First match
+   drawn" for a 1-court tournament, "First *n* matches drawn" otherwise); on
+   confirm they are placed in the queue (not auto-started — the organizer taps Start match per court,
    below), and the organizer is taken directly into that tournament's
    Manage screen (tab 2's drill-down, below) — the new tournament also
    appears in tab 2's list automatically. If the roster is too small to
@@ -552,7 +556,7 @@ at every screen size (not a responsive top-nav on wider viewports):
    **Confirm** sits below the list.
 2. **Active** — list of tournaments currently in progress. Each card:
    name, type, current match number (e.g. "Match 7" — the highest match
-   number started so far; there is no fixed total match count and therefore
+   number started so far, "Match 0" before the first Start match; there is no fixed total match count and therefore
    no progress fraction/bar).
    Tapping a card opens **Manage tournament** for it:
    - **Participants** — the tournament's roster (photo/avatar, name, level),
