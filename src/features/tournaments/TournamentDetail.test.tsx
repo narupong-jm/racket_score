@@ -2273,3 +2273,167 @@ describe('TournamentDetail: Start failure and pending state', () => {
     ).toBeDisabled()
   })
 })
+
+describe('TournamentDetail: queue vs. roster and Start/Cancel bookkeeping', () => {
+  it('drops queued matches containing a participant who already left (e.g. on another device)', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      makeParticipant('p1'),
+      makeParticipant('p2', 'left'),
+      makeParticipant('p3'),
+      makeParticipant('p4'),
+    ])
+    vi.mocked(playersApi.listPlayers).mockResolvedValue(fourPlayers)
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    seedQueue([singles('p1', 'p2'), singles('p3', 'p4')])
+
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    expect(
+      await screen.findByRole('heading', { name: 'Queue (1/2)' }),
+    ).toBeInTheDocument()
+    expect(within(queueCard()).getByText('Carol vs Dave')).toBeInTheDocument()
+    expect(within(queueCard()).queryByText('Alice vs Bob')).toBeNull()
+    expect(getQueue('t1')).toEqual([singles('p3', 'p4')])
+  })
+
+  it('does not offer a participant who left in the queue Edit pickers', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      makeParticipant('p1'),
+      makeParticipant('p2'),
+      makeParticipant('p3', 'left'),
+    ])
+    vi.mocked(playersApi.listPlayers).mockResolvedValue(fourPlayers)
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    seedQueue([singles('p1', 'p2')])
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Edit 1. Alice vs Bob' }),
+    )
+    const picker = screen.getByRole('combobox', { name: 'Team 1 player 1' })
+    expect(within(picker).queryByRole('option', { name: 'Carol' })).toBeNull()
+  })
+
+  it('Start removes the entry that was started even if the queue head changed while it was in flight', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
+      makeParticipant('p1'),
+      makeParticipant('p2'),
+      makeParticipant('p3'),
+      makeParticipant('p4'),
+    ])
+    vi.mocked(playersApi.listPlayers).mockResolvedValue(fourPlayers)
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    let release: () => void = () => {}
+    vi.mocked(matchesApi.createMatch).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve(makeMatch('m-new', 1, 'queued', 1))
+        }),
+    )
+    seedQueue([singles('p1', 'p2'), singles('p3', 'p4')])
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Start ▶ Alice vs Bob' }),
+    )
+    await waitFor(() => expect(matchesApi.createMatch).toHaveBeenCalled())
+
+    // Meanwhile the started head is removed (e.g. from another tab).
+    setQueue('t1', [singles('p3', 'p4')])
+    const listCallsBefore = vi.mocked(matchesApi.listMatches).mock.calls.length
+    release()
+
+    // The success handler (queue update, then invalidation) has run once the
+    // matches query is refetched.
+    await waitFor(() => {
+      expect(
+        vi.mocked(matchesApi.listMatches).mock.calls.length,
+      ).toBeGreaterThan(listCallsBefore)
+    })
+    expect(getQueue('t1')).toEqual([singles('p3', 'p4')])
+  })
+
+  it('clears the stored queue when the tournament is cancelled', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    vi.mocked(tournamentsApi.cancelTournament).mockResolvedValue({
+      ...activeTournament,
+      status: 'cancelled',
+    })
+    seedQueue([singles('p1', 'p2')])
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Cancel tournament' }),
+    )
+    await user.click(
+      screen.getByRole('button', { name: 'Yes, cancel tournament' }),
+    )
+
+    await waitFor(() => {
+      expect(tournamentsApi.cancelTournament).toHaveBeenCalled()
+    })
+    await waitFor(() => {
+      expect(localStorage.getItem('racket-score.matchQueue.t1')).toBeNull()
+    })
+  })
+
+  it('clears the stored queue when the tournament is ended', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([
+      makeMatch('m1', 1, 'completed'),
+    ])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([
+      { match_id: 'm1', player_id: 'p1', team: 1 },
+      { match_id: 'm1', player_id: 'p2', team: 2 },
+    ])
+    vi.mocked(tournamentsApi.endTournament).mockResolvedValue({
+      ...activeTournament,
+      status: 'completed',
+    })
+    seedQueue([singles('p1', 'p2')])
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'End tournament' }),
+    )
+    await user.click(await screen.findByRole('button', { name: /^Yes, end/ }))
+
+    await waitFor(() => {
+      expect(tournamentsApi.endTournament).toHaveBeenCalled()
+    })
+    await waitFor(() => {
+      expect(localStorage.getItem('racket-score.matchQueue.t1')).toBeNull()
+    })
+  })
+})

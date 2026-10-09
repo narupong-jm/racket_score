@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useTournaments } from './useTournaments'
 import { useEndTournament } from './useEndTournament'
@@ -64,6 +64,23 @@ export function TournamentDetail({
   const queueDrafts = useMatchQueueDrafts(tournamentId)
   const startMatch = useStartMatchOnCourt(tournamentId)
 
+  // The queue lives in this browser only, so a participant can leave from
+  // another device (or after this screen unmounted mid-Leave) while still
+  // sitting in a queued match here. Never let such an entry be started.
+  const { queue: storedQueue, removeContaining } = queueDrafts
+  useEffect(() => {
+    for (const participant of participants ?? []) {
+      if (
+        participant.status === 'left' &&
+        storedQueue.some((m) =>
+          m.participants.some((p) => p.playerId === participant.player_id),
+        )
+      ) {
+        removeContaining(participant.player_id)
+      }
+    }
+  }, [participants, storedQueue, removeContaining])
+
   if (!tournament) return <p>{t('tournaments.detail.notFound')}</p>
 
   const isActive = tournament.status === 'active'
@@ -77,6 +94,7 @@ export function TournamentDetail({
   const playerNameById = new Map((players ?? []).map((p) => [p.id, p.name]))
   const rosterPlayers: RosterPlayer[] = (participants ?? []).flatMap(
     (participant) => {
+      if (participant.status !== 'active') return []
       const player = players?.find((p) => p.id === participant.player_id)
       if (!player || (player.gender !== 'male' && player.gender !== 'female'))
         return []

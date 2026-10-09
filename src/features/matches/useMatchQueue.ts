@@ -10,7 +10,7 @@ import {
   type MatchParticipantInput,
 } from './matchesApi'
 import { usePassphraseGate } from '../passphrase/usePassphraseGate'
-import { shiftQueue } from '../../lib/matchQueueStore'
+import { getQueue, setQueue } from '../../lib/matchQueueStore'
 
 export interface TournamentMatches {
   matches: Match[]
@@ -47,6 +47,32 @@ export interface StartMatchOnCourtInput {
   courtNumber: number
 }
 
+function lineupKey(participants: { playerId: string; team: number }[]): string {
+  return participants
+    .map((p) => `${p.team}:${p.playerId}`)
+    .sort()
+    .join('|')
+}
+
+/** Removes the first queued entry with the started lineup; no-op if gone. */
+function removeStartedEntry(
+  tournamentId: string,
+  started: MatchParticipantInput[],
+) {
+  const key = lineupKey(
+    started.map((p) => ({ playerId: p.player_id, team: p.team })),
+  )
+  const current = getQueue(tournamentId)
+  const index = current.findIndex(
+    (entry) => lineupKey(entry.participants) === key,
+  )
+  if (index === -1) return
+  setQueue(
+    tournamentId,
+    current.filter((_, i) => i !== index),
+  )
+}
+
 export function useStartMatchOnCourt(tournamentId: string) {
   const queryClient = useQueryClient()
   const { getPassphrase } = usePassphraseGate()
@@ -67,11 +93,13 @@ export function useStartMatchOnCourt(tournamentId: string) {
       )
     },
     // Mutation-level (not per-mutate) so it still runs if the component
-    // unmounts mid-flight. The started match is always the queue head. The
-    // returned promise makes React Query wait for the refetches before any
+    // unmounts mid-flight. The started entry is normally the queue head, but
+    // the queue can change while the request is in flight (Leave, another tab),
+    // so remove the entry that was actually started, not whatever is first now.
+    // The returned promise makes React Query wait for the refetches before any
     // call-site onSuccess, so callers see fresh in-progress rosters.
-    onSuccess: () => {
-      shiftQueue(tournamentId)
+    onSuccess: (_data, { participants }) => {
+      removeStartedEntry(tournamentId, participants)
       return Promise.all([
         queryClient.invalidateQueries({ queryKey: ['matches', tournamentId] }),
         queryClient.invalidateQueries({

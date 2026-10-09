@@ -3053,7 +3053,14 @@ Thai wording nits (`reusedWarning`, `removeFromQueue`); `manage.done` is kept on
     with "Delete last match" on the newest only; Active "Match 2"; History "Match 2 · Court 2" vs. "Match 19" for 1-court;
     1-court create "First match drawn". The deferred `useRecordMatchResult` race was real (invalidations were not awaited)
     and is fixed with a failing-first test. Fixtures cleaned (9 tournaments / 16 players / 106 matches / 0 queued / 0 UUID rows).
-    **Remaining:** final whole-branch review, then merge + migration 2b + CLAUDE.md "shipped".
+    **Final whole-branch review (2026-10-09): 0 Critical, 2 Important, 11 Minor.** Fixed before merge (tests first):
+    I2 — queued matches containing a participant who has left are dropped automatically, and Edit pickers / games table
+    list active participants only; M2 — Start removes the entry that was actually started, not whatever is first when the
+    request returns; M3 — Cancel/End clear the stored queue. I1 became the merge checklist under step 2b. Left for
+    follow-up (not blocking): generic Start error copy + no refetch on failure, End while other courts are in progress,
+    games-played table includes the fairness offset, create-popup reuse warning not re-derived after edits, dismissing the
+    create popup loses the drawn queue, non-integer court count, index-keyed Edit popup, two dead locale keys
+    (`manage.courtHeading`, `manage.done`), a few weak tests. **Remaining:** merge + migration 2b + CLAUDE.md "shipped".
 
 **Known limitations carried into this phase (deliberate):**
 - The queue is browser-local (SPEC §9), so a second device won't see it.

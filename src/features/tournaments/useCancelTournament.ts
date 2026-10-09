@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { cancelTournament } from './tournamentsApi'
 import { usePassphraseGate } from '../passphrase/usePassphraseGate'
+import { clearQueue } from '../../lib/matchQueueStore'
 
 export function useCancelTournament() {
   const queryClient = useQueryClient()
@@ -11,6 +12,7 @@ export function useCancelTournament() {
       return cancelTournament(tournamentId, passphrase)
     },
     onSuccess: (_data, tournamentId) => {
+      clearQueue(tournamentId)
       queryClient.invalidateQueries({ queryKey: ['tournaments'] })
       queryClient.invalidateQueries({ queryKey: ['matches', tournamentId] })
     },
