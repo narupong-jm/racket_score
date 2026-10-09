@@ -17,7 +17,9 @@ function makeGame(
   }
 }
 
-function makeStats(overrides: Partial<PlayerStats> & { player_id: string }): PlayerStats {
+function makeStats(
+  overrides: Partial<PlayerStats> & { player_id: string },
+): PlayerStats {
   return {
     player_id: overrides.player_id,
     sport: 'badminton',
@@ -47,8 +49,24 @@ describe('computeMatchImpactPreview', () => {
     ]
     const games = [makeGame('m1', 1, 21, 15), makeGame('m1', 2, 21, 18)]
     const statsByPlayerId = new Map<string, PlayerStats>([
-      ['p1', makeStats({ player_id: 'p1', total_matches: 5, total_wins: 4, win_rate: 80 })],
-      ['p2', makeStats({ player_id: 'p2', total_matches: 5, total_wins: 1, win_rate: 20 })],
+      [
+        'p1',
+        makeStats({
+          player_id: 'p1',
+          total_matches: 5,
+          total_wins: 4,
+          win_rate: 80,
+        }),
+      ],
+      [
+        'p2',
+        makeStats({
+          player_id: 'p2',
+          total_matches: 5,
+          total_wins: 1,
+          win_rate: 20,
+        }),
+      ],
     ])
 
     const result = computeMatchImpactPreview(
@@ -85,10 +103,42 @@ describe('computeMatchImpactPreview', () => {
     ]
     const games = [makeGame('m2', 1, 15, 21), makeGame('m2', 2, 10, 21)]
     const statsByPlayerId = new Map<string, PlayerStats>([
-      ['p1', makeStats({ player_id: 'p1', total_matches: 3, total_wins: 1, win_rate: 33.33 })],
-      ['p2', makeStats({ player_id: 'p2', total_matches: 2, total_wins: 0, win_rate: 0 })],
-      ['p3', makeStats({ player_id: 'p3', total_matches: 4, total_wins: 3, win_rate: 75 })],
-      ['p4', makeStats({ player_id: 'p4', total_matches: 1, total_wins: 1, win_rate: 100 })],
+      [
+        'p1',
+        makeStats({
+          player_id: 'p1',
+          total_matches: 3,
+          total_wins: 1,
+          win_rate: 33.33,
+        }),
+      ],
+      [
+        'p2',
+        makeStats({
+          player_id: 'p2',
+          total_matches: 2,
+          total_wins: 0,
+          win_rate: 0,
+        }),
+      ],
+      [
+        'p3',
+        makeStats({
+          player_id: 'p3',
+          total_matches: 4,
+          total_wins: 3,
+          win_rate: 75,
+        }),
+      ],
+      [
+        'p4',
+        makeStats({
+          player_id: 'p4',
+          total_matches: 1,
+          total_wins: 1,
+          win_rate: 100,
+        }),
+      ],
     ])
 
     const result = computeMatchImpactPreview(
@@ -131,7 +181,15 @@ describe('computeMatchImpactPreview', () => {
     const games = [makeGame('m3', 1, 21, 10), makeGame('m3', 2, 21, 12)]
     // p5 has no entry in statsByPlayerId at all.
     const statsByPlayerId = new Map<string, PlayerStats>([
-      ['p1', makeStats({ player_id: 'p1', total_matches: 1, total_wins: 1, win_rate: 100 })],
+      [
+        'p1',
+        makeStats({
+          player_id: 'p1',
+          total_matches: 1,
+          total_wins: 1,
+          win_rate: 100,
+        }),
+      ],
     ])
 
     const result = computeMatchImpactPreview(
@@ -160,8 +218,24 @@ describe('computeMatchImpactPreview', () => {
     // 1-1 on games won: nobody "won" the match.
     const games = [makeGame('m4', 1, 21, 15), makeGame('m4', 2, 15, 21)]
     const statsByPlayerId = new Map<string, PlayerStats>([
-      ['p1', makeStats({ player_id: 'p1', total_matches: 4, total_wins: 2, win_rate: 50 })],
-      ['p2', makeStats({ player_id: 'p2', total_matches: 4, total_wins: 2, win_rate: 50 })],
+      [
+        'p1',
+        makeStats({
+          player_id: 'p1',
+          total_matches: 4,
+          total_wins: 2,
+          win_rate: 50,
+        }),
+      ],
+      [
+        'p2',
+        makeStats({
+          player_id: 'p2',
+          total_matches: 4,
+          total_wins: 2,
+          win_rate: 50,
+        }),
+      ],
     ])
 
     const result = computeMatchImpactPreview(
@@ -186,8 +260,24 @@ describe('computeMatchImpactPreview', () => {
     ]
     const games: MatchGame[] = []
     const statsByPlayerId = new Map<string, PlayerStats>([
-      ['p1', makeStats({ player_id: 'p1', total_matches: 1, total_wins: 1, win_rate: 100 })],
-      ['p2', makeStats({ player_id: 'p2', total_matches: 1, total_wins: 0, win_rate: 0 })],
+      [
+        'p1',
+        makeStats({
+          player_id: 'p1',
+          total_matches: 1,
+          total_wins: 1,
+          win_rate: 100,
+        }),
+      ],
+      [
+        'p2',
+        makeStats({
+          player_id: 'p2',
+          total_matches: 1,
+          total_wins: 0,
+          win_rate: 0,
+        }),
+      ],
     ])
 
     const result = computeMatchImpactPreview(

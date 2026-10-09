@@ -362,6 +362,10 @@ describe('matchesApi: deleteMatchResult (real project, anon key)', () => {
     expect(
       beforeDelete.some((entry) => entry.match.id === matchToDeleteId),
     ).toBe(true)
+    expect(
+      beforeDelete.find((entry) => entry.match.id === matchToDeleteId)
+        ?.courtCount,
+    ).toBe(1)
 
     await deleteMatchResult(matchToDeleteId, testWritePassphrase)
 

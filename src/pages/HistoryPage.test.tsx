@@ -85,6 +85,7 @@ const recentMatch: RecentCompletedMatch = {
     manually_adjusted: false,
   },
   tournamentName: 'Sunday Smash',
+  courtCount: 1,
   participants: [
     { match_id: 'm1', player_id: 'p1', team: 1 },
     { match_id: 'm1', player_id: 'p2', team: 2 },
@@ -146,13 +147,13 @@ describe('HistoryPage', () => {
     ).toBeInTheDocument()
 
     // Collapsed by default: heading + toggle only, no item content yet.
-    expect(screen.queryByText('Round 2')).toBeNull()
+    expect(screen.queryByText('Match 2')).toBeNull()
     expect(screen.queryByText('Winter Cup')).toBeNull()
     const toggles = screen.getAllByRole('button', { name: 'Show more' })
     expect(toggles).toHaveLength(2)
 
     await user.click(toggles[0])
-    expect(await screen.findByText('Round 2')).toBeInTheDocument()
+    expect(await screen.findByText('Match 2')).toBeInTheDocument()
     expect(screen.getByText('Alice')).toBeInTheDocument()
     expect(screen.getByText('Bob')).toBeInTheDocument()
     expect(screen.getByText('1-0')).toBeInTheDocument()
@@ -160,6 +161,31 @@ describe('HistoryPage', () => {
     await user.click(screen.getByRole('button', { name: 'Show more' }))
     expect(await screen.findByText('Winter Cup')).toBeInTheDocument()
     expect(screen.getAllByText('Sunday Smash').length).toBeGreaterThan(0)
+  })
+
+  it('shows the court name on by-match rows only for multi-court tournaments', async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+    vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([
+      {
+        ...recentMatch,
+        courtCount: 2,
+        match: { ...recentMatch.match, id: 'm9', court_number: 2 },
+      },
+      {
+        ...recentMatch,
+        match: { ...recentMatch.match, id: 'm8', sequence_number: 5 },
+      },
+    ])
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([])
+
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.click(
+      (await screen.findAllByRole('button', { name: 'Show more' }))[0],
+    )
+    expect(await screen.findByText('Match 2 · Court 2')).toBeInTheDocument()
+    expect(screen.getByText('Match 5')).toBeInTheDocument()
   })
 
   it('links every By-tournament row to its scoreboard, regardless of status', async () => {
@@ -202,7 +228,7 @@ describe('HistoryPage', () => {
       renderPage()
 
       await screen.findByRole('heading', { name: 'By match' })
-      expect(screen.queryByText('Round 2')).toBeNull()
+      expect(screen.queryByText('Match 2')).toBeNull()
       expect(screen.queryByText('Sunday Smash')).toBeNull()
       expect(screen.getAllByRole('button', { name: 'Show more' })).toHaveLength(
         2,
@@ -227,7 +253,7 @@ describe('HistoryPage', () => {
 
       await user.click(byMatchToggle)
 
-      expect(await screen.findByText('Round 2')).toBeInTheDocument()
+      expect(await screen.findByText('Match 2')).toBeInTheDocument()
       expect(byMatchToggle).toHaveTextContent('Show less')
     })
 
@@ -248,10 +274,10 @@ describe('HistoryPage', () => {
         byMatchHeading.parentElement!.querySelector('button')!
 
       await user.click(byMatchToggle)
-      expect(await screen.findByText('Round 2')).toBeInTheDocument()
+      expect(await screen.findByText('Match 2')).toBeInTheDocument()
 
       await user.click(byMatchToggle)
-      expect(screen.queryByText('Round 2')).toBeNull()
+      expect(screen.queryByText('Match 2')).toBeNull()
       expect(byMatchToggle).toHaveTextContent('Show more')
     })
 
@@ -272,7 +298,7 @@ describe('HistoryPage', () => {
         byMatchHeading.parentElement!.querySelector('button')!
 
       await user.click(byMatchToggle)
-      expect(await screen.findByText('Round 2')).toBeInTheDocument()
+      expect(await screen.findByText('Match 2')).toBeInTheDocument()
 
       // By tournament section is untouched -- still collapsed.
       const byTournamentHeading = screen.getByRole('heading', {
@@ -327,7 +353,7 @@ describe('HistoryPage', () => {
 
       await user.click(screen.getAllByRole('button', { name: 'Show more' })[0])
 
-      await screen.findByText('Round 2')
+      await screen.findByText('Match 2')
       expect(screen.queryByText('Manually adjusted')).toBeNull()
     })
 
@@ -347,7 +373,7 @@ describe('HistoryPage', () => {
 
       await user.click(screen.getAllByRole('button', { name: 'Show more' })[0])
 
-      expect(await screen.findByText('Round 2')).toBeInTheDocument()
+      expect(await screen.findByText('Match 2')).toBeInTheDocument()
       expect(screen.getByText('Manually adjusted')).toBeInTheDocument()
     })
   })
@@ -383,7 +409,7 @@ describe('HistoryPage', () => {
       renderPage()
 
       await user.click(screen.getAllByRole('button', { name: 'Show more' })[0])
-      await screen.findByText('Round 2')
+      await screen.findByText('Match 2')
 
       return {
         user,

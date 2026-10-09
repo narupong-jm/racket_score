@@ -45,7 +45,6 @@
     "loading": "Loading tournaments...",
     "loadError": "Failed to load tournaments.",
     "empty": "No active tournaments",
-    "roundLabel": "Round {{n}}",
     "matchLabel": "Match {{n}}"
   },
   "history": {
@@ -205,7 +204,6 @@
     "gameScoreLine": "Game {{n}}: {{team1}} {{team1Score}} - {{team2}} {{team2Score}}",
     "cancel": "Cancel",
     "confirmResultButton": "Confirm result",
-    "roundLabel": "Round {{n}}",
     "finalScore": "{{team1Games}}-{{team2Games}}",
     "endTournament": "End tournament",
     "confirmEndTitle": "End this tournament?",

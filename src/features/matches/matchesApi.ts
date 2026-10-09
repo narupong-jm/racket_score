@@ -120,6 +120,7 @@ export async function listGamesForMatches(
 export interface RecentCompletedMatch {
   match: Match
   tournamentName: string
+  courtCount: number
   participants: MatchHistoryEntry[]
   games: MatchGame[]
 }
@@ -129,7 +130,7 @@ export async function listRecentCompletedMatches(
 ): Promise<RecentCompletedMatch[]> {
   const { data, error } = await supabase
     .from('matches')
-    .select('*, tournaments!inner(name, sport)')
+    .select('*, tournaments!inner(name, sport, court_count)')
     .eq('status', 'completed')
     .eq('tournaments.sport', sport)
     .order('completed_at', { ascending: false })
@@ -145,6 +146,7 @@ export async function listRecentCompletedMatches(
   return matches.map(({ tournaments, ...match }) => ({
     match,
     tournamentName: tournaments?.name ?? '',
+    courtCount: tournaments?.court_count ?? 1,
     participants: participants.filter((p) => p.match_id === match.id),
     games: games.filter((g) => g.match_id === match.id),
   }))

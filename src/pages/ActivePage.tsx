@@ -62,7 +62,9 @@ function ActiveTournamentCard({
         {t(`tournamentType.${tournament.type}`)}
       </span>
       <span className="tournament-card-round">
-        {t('active.roundLabel', { n: matches?.length ?? 0 })}
+        {t('active.matchLabel', {
+          n: Math.max(0, ...(matches ?? []).map((m) => m.sequence_number)),
+        })}
       </span>
     </button>
   )

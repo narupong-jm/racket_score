@@ -43,6 +43,7 @@ const row: RecentCompletedMatch = {
     completed_at: '2026-01-01T00:10:00Z',
   },
   tournamentName: 'Spring Open',
+  courtCount: 1,
   participants: [
     { match_id: 'm1', player_id: 'p1', team: 1 },
     { match_id: 'm1', player_id: 'p2', team: 2 },
@@ -158,9 +159,11 @@ describe('DeleteMatchConfirmModal', () => {
     // Simulate the parent clearing `row` after onClose, then reopening it.
     rerender(
       <QueryClientProvider
-        client={new QueryClient({
-          defaultOptions: { queries: { retry: false } },
-        })}
+        client={
+          new QueryClient({
+            defaultOptions: { queries: { retry: false } },
+          })
+        }
       >
         <DeleteMatchConfirmModal
           row={null}
@@ -172,9 +175,11 @@ describe('DeleteMatchConfirmModal', () => {
     )
     rerender(
       <QueryClientProvider
-        client={new QueryClient({
-          defaultOptions: { queries: { retry: false } },
-        })}
+        client={
+          new QueryClient({
+            defaultOptions: { queries: { retry: false } },
+          })
+        }
       >
         <DeleteMatchConfirmModal
           row={row}

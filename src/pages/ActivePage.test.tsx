@@ -99,7 +99,7 @@ describe('ActivePage', () => {
     renderApp()
 
     const card = await screen.findByRole('button', { name: /sunday smash/i })
-    await screen.findByText('Round 2')
+    await screen.findByText('Match 2')
 
     await user.click(card)
 
@@ -125,5 +125,39 @@ describe('ActivePage', () => {
     renderApp()
 
     expect(await screen.findByText('No active tournaments')).toBeInTheDocument()
+  })
+
+  it('shows the highest started match number, not the match count', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([tournament()])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([
+      match('m1', 1),
+      match('m2', 2),
+      { ...match('m3', 3), status: 'queued', completed_at: null },
+    ])
+
+    renderApp()
+
+    expect(await screen.findByText('Match 3')).toBeInTheDocument()
+  })
+
+  it('uses the max sequence number even when a match was deleted', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([tournament()])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([
+      match('m1', 1),
+      match('m3', 3),
+    ])
+
+    renderApp()
+
+    expect(await screen.findByText('Match 3')).toBeInTheDocument()
+  })
+
+  it('shows Match 0 when no match has been started', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([tournament()])
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+
+    renderApp()
+
+    expect(await screen.findByText('Match 0')).toBeInTheDocument()
   })
 })

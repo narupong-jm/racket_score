@@ -5,6 +5,7 @@ import { usePlayers } from '../features/players/usePlayers'
 import { useTournaments } from '../features/tournaments/useTournaments'
 import { useRecentCompletedMatches } from '../features/matches/useRecentCompletedMatches'
 import {
+  formatMatchLabel,
   teamNames,
   summarizeGamesWon,
 } from '../features/matches/matchFormatting'
@@ -80,7 +81,13 @@ function ByMatchSection({
           {!isLoading && !isError && matches && matches.length > 0 && (
             <ul className="round-list">
               {matches.map((row) => {
-                const { match, tournamentName, participants, games } = row
+                const {
+                  match,
+                  tournamentName,
+                  courtCount,
+                  participants,
+                  games,
+                } = row
                 const team1Name = teamNames(participants, 1, playerNameById)
                 const team2Name = teamNames(participants, 2, playerNameById)
                 const { team1Games, team2Games } = summarizeGamesWon(games)
@@ -90,9 +97,7 @@ function ByMatchSection({
                   <li key={match.id} className="round-row">
                     <span className="round-label">
                       <span className="round-tournament">{tournamentName}</span>{' '}
-                      <span>
-                        {t('manage.roundLabel', { n: match.sequence_number })}
-                      </span>
+                      <span>{formatMatchLabel(t, match, courtCount)}</span>
                       {match.manually_adjusted && (
                         <span className="badge">
                           {t('history.manuallyAdjustedBadge')}

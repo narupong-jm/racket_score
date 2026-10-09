@@ -45,7 +45,6 @@
     "loading": "กำลังโหลดทัวร์นาเมนต์...",
     "loadError": "โหลดทัวร์นาเมนต์ไม่สำเร็จ",
     "empty": "ยังไม่มีทัวร์นาเมนต์ที่กำลังแข่ง",
-    "roundLabel": "รอบที่ {{n}}",
     "matchLabel": "แมตช์ที่ {{n}}"
   },
   "history": {
@@ -205,7 +204,6 @@
     "gameScoreLine": "เกมที่ {{n}}: {{team1}} {{team1Score}} - {{team2}} {{team2Score}}",
     "cancel": "ยกเลิก",
     "confirmResultButton": "ยืนยันผล",
-    "roundLabel": "รอบที่ {{n}}",
     "finalScore": "{{team1Games}}-{{team2Games}}",
     "endTournament": "จบทัวร์นาเมนต์",
     "confirmEndTitle": "จบทัวร์นาเมนต์นี้หรือไม่?",

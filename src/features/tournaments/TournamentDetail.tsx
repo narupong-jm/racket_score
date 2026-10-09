@@ -585,6 +585,7 @@ function RoundsPlayedList({
                       setDeletingRow({
                         match,
                         tournamentName,
+                        courtCount,
                         participants,
                         games: matchGames,
                       })
