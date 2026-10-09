@@ -16,16 +16,21 @@ export function useRecordMatchResult(tournamentId: string) {
       const passphrase = await getPassphrase()
       return recordMatchResult(matchId, games, passphrase)
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['matches', tournamentId] })
-      queryClient.invalidateQueries({ queryKey: ['drawInputs', tournamentId] })
-      queryClient.invalidateQueries({ queryKey: ['playerStats'] })
-      queryClient.invalidateQueries({
-        queryKey: ['tournamentStandingsRanked', tournamentId],
-      })
-      queryClient.invalidateQueries({
-        queryKey: ['tournamentTotalPoints', tournamentId],
-      })
-    },
+    // Returned (awaited) so a draw right after Save sees the finished players'
+    // completed match rather than stale rosters.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['matches', tournamentId] }),
+        queryClient.invalidateQueries({
+          queryKey: ['drawInputs', tournamentId],
+        }),
+        queryClient.invalidateQueries({ queryKey: ['playerStats'] }),
+        queryClient.invalidateQueries({
+          queryKey: ['tournamentStandingsRanked', tournamentId],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['tournamentTotalPoints', tournamentId],
+        }),
+      ]),
   })
 }
