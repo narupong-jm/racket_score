@@ -4,14 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Phases 1-24 of `docs/PLAN.md` are complete (Phase 24 per the note below), including Phase 13's 5-tab bottom-nav
-overhaul (Create / Active / Scoreboard / History / Member) and every IMPROVEMENT-doc-driven patch
+Phases 1-23 of `docs/PLAN.md` are complete and shipped; Phase 24 (multi-court) is implemented on
+branch `worktree-phase-24-multi-court` but not yet merged or fully verified — see its paragraph
+below. Shipped work includes Phase 13's 5-tab bottom-nav overhaul (Create / Active / Scoreboard /
+History / Member) and every IMPROVEMENT-doc-driven patch
 (`docs/IMPROVEMENT.md` through `docs/IMPROVEMENT4.md` — all four are fully absorbed into shipped
 phases: IMPROVEMENT.md → Phase 13, IMPROVEMENT2.md → Phase 14, IMPROVEMENT3.md → Phase 18,
-IMPROVEMENT4.md → Phase 20; nothing in any of them is still outstanding). Phases 21-24 then shipped
+IMPROVEMENT4.md → Phase 20; nothing in any of them is still outstanding). Phases 21-23 then shipped
 without a numbered IMPROVEMENT doc of their own (driven directly by `docs/SPEC.md`'s dated "Updated"
 notes instead). Do not assume from old conversation history or partial doc reads that any of this
-is still in flight — check `docs/PLAN.md`'s phase checkboxes (all `[x]`) and `src/` directly if in
+is still in flight — check `docs/PLAN.md`'s phase checkboxes (all `[x]` through Phase 23; Phase 24's steps 11-12 are still open in
+`docs/PLAN.md`) and `src/` directly if in
 doubt.
 
 **Most recent phase — Phase 24, multi-court tournaments:** replaces the single-court model.
@@ -34,7 +37,8 @@ queue head on a free court. The queue is per browser. Matchmaking feeds the unch
 thing to see whether it has landed. PLAN.md's step 12 (full regression + live Playwright pass) is the
 remaining verification. The integration-test fixture cleanup rule (controller runs the UUID-regex
 `execute_sql` pass; subagents never do) still applies. `docs/SPEC.md` §4-§6/§9 and its "Updated:
-2026-10-08" note describe the built behavior.
+2026-10-08" note describe the built behavior. Update this file again to "shipped" once the branch is merged and
+migration 2b is applied.
 
 **Phase 23, delete a confirmed match result:** reverses the previous
 "permanently locked, no admin-override" rule for whole-match deletion only (in-place score editing

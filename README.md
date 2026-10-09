@@ -327,16 +327,16 @@ client-side routing.
 
 ## Documentation map
 
-| File                                           | Purpose                                                                            |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------- |
-| [`docs/SPEC.md`](docs/SPEC.md)                 | Normative product requirements — source of truth for what to build                 |
-| [`docs/IMPROVEMENT.md`](docs/IMPROVEMENT.md)   | UX rationale behind the 5-tab navigation rework                                    |
-| [`docs/IMPROVEMENT2.md`](docs/IMPROVEMENT2.md) | Post-launch patch: matchmaking corrections, manual draw editing, History collapse  |
-| [`docs/IMPROVEMENT3.md`](docs/IMPROVEMENT3.md) | Post-launch patch: mid-tournament Leave / Add participant, fairness offset         |
+| File                                           | Purpose                                                                           |
+| ---------------------------------------------- | --------------------------------------------------------------------------------- |
+| [`docs/SPEC.md`](docs/SPEC.md)                 | Normative product requirements — source of truth for what to build                |
+| [`docs/IMPROVEMENT.md`](docs/IMPROVEMENT.md)   | UX rationale behind the 5-tab navigation rework                                   |
+| [`docs/IMPROVEMENT2.md`](docs/IMPROVEMENT2.md) | Post-launch patch: matchmaking corrections, manual draw editing, History collapse |
+| [`docs/IMPROVEMENT3.md`](docs/IMPROVEMENT3.md) | Post-launch patch: mid-tournament Leave / Add participant, fairness offset        |
 | [`docs/IMPROVEMENT4.md`](docs/IMPROVEMENT4.md) | Multi-sport support (Badminton + Tennis): schema, sport workspace, per-sport level |
-| [`docs/PLAN.md`](docs/PLAN.md)                 | Phased implementation plan and stack decisions                                     |
-| [`docs/RESEARCH.md`](docs/RESEARCH.md)         | Point-in-time snapshot of environment/account state at planning time               |
-| [`CLAUDE.md`](CLAUDE.md)                       | Instructions for AI coding agents working in this repo                             |
+| [`docs/PLAN.md`](docs/PLAN.md)                 | Phased implementation plan and stack decisions                                    |
+| [`docs/RESEARCH.md`](docs/RESEARCH.md)         | Point-in-time snapshot of environment/account state at planning time              |
+| [`CLAUDE.md`](CLAUDE.md)                       | Instructions for AI coding agents working in this repo                            |
 
 ## License
 
