@@ -2934,6 +2934,12 @@ Thai wording nits (`reusedWarning`, `removeFromQueue`); `manage.done` is kept on
    `get_advisors` (security) — only the expected anon-executable `SECURITY DEFINER` advisories.
    **2b. (at merge time, not before)** Migration C: drop the old `create_tournament` / `create_match` overloads and add
    a unique index on `(tournament_id, sequence_number)`. _Test:_ old-signature call now fails, new flows unaffected.
+   **Merge checklist (final review, 2026-10-09):** (a) merge and confirm the Vercel production deploy is live BEFORE
+   applying 2b (the old build's Create/Start calls use the old overloads); (b) right before the index, re-run
+   `select tournament_id, sequence_number, count(*) ... having count(*) > 1` — the old build still computes sequence
+   numbers client-side, so duplicates may have appeared; renumber if any; (c) `update matches set court_number = 1
+   where court_number is null` (at least the `status='queued'` rows the old build created, otherwise the UI shows them
+   on court 1 while the server cannot see them); (d) regenerate `src/lib/database.types.ts` and run `npx tsc -b`.
    **Done (2026-10-08):** applied as `phase24_multi_court_rpcs` (old overloads left in place). `pg_proc` shows both
    overloads of each function; a wrong-passphrase call resolves to exactly one overload in all four combinations
    (old/new x positional/named) and fails with `invalid_passphrase`. `get_advisors` (security): only the two expected new
