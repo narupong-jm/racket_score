@@ -3113,6 +3113,34 @@ only (deleting the person row when it was their last sport); and names must be u
   CHECK rejects the intermediate all-null state. Getting this backwards fails exactly on the "remove their
   last sport" path.
 
+**Implementation status (2026-10-10, end of session):** being built via `superpowers:subagent-driven-development`
+in an isolated worktree at `.claude/worktrees/phase-25-per-sport-members` (branch
+`worktree-phase-25-per-sport-members`, based on `main` @ `8ff6bd2` + this phase's SPEC/PLAN commit `609b245`)
+— **not merged to `main`**. Steps 1-5 are complete and task-reviewed CLEAN (one carried-over ruling: step 5's
+brief wrongly assumed `useDeletePlayer` had no consumer; `PlayerList.tsx` uses it, so its deletion was
+deferred to step 7 — see step 5's note below and `task-4-brief.md`, already written). Step 6 (i18n, commit `8cc31af`) is **complete and task-reviewed CLEAN** (one Minor stylistic nit on Thai
+copy density, not worth a fix round). Steps 7-13 are not started; step 7's full brief already exists at
+`.superpowers/sdd/spec-lexical-crayon/task-4-brief.md`, ready to dispatch next.
+
+Migrations A and B are **already applied to the live production database** (additive — `create_player`/
+`update_player` gained unchanged-signature `name_taken` checks, `remove_player_from_sport` is a new RPC) and
+verified, including against one real person's real match history, with that person's state restored
+afterward. `src/lib/database.types.ts` is regenerated. The live database and `main` are otherwise untouched;
+no fixtures or fixture rows were left behind (re-verified: 16 players / 9 tournaments / 106 matches).
+
+**To resume:** `cd` into the worktree (or `EnterWorktree` with `path: .claude/worktrees/phase-25-per-sport-members`),
+read the git-ignored SDD workspace `.superpowers/sdd/spec-lexical-crayon/` — `progress.md` (ledger: every task
+outcome, the pre-flight conflict scan, the binding cross-task contracts C1-C6, and the `useDeletePlayer`
+ruling), `contracts.md` is folded into `progress.md` for this phase (no separate file), `task-<N>-brief.md` /
+`-report.md` per task — then: (1) dispatch step 7 using the
+already-written `task-4-brief.md`; (2) continue steps 8-13 in order, writing each task's brief from the plan
+step's text plus the current state of the files it touches (do not reuse an old brief verbatim — re-read the
+actual files first, since each prior step changes what later steps see). Steps 2-3's migrations are **already
+live** — do not re-apply them. The merge-time destructive migration (tennis-level clearing + the ≥1-sport
+CHECK + dropping `delete_player`) is step 13 only, after the production deploy of this phase is confirmed
+READY — never before. If `.superpowers/` is gone, rebuild from `git log` on the worktree branch (one or more
+commits per step, subjects "Phase 25 step N: ...") and this section.
+
 1. [x] **Pure membership + name helpers.** New `src/features/players/playerMembership.ts`: `LEVEL_COLUMN`,
    `sportLevel(player, sport)`, `isMemberOfSport(player, sport)`, `otherSport(sport)`,
    `membershipSports(player)`, `otherSportMembership(player, activeSport)` (drives the dropdown label),
@@ -3192,7 +3220,7 @@ only (deleting the person row when it was their last sport); and names must be u
    `useDeletePlayer.ts` (and its test, if any) and drop `deletePlayer` from `PlayerList.test.tsx`'s mock
    factory** once `PlayerList.tsx` no longer calls it — `playersApi.deletePlayer` itself and the RPC stay
    until step 13's merge-time migration regardless. Non-integration suite 56→59 files / 421→440 tests.
-6. [ ] **i18n (before every UI step).** New: `member.addExistingHeading`, `addExistingSelectLabel`,
+6. [x] **i18n (before every UI step).** New: `member.addExistingHeading`, `addExistingSelectLabel`,
    `addExistingPlaceholder`, `addExistingOption` ("{{name}} ({{sport}}: {{level}})"), `addExistingOptionPlain`,
    `addExistingLevelLabel`, `addExistingButton`, `addExistingEmpty`, `addExistingFailed`,
    `confirmRemoveBodySport` (stays in the other sport) and `confirmRemoveBodyLast` (deletes the person),
@@ -3205,6 +3233,13 @@ only (deleting the person row when it was their last sport); and names must be u
    identical key sets, placeholder parity (`confirmRemoveTitle` gains `{{sport}}` in both locales or the test
    fails), and a new `PHASE_25_KEYS` non-empty list beside `PHASE_24_KEYS`; `grep` confirms the three deleted
    keys are unreferenced.
+   **Done (2026-10-10, commit 8cc31af):** task-reviewed CLEAN (one Minor: `removeFailedInTournament`'s Thai
+   reads a bit denser than its sibling — not worth a fix round). The three candidate-deletion keys are all
+   **still referenced** (`levelNotSet` by `EditablePlayerLevel.tsx` + `CreateTournamentPage.tsx`;
+   `confirmRemoveBody` by `PlayerList.tsx`; `participantMissingLevel` by `TournamentDetail.tsx` +
+   `CreateTournamentPage.tsx`) and correctly left in place with their original copy — steps 7 and 10 delete
+   each once they remove its last reference. `PHASE_25_KEYS` added (16 entries). Non-integration suite
+   unaffected in file/test count (i18n-only change; `src/i18n` suite itself: 2 files / 59 tests).
 7. [ ] **Member list goes per-sport, with the two-variant Remove dialog.** `PlayerList.tsx` →
    `useSportMembers(sport!)`; `membershipSports` decides `isLastSport` → which confirm body; failures mapped
    through `removeMemberErrorKey`; Remove calls `useRemovePlayerFromSport` with `{ id, sport }`; sport-aware
