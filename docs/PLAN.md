@@ -3121,7 +3121,7 @@ only (deleting the person row when it was their last sport); and names must be u
    tennis-only / both / neither; false for null and true for every level value; `otherSportMembership` returns
    the other sport's level or null; `findNameConflict` matches case-insensitively and trimmed, ignores the
    excluded id, and returns null for a free name.
-2. [ ] **Migration A — name uniqueness + friendly `name_taken` (additive, safe before deploy).** Re-verify
+2. [x] **Migration A — name uniqueness + friendly `name_taken` (additive, safe before deploy).** Re-verify
    `select lower(btrim(name)), count(*) ... having count(*) > 1` returns 0 rows, then add unique index
    `players_name_ci_unique on players (lower(btrim(name)))`, and `create or replace` `create_player` /
    `update_player` with **unchanged argument lists** (so this is not a signature change and the live old build
@@ -3133,7 +3133,12 @@ only (deleting the person row when it was their last sport); and names must be u
    `get_advisors` shows no new advisory classes. Note the index takes effect on the **live old build**
    immediately: a duplicate name there now fails with a raw Postgres error instead of silently succeeding —
    accepted as a fix, not a regression.
-3. [ ] **Migration B — per-sport removal RPC (additive).** New `remove_player_from_sport(p_id, p_sport,
+   **Done (2026-10-10):** applied as `phase25_player_name_unique_ci`. Verified: duplicate (differing by
+   case + whitespace) rejected by the index on both create and rename; renaming to a different case of one's
+   own name allowed; passphrase still checked before the name check (`invalid_passphrase`, not `name_taken`,
+   on a bad-passphrase + bad-name call); `get_advisors` unchanged (only the existing anon `SECURITY DEFINER`
+   warnings).
+3. [x] **Migration B — per-sport removal RPC (additive).** New `remove_player_from_sport(p_id, p_sport,
    p_passphrase) returns boolean` (true = the person row was deleted because it was their last sport):
    passphrase first, then `invalid_sport`, `player_not_found`, `not_a_member` when that sport's level is
    already null, then `player_has_matches` / `player_in_tournament` evaluated **joined through
@@ -3144,6 +3149,16 @@ only (deleting the person row when it was their last sport); and names must be u
    named sport and keeps the other level; a single-sport person's row is deleted; badminton match history blocks
    badminton removal but **not** tennis removal; a tennis roster row blocks tennis only; a wrong passphrase
    fails before any other check; `not_a_member` on a second call; then assert I1 across the whole table.
+   **Done (2026-10-10):** applied as `phase25_remove_player_from_sport`. Verified via disposable RPC-created
+   fixtures (anon has no direct `players` write grant, so fixtures go through `create_player`/`update_player`
+   same as the app): both-sport person loses only the named sport and keeps the other level; single-sport
+   removal deletes the row (returns `true`); `not_a_member` on a repeat call; `invalid_sport`; wrong passphrase
+   fails before any mutation. Real-data check on an existing member with 12 real badminton matches and a
+   placeholder tennis level: removing tennis succeeded despite the badminton history (per-sport scoping
+   confirmed), removing badminton was blocked by `player_has_matches`; their tennis level was restored
+   immediately after and the restore verified. `get_advisors`: `remove_player_from_sport` joined the existing
+   anon `SECURITY DEFINER` list, no new advisory class. Fixtures cleaned (16 players / 9 tournaments / 106
+   matches unchanged).
 4. [ ] **Regenerate `src/lib/database.types.ts`.** _Test:_ `npx tsc -b` (nothing should break yet —
    `delete_player` still exists at this point).
 5. [ ] **API + hooks + error mapping.** `playersApi.removePlayerFromSport(id, sport, passphrase)` replacing
