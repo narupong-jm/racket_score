@@ -3048,11 +3048,18 @@ Thai wording nits (`reusedWarning`, `removeFromQueue`); `manage.done` is kept on
     **Final whole-branch review (2026-10-09): 0 Critical, 2 Important, 11 Minor.** Fixed before merge (tests first):
     I2 — queued matches containing a participant who has left are dropped automatically, and Edit pickers / games table
     list active participants only; M2 — Start removes the entry that was actually started, not whatever is first when the
-    request returns; M3 — Cancel/End clear the stored queue. I1 became the merge checklist under step 2b. Left for
-    follow-up (not blocking): generic Start error copy + no refetch on failure, End while other courts are in progress,
-    games-played table includes the fairness offset, create-popup reuse warning not re-derived after edits, dismissing the
-    create popup loses the drawn queue, non-integer court count, index-keyed Edit popup, two dead locale keys
-    (`manage.courtHeading`, `manage.done`), a few weak tests. **Phase 24 is merged and shipped (2026-10-10).**
+    request returns; M3 — Cancel/End clear the stored queue. I1 became the merge checklist under step 2b.
+    **Phase 24 is merged and shipped (2026-10-10).**
+    **Follow-ups fixed afterwards (2026-10-10, tests first, 439 tests green, live-checked on the real project):** M1 — a
+    failed Start refetches matches/tournaments and shows a specific message (`court_occupied`, `participant_on_court`,
+    `tournament_not_active`; nothing at all if the passphrase prompt was dismissed; `startMatchError.ts`); M4 — the End
+    dialog names courts that still have a match in progress ("won't be recorded"); M5 — the games-played table counts real
+    completed matches (no fairness offset); M6 — the create popup derives its reuse warning from the current drafts; M7 —
+    closing the create popup without confirming still writes the drawn matches to the queue; M8 — games/points/courts must
+    be integers; M9 — the queue Edit popup resets when its entry disappears; M10 — dead keys `manage.courtHeading` and
+    `manage.done` removed; M11 — added an uneven-baseline/in-progress fairness-invariant test. Still open (minor,
+    low value): the `matchesApi` rollback test uses a bare `.rejects.toThrow()`, a few small store/hook test gaps, Thai
+    wording polish.
 
 **Known limitations carried into this phase (deliberate):**
 - The queue is browser-local (SPEC §9), so a second device won't see it.

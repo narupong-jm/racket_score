@@ -18,7 +18,8 @@ interface CourtCardProps {
   /** Names of queue-head players already playing on another court. */
   blockedNames: string[]
   startPending: boolean
-  startFailed: boolean
+  /** Locale key of the failure message for THIS court's last Start, if any. */
+  startErrorKey: string | null
   onStart: () => void
 }
 
@@ -38,7 +39,7 @@ export function CourtCard({
   queueHead,
   blockedNames,
   startPending,
-  startFailed,
+  startErrorKey,
   onStart,
 }: CourtCardProps) {
   const { t } = useTranslation()
@@ -110,7 +111,7 @@ export function CourtCard({
           {t('manage.startBlocked', { names: blockedNames.join(', ') })}
         </p>
       )}
-      {startFailed && <p className="field-error">{t('manage.startFailed')}</p>}
+      {startErrorKey && <p className="field-error">{t(startErrorKey)}</p>}
     </li>
   )
 }

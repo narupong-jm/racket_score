@@ -35,11 +35,7 @@ multi-court `create_tournament`/`create_match` signatures exist, and `matches` h
 NULL` (the UI treats NULL as court 1). Full regression and a live Playwright pass against the real
 project were done before the merge. The integration-test fixture cleanup rule (controller runs the
 UUID-regex `execute_sql` pass; subagents never do) still applies. `docs/SPEC.md` §4-§6/§9 and its
-"Updated: 2026-10-08" note describe the built behavior. Known follow-ups (not blocking, listed in
-PLAN.md's step 12 note): generic Start error copy, End while other courts are in progress,
-fairness offset shown in the games-played table, create-popup reuse warning not re-derived after
-edits.
-
+"Updated: 2026-10-08" note describe the built behavior.
 **Phase 23, delete a confirmed match result:** reverses the previous
 "permanently locked, no admin-override" rule for whole-match deletion only (in-place score editing
 is still unsupported). A passphrase-gated confirm dialog previews per-player stat impact before

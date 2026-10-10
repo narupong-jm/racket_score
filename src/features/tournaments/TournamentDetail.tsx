@@ -37,6 +37,7 @@ import type {
 import { DeleteMatchConfirmModal } from '../matches/DeleteMatchConfirmModal'
 import { TournamentScoreboardSection } from './TournamentScoreboardSection'
 import { CourtCard } from './CourtCard'
+import { startMatchErrorKey } from './startMatchError'
 import { QueueCard } from './QueueCard'
 
 interface TournamentDetailProps {
@@ -120,6 +121,16 @@ export function TournamentDetail({
       team: p.team as 1 | 2,
     })),
   )
+  const completedMatchIds = new Set(completedMatches.map((m) => m.id))
+  const completedCountById = new Map<string, number>()
+  for (const p of matchParticipants) {
+    if (completedMatchIds.has(p.match_id)) {
+      completedCountById.set(
+        p.player_id,
+        (completedCountById.get(p.player_id) ?? 0) + 1,
+      )
+    }
+  }
   const inProgressPlayerIds = new Set(
     inProgressRosters.flatMap((roster) => roster.map((p) => p.playerId)),
   )
@@ -218,9 +229,11 @@ export function TournamentDetail({
               queueHead={queueHead}
               blockedNames={headBlockedNames}
               startPending={startMatch.isPending}
-              startFailed={
+              startErrorKey={
                 startMatch.isError &&
                 startMatch.variables?.courtNumber === courtNumber
+                  ? startMatchErrorKey(startMatch.error)
+                  : null
               }
               onStart={() => handleStart(courtNumber)}
             />
@@ -241,6 +254,7 @@ export function TournamentDetail({
         }))}
         rosterPlayers={rosterPlayers}
         playerNameById={playerNameById}
+        completedCountById={completedCountById}
         busy={startMatch.isPending}
       />
 
@@ -283,6 +297,18 @@ export function TournamentDetail({
           <Modal open={endModalOpen} onClose={() => setEndModalOpen(false)}>
             <h3>{t('manage.confirmEndTitle')}</h3>
             <p>{t('manage.confirmEndBody')}</p>
+            {inProgress.length > 0 && (
+              <p className="field-warning">
+                {t('manage.confirmEndInProgress', {
+                  courts: inProgress
+                    .map((m) => m.court_number ?? 1)
+                    .sort((a, b) => a - b)
+                    .map((n) => t('manage.nowCourt', { n }))
+                    .join(', '),
+                  count: inProgress.length,
+                })}
+              </p>
+            )}
             <div className="modal-actions">
               <button
                 type="button"

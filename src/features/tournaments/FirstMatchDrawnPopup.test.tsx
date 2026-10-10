@@ -29,7 +29,6 @@ function renderPopup(
     <FirstMatchDrawnPopup
       open
       matches={[match1, match2]}
-      reusedPlayerIds={[]}
       matchType="singles"
       rosterPlayers={rosterPlayers}
       onConfirm={() => {}}
@@ -164,17 +163,53 @@ describe('FirstMatchDrawnPopup', () => {
     ])
   })
 
-  it('shows the reuse warning with names under the list only when players are reused', () => {
+  it('shows the reuse warning only while the drafted matches really overlap, and re-derives it after an edit', async () => {
     const { unmount } = renderPopup()
     expect(screen.queryByText(/appear in more than one match/)).toBeNull()
     unmount()
 
-    renderPopup({ reusedPlayerIds: ['p1', 'p2'] })
+    const overlapping: PlannedMatch = [
+      { playerId: 'p1', team: 1 },
+      { playerId: 'p3', team: 2 },
+    ]
+    const user = userEvent.setup()
+    renderPopup({ matches: [match1, overlapping] })
     expect(
       screen.getByText(
-        'Alice, Bob appear in more than one match (not enough players)',
+        'Alice appear in more than one match (not enough players)',
       ),
     ).toBeInTheDocument()
+
+    await user.click(screen.getAllByRole('button', { name: /^Edit/ })[1])
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Team 1 player 1' }),
+      'p5',
+    )
+    expect(screen.queryByText(/appear in more than one match/)).toBeNull()
+  })
+
+  it('hands the current (edited) drafts to onDismiss so closing the popup keeps the draw', async () => {
+    const onDismiss = vi.fn()
+    const user = userEvent.setup()
+    renderPopup({ onDismiss })
+
+    await user.click(screen.getAllByRole('button', { name: /^Edit/ })[1])
+    await user.selectOptions(
+      screen.getByRole('combobox', { name: 'Team 1 player 1' }),
+      'p5',
+    )
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+
+    expect(onDismiss).toHaveBeenCalledWith([
+      { participants: match1, manuallyAdjusted: false },
+      {
+        participants: [
+          { playerId: 'p5', team: 1 },
+          { playerId: 'p4', team: 2 },
+        ],
+        manuallyAdjusted: true,
+      },
+    ])
   })
 
   it('shows a non-blocking warning when an edit leaves a 2-2 doubles quartet split into same-gender teams', async () => {

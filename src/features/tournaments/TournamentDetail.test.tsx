@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactElement } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -915,8 +915,10 @@ describe('TournamentDetail: Queue entry inline edit', () => {
     ])
     vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
       candidates: [
+        // The draw input count may include the late-joiner fairness offset
+        // (here p1 reports 4); the table must show real matches only.
         ...fourCandidates.map((c) =>
-          c.id === 'p1' ? { ...c, matchesPlayedInTournament: 1 } : c,
+          c.id === 'p1' ? { ...c, matchesPlayedInTournament: 4 } : c,
         ),
         {
           id: 'p5',
@@ -930,12 +932,15 @@ describe('TournamentDetail: Queue entry inline edit', () => {
     vi.mocked(matchesApi.listMatches).mockResolvedValue([
       makeMatch('m1', 1, 'queued', 1),
       makeMatch('m2', 2, 'queued', 2),
+      makeMatch('m0', 3, 'completed'),
     ])
     vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([
       { match_id: 'm1', player_id: 'p1', team: 1 },
       { match_id: 'm1', player_id: 'p2', team: 2 },
       { match_id: 'm2', player_id: 'p3', team: 1 },
       { match_id: 'm2', player_id: 'p4', team: 2 },
+      { match_id: 'm0', player_id: 'p1', team: 1 },
+      { match_id: 'm0', player_id: 'p3', team: 2 },
     ])
     seedQueue([singles('p5', 'p2')])
 
@@ -961,9 +966,9 @@ describe('TournamentDetail: Queue entry inline edit', () => {
     expect(rowTexts).toEqual([
       ['Erin', '0', '—'],
       ['Bob', '1', 'Court 1'],
-      ['Carol', '1', 'Court 2'],
       ['Dave', '1', 'Court 2'],
       ['Alice', '2', 'Court 1'],
+      ['Carol', '2', 'Court 2'],
     ])
   })
 })
@@ -1935,12 +1940,17 @@ describe('TournamentDetail: Queue Edit popup -- title and Now column', () => {
       })),
       pairingHistory: { opponentPairs: new Set(), teammatePairs: new Set() },
     })
+    // Gina and Frank have one real completed match together (Gina's draw-input
+    // count of 2 above is a fairness offset and must not be shown).
     vi.mocked(matchesApi.listMatches).mockResolvedValue([
       makeMatch('m1', 1, 'queued', 1),
+      makeMatch('m0', 2, 'completed'),
     ])
     vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([
       { match_id: 'm1', player_id: 'p1', team: 1 },
       { match_id: 'm1', player_id: 'p2', team: 2 },
+      { match_id: 'm0', player_id: 'p7', team: 1 },
+      { match_id: 'm0', player_id: 'p6', team: 2 },
     ])
     seedQueue([singles('p3', 'p1'), singles('p4', 'p5'), singles('p3', 'p6')])
   }
@@ -1998,8 +2008,8 @@ describe('TournamentDetail: Queue Edit popup -- title and Now column', () => {
       // Dave & Erin are only in the entry being edited: not its own "Queue #"
       Dave: ['0', '—'],
       Erin: ['0', '—'],
-      Frank: ['0', 'Queue #3'],
-      Gina: ['2', '—'],
+      Frank: ['1', 'Queue #3'],
+      Gina: ['1', '—'],
     })
   })
 
@@ -2019,7 +2029,7 @@ describe('TournamentDetail: Queue Edit popup -- title and Now column', () => {
     )
 
     // Gina joined the entry being edited, so it is not listed as her queue slot.
-    expect(nowByName().Gina).toEqual(['2', '—'])
+    expect(nowByName().Gina).toEqual(['1', '—'])
     expect(nowByName().Dave).toEqual(['0', '—'])
   })
 })
@@ -2242,6 +2252,67 @@ describe('TournamentDetail: Start failure and pending state', () => {
     expect(getQueue('t1')).toEqual([singles('p1', 'p2')])
   })
 
+  it('explains a court_occupied failure and refetches so the screen is no longer stale', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      twoCourtTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.createMatch).mockRejectedValue(
+      new Error('court_occupied'),
+    )
+    seedQueue([singles('p1', 'p2')])
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    const court1Strip = (await screen.findByText('Court 1 · free')).closest(
+      'li',
+    )!
+    const listCallsBefore = vi.mocked(matchesApi.listMatches).mock.calls.length
+    await user.click(
+      within(court1Strip).getByRole('button', { name: /^Start/ }),
+    )
+
+    expect(
+      await within(court1Strip).findByText(
+        'That court was just taken -- the screen has been refreshed.',
+      ),
+    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(
+        vi.mocked(matchesApi.listMatches).mock.calls.length,
+      ).toBeGreaterThan(listCallsBefore)
+    })
+    expect(getQueue('t1')).toEqual([singles('p1', 'p2')])
+  })
+
+  it('says nothing when the user dismissed the passphrase prompt', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.createMatch).mockRejectedValue(
+      new Error('passphrase_cancelled'),
+    )
+    seedQueue([singles('p1', 'p2')])
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    const strip = (await screen.findByText('Court 1 · free')).closest('li')!
+    await user.click(within(strip).getByRole('button', { name: /^Start/ }))
+
+    await waitFor(() => {
+      expect(matchesApi.createMatch).toHaveBeenCalled()
+    })
+    expect(within(strip).queryByText(/start the match/i)).toBeNull()
+    expect(within(strip).queryByText(/just taken/i)).toBeNull()
+  })
+
   it('disables Start on the other free court while a Start is pending', async () => {
     vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
       twoCourtTournament,
@@ -2370,6 +2441,87 @@ describe('TournamentDetail: queue vs. roster and Start/Cancel bookkeeping', () =
       ).toBeGreaterThan(listCallsBefore)
     })
     expect(getQueue('t1')).toEqual([singles('p3', 'p4')])
+  })
+
+  it('closes the Edit popup when its entry disappears and does not re-open it when the queue grows again', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      activeTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(tournamentsApi.listParticipants).mockResolvedValue(
+      ['p1', 'p2', 'p3', 'p4'].map((id) => makeParticipant(id)),
+    )
+    vi.mocked(playersApi.listPlayers).mockResolvedValue(fourPlayers)
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+    seedQueue([singles('p1', 'p2'), singles('p3', 'p4')])
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Edit 2. Carol vs Dave' }),
+    )
+    await screen.findByText('Edit queue match 2 of 2')
+
+    // e.g. another tab of this browser removes the entry being edited.
+    act(() => setQueue('t1', [singles('p1', 'p2')]))
+    await waitFor(() => {
+      expect(screen.queryByText(/^Edit queue match/)).toBeNull()
+    })
+
+    act(() => setQueue('t1', [singles('p1', 'p2'), singles('p3', 'p4')]))
+    await screen.findByRole('button', { name: 'Edit 2. Carol vs Dave' })
+    expect(screen.queryByText(/^Edit queue match/)).toBeNull()
+  })
+
+  it('warns in the End dialog which courts still have a match in progress (it will not be recorded)', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      twoCourtTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([
+      makeMatch('m1', 1, 'completed', 1),
+      makeMatch('m2', 2, 'queued', 2),
+    ])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([
+      { match_id: 'm1', player_id: 'p1', team: 1 },
+      { match_id: 'm1', player_id: 'p2', team: 2 },
+      { match_id: 'm2', player_id: 'p1', team: 1 },
+      { match_id: 'm2', player_id: 'p2', team: 2 },
+    ])
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'End tournament' }),
+    )
+    expect(
+      await screen.findByText(
+        "Still in progress on Court 2 -- that match won't be recorded.",
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('shows no in-progress warning in the End dialog when every court is free', async () => {
+    vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+      twoCourtTournament,
+    ])
+    setupCommonMocks()
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([
+      makeMatch('m1', 1, 'completed', 1),
+    ])
+    vi.mocked(matchesApi.getParticipantsForMatches).mockResolvedValue([])
+
+    const user = userEvent.setup()
+    renderWithClient(<TournamentDetail tournamentId="t1" />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'End tournament' }),
+    )
+    await screen.findByText('End this tournament?')
+    expect(screen.queryByText(/Still in progress on/)).toBeNull()
   })
 
   it('clears the stored queue when the tournament is cancelled', async () => {

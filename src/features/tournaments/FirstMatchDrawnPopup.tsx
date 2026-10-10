@@ -7,7 +7,10 @@ import {
 } from '../../components/DrawSlotSelect'
 import { isMixedDoublesRuleViolated } from '../matchmaking/isMixedDoublesRuleViolated'
 import type { GeneratedMatchParticipant } from '../matchmaking/generateNextMatch'
-import type { PlannedMatch } from '../matchmaking/plannedMatches'
+import {
+  findReusedPlayerIds,
+  type PlannedMatch,
+} from '../matchmaking/plannedMatches'
 import type { QueuedMatch } from '../../lib/matchQueueStore'
 import type { MatchType } from '../matchmaking/types'
 
@@ -15,18 +18,16 @@ interface FirstMatchDrawnPopupProps {
   open: boolean
   /** The drawn matches in queue order; empty when nothing could be drawn. */
   matches: PlannedMatch[]
-  /** Players appearing in more than one drawn match (roster too small). */
-  reusedPlayerIds: string[]
   matchType: MatchType
   rosterPlayers: RosterPlayer[]
   onConfirm: (matches: QueuedMatch[]) => void
-  onDismiss: () => void
+  /** Closing without confirming still hands over the (edited) drafts. */
+  onDismiss: (matches: QueuedMatch[]) => void
 }
 
 export function FirstMatchDrawnPopup({
   open,
   matches,
-  reusedPlayerIds,
   matchType,
   rosterPlayers,
   onConfirm,
@@ -74,17 +75,26 @@ export function FirstMatchDrawnPopup({
     )
   }
 
+  // Derived from the current drafts (not the original draw) so an inline edit
+  // that removes or introduces an overlap updates the warning.
+  const reusedPlayerIds: string[] = []
+  drafts.forEach((draft, i) => {
+    const earlier = drafts.slice(0, i).map((m) => m.participants)
+    for (const id of findReusedPlayerIds(draft.participants, earlier)) {
+      if (!reusedPlayerIds.includes(id)) reusedPlayerIds.push(id)
+    }
+  })
   const reusedNames = reusedPlayerIds
     .map((id) => playerNameById.get(id) ?? id)
     .join(', ')
 
   if (drafts.length === 0) {
     return (
-      <Modal open={open} onClose={onDismiss}>
+      <Modal open={open} onClose={() => onDismiss(drafts)}>
         <h2>{t('tournaments.firstMatchPopup.heading')}</h2>
         <p>{t('tournaments.firstMatchPopup.notDrawn')}</p>
         <div className="modal-actions">
-          <button type="button" onClick={onDismiss}>
+          <button type="button" onClick={() => onDismiss(drafts)}>
             {t('tournaments.firstMatchPopup.confirm')}
           </button>
         </div>
@@ -93,7 +103,7 @@ export function FirstMatchDrawnPopup({
   }
 
   return (
-    <Modal open={open} onClose={onDismiss}>
+    <Modal open={open} onClose={() => onDismiss(drafts)}>
       <h2>
         {drafts.length === 1
           ? t('tournaments.firstMatchPopup.titleSingle')

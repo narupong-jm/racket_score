@@ -31,7 +31,9 @@ interface QueueCardProps {
   inProgress: { courtNumber: number; roster: PlannedMatch }[]
   rosterPlayers: RosterPlayer[]
   playerNameById: Map<string, string>
-  /** A Start is in flight; its success shifts the queue head. */
+  /** Real completed matches per player (never includes the fairness offset). */
+  completedCountById: Map<string, number>
+  /** A Start is in flight; its success removes the started entry. */
   busy: boolean
 }
 
@@ -50,6 +52,7 @@ export function QueueCard({
   inProgress,
   rosterPlayers,
   playerNameById,
+  completedCountById,
   busy,
 }: QueueCardProps) {
   const { t } = useTranslation()
@@ -85,6 +88,12 @@ export function QueueCard({
     remove(index)
   }
 
+  // The queue can shrink under an open Edit popup (another tab, Leave). Reset
+  // the index right away so the popup cannot silently re-open on a different
+  // entry once the queue grows again.
+  if (editingIndex !== null && editingIndex >= queue.length) {
+    setEditingIndex(null)
+  }
   const editingEntry = editingIndex === null ? undefined : queue[editingIndex]
 
   function handleSwap(oldPlayerId: string, newPlayerId: string) {
@@ -123,18 +132,12 @@ export function QueueCard({
       )
     }
   }
-  const matchesPlayedById = new Map(
-    (drawInputs?.candidates ?? []).map((c) => [
-      c.id,
-      c.matchesPlayedInTournament,
-    ]),
-  )
   const gamesPlayedRows = rosterPlayers
     .map((r) => ({
       id: r.id,
       name: r.name,
       gamesPlayed:
-        (matchesPlayedById.get(r.id) ?? 0) +
+        (completedCountById.get(r.id) ?? 0) +
         (inProgressCountById.get(r.id) ?? 0),
     }))
     .sort((a, b) => a.gamesPlayed - b.gamesPlayed)

@@ -421,6 +421,84 @@ describe('CreateTournamentPage', () => {
     expect(matchesApi.createMatch).not.toHaveBeenCalled()
   })
 
+  it('does not accept a fractional court count (submit stays disabled)', async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue(
+      players.map((p) => makeStats(p.id)),
+    )
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.type(await screen.findByLabelText(/name/i), 'Fractions')
+    await user.click(screen.getByRole('checkbox', { name: 'Alice' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Bob' }))
+    await user.type(screen.getByLabelText('Games per match'), '3')
+    await user.type(screen.getByLabelText('Points per game'), '21')
+    const submit = screen.getByRole('button', { name: /create tournament/i })
+    expect(submit).toBeEnabled()
+
+    const courts = screen.getByLabelText('Number of courts')
+    await user.clear(courts)
+    await user.type(courts, '2.5')
+    expect(submit).toBeDisabled()
+  })
+
+  it('closing the first-matches popup without confirming still keeps the drawn matches in the queue', async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue(
+      players.map((p) => makeStats(p.id)),
+    )
+    vi.mocked(tournamentsApi.createTournament).mockResolvedValue({
+      ...tournament,
+      type: 'singles',
+      court_count: 2,
+    })
+    vi.mocked(tournamentsApi.addParticipant).mockResolvedValue({
+      tournament_id: 't1',
+      player_id: 'p1',
+      joined_at: '2026-01-01T00:00:00Z',
+      status: 'active',
+      match_count_offset: 0,
+    })
+    vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
+      candidates: [],
+      pairingHistory: { opponentPairs: new Set(), teammatePairs: new Set() },
+    })
+    vi.mocked(generateNextMatchModule.generateNextMatch)
+      .mockReturnValueOnce({
+        ok: true,
+        participants: [
+          { playerId: 'p1', team: 1 },
+          { playerId: 'p2', team: 2 },
+        ],
+      })
+      .mockReturnValueOnce({
+        ok: true,
+        participants: [
+          { playerId: 'p3', team: 1 },
+          { playerId: 'p4', team: 2 },
+        ],
+      })
+
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.type(await screen.findByLabelText(/name/i), 'Two Courts')
+    for (const name of ['Alice', 'Bob', 'Carol', 'Dave']) {
+      await user.click(screen.getByRole('checkbox', { name }))
+    }
+    await user.type(screen.getByLabelText('Games per match'), '3')
+    await user.type(screen.getByLabelText('Points per game'), '21')
+    await user.click(screen.getAllByRole('button', { name: 'increase' })[2])
+    await user.click(screen.getByRole('button', { name: /create tournament/i }))
+
+    await screen.findByRole('heading', { name: 'First 2 matches drawn' })
+    await user.click(screen.getByRole('button', { name: 'Close' }))
+
+    expect(await screen.findByText('Manage tournament t1')).toBeInTheDocument()
+    expect(getQueue('t1')).toHaveLength(2)
+  })
+
   it('tennis: disables the Points per game field at a fixed value of 4', async () => {
     vi.mocked(useSportModule.useSport).mockReturnValue({
       sport: 'tennis',

@@ -76,10 +76,13 @@ export function CreateTournamentPage() {
   const isValid =
     trimmedName.length > 0 &&
     gamesPerMatch !== '' &&
+    Number.isInteger(gamesPerMatch) &&
     gamesPerMatch > 0 &&
     effectivePointsPerGame !== '' &&
+    Number.isInteger(effectivePointsPerGame) &&
     effectivePointsPerGame > 0 &&
     courtCount !== '' &&
+    Number.isInteger(courtCount) &&
     courtCount >= MIN_COURTS &&
     !notEnoughSelected
 
@@ -117,8 +120,11 @@ export function CreateTournamentPage() {
     navigate(`/tournaments/${result.tournament.id}`)
   }
 
-  function handleDismissPopup() {
+  function handleDismissPopup(matches: QueuedMatch[]) {
     if (!result) return
+    // The tournament already exists, so closing the popup must not throw the
+    // drawn (and possibly hand-edited) matches away.
+    if (matches.length > 0) setQueue(result.tournament.id, matches)
     navigate(`/tournaments/${result.tournament.id}`)
   }
 
@@ -243,7 +249,6 @@ export function CreateTournamentPage() {
         <FirstMatchDrawnPopup
           open
           matches={result.drawnMatches}
-          reusedPlayerIds={result.reusedPlayerIds}
           matchType={submittedType}
           rosterPlayers={rosterPlayers}
           onConfirm={handleConfirmFirstMatches}

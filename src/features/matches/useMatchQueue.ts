@@ -92,6 +92,14 @@ export function useStartMatchOnCourt(tournamentId: string) {
         manuallyAdjusted,
       )
     },
+    // A failed Start usually means this screen was stale (court taken, player
+    // on another court, tournament ended elsewhere): refetch so it is not.
+    onError: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ['matches', tournamentId],
+      })
+      void queryClient.invalidateQueries({ queryKey: ['tournaments'] })
+    },
     // Mutation-level (not per-mutate) so it still runs if the component
     // unmounts mid-flight. The started entry is normally the queue head, but
     // the queue can change while the request is in flight (Leave, another tab),

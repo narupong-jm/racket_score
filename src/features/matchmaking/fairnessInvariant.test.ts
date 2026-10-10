@@ -92,6 +92,39 @@ describe('fairness invariant: sequential multi-court draws (planned matches)', (
     },
   )
 
+  it('holds from an uneven baseline with matches in progress when the queue is filled one Randomize at a time', () => {
+    // p0/p1 already played once; p2/p3 are in progress (so planned = 1 each);
+    // p4..p6 have 0. Each draw is fed back as `planned`, like the Randomize path.
+    const players = makePool(7).map((p, i) =>
+      i < 2 ? { ...p, matchesPlayedInTournament: 1 } : p,
+    )
+    const inProgress = [
+      [
+        { playerId: 'p2', team: 1 as const },
+        { playerId: 'p3', team: 2 as const },
+      ],
+    ]
+    const history = emptyHistory()
+    const queued: ReturnType<typeof drawMatches>['matches'] = []
+
+    for (let i = 0; i < 3; i++) {
+      const { matches } = drawMatches(
+        'singles',
+        players,
+        history,
+        [...inProgress, ...queued],
+        1,
+      )
+      expect(matches).toHaveLength(1)
+      queued.push(...matches)
+      const { candidates } = applyPlannedMatches(players, history, [
+        ...inProgress,
+        ...queued,
+      ])
+      expect(invariantHolds(candidates)).toBe(true)
+    }
+  })
+
   it('draws the lowest-planned players first when some are already in progress', () => {
     const players = makePool(6)
     const inProgress = [
