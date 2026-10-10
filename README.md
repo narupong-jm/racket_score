@@ -48,7 +48,11 @@ works identically per sport.
   (up to courts + 1), filled with Randomize or Fill queue. The Create flow
   draws the first n matches into it; each entry can be edited or removed
   before it starts. The queue lives in `localStorage` per tournament, so it
-  survives navigating away but stays on that one browser
+  survives navigating away (even closing the Create popup without confirming)
+  but stays on that one browser. A queued match is dropped automatically if
+  one of its players leaves the tournament, and Start refuses (with a
+  specific message and a refresh) if the court was just taken or a player is
+  already on another court
 - Balanced random matchmaking (not round-robin) — see [Matchmaking
   algorithm](#matchmaking-algorithm) below
 - Singles **or** doubles per tournament, with configurable games-per-match
@@ -122,6 +126,10 @@ These are deliberate design choices, not missing features:
   M" — a tournament runs until the organizer manually ends it.
 - **The queue is per browser.** It is not shared between devices, and the
   number of courts can't be changed after a tournament is created.
+- **Ending a tournament doesn't record matches still in progress.** With
+  several courts another court may still be playing when the organizer ends
+  the tournament; the End dialog names those courts and warns that their
+  matches won't be recorded (scoreboards only ever count confirmed results).
 - **No real-time sync.** Data updates via polling/manual refresh only.
 - **No photo upload.** Player avatars are always a generated placeholder.
 - **Doubles pairs are never persisted as an entity.** Every tournament
@@ -232,6 +240,15 @@ current rather than relying on batch recomputation:
 - `player_match_history` — cross-tournament match history for the Overall
   Scoreboard, tagged with `sport`
 
+Multi-court support adds `tournaments.court_count` (1–8) and
+`matches.court_number`. A match with `status = 'queued'` is the one **in
+progress** on its court — at most one per court, enforced by a partial unique
+index — and `(tournament_id, sequence_number)` is unique. `create_match`
+takes the court, assigns the match number server-side, and rejects an
+occupied or invalid court, an inactive tournament, or a player already on
+another court. Matches completed before multi-court have no court recorded
+and are treated as court 1.
+
 This repository does not include a `migrations/` or `supabase/` folder —
 schema and views were applied directly to the live Supabase project. To
 reproduce the schema, provision a new Supabase project and recreate the
@@ -291,7 +308,7 @@ src/
     sport/           # sport-workspace context/provider/hook (Badminton/Tennis)
   pages/             # Home (sport picker) + the 5 tab routes (Create/Active/Scoreboard/History/Member)
   components/        # shared UI components
-  lib/               # Supabase client, generated DB types, shared utilities
+  lib/               # Supabase client, generated DB types, match-queue store, shared utilities
   i18n/               # en.json / th.json locale files
 ```
 
@@ -311,7 +328,10 @@ Some tests are integration tests that hit a real Supabase project
 and require valid `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` env vars to
 pass. The subset of those that perform writes (creating a player, a
 tournament, a match, etc.) also require `VITE_TEST_WRITE_PASSPHRASE` — see
-[Write-access passphrase](#write-access-passphrase).
+[Write-access passphrase](#write-access-passphrase). They create rows with
+UUID-suffixed names in the live project and clean up after themselves, but an
+interrupted run can leave some behind — check for and delete such rows (names
+containing a UUID) afterward.
 
 ## Deployment
 
