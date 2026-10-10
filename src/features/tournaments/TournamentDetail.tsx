@@ -12,8 +12,7 @@ import { formatDate } from '../../i18n/formatDate'
 import { Modal } from '../../components/Modal'
 import { Avatar } from '../../components/Avatar'
 import { usePlayers } from '../players/usePlayers'
-import { usePlayerStatsList } from '../players/usePlayerStatsList'
-import type { Player } from '../players/playersApi'
+import { useSportMembers } from '../players/useSportMembers'
 import type { Sport } from '../sport/sportTypes'
 import {
   useTournamentMatches,
@@ -272,7 +271,6 @@ export function TournamentDetail({
         tournamentId={tournamentId}
         sport={sport}
         participants={participants}
-        players={players}
         playerNameById={playerNameById}
         isActive={isActive}
         inProgressPlayerIds={inProgressPlayerIds}
@@ -374,7 +372,6 @@ interface ParticipantsCardProps {
   tournamentId: string
   sport: Sport
   participants: TournamentParticipant[] | undefined
-  players: Player[] | undefined
   playerNameById: Map<string, string>
   isActive: boolean
   /** Players in an in-progress match on any court (can't Leave). */
@@ -387,14 +384,16 @@ function ParticipantsCard({
   tournamentId,
   sport,
   participants,
-  players,
   playerNameById,
   isActive,
   inProgressPlayerIds,
   onParticipantLeft,
 }: ParticipantsCardProps) {
   const { t } = useTranslation()
-  const { data: stats } = usePlayerStatsList(sport)
+  // `sport` is the tournament's own sport, which may differ from the active
+  // workspace -- the Add-participant picker must stay scoped to the
+  // tournament's sport regardless of which workspace is open.
+  const { data: members } = useSportMembers(sport)
   const leaveParticipant = useLeaveParticipant(tournamentId)
   const addParticipant = useAddParticipant(tournamentId)
   const [leavingParticipant, setLeavingParticipant] = useState<{
@@ -421,13 +420,12 @@ function ParticipantsCard({
     })
   }
 
-  const statsByPlayerId = new Map((stats ?? []).map((s) => [s.player_id, s]))
   const activeParticipantIds = new Set(
     (participants ?? [])
       .filter((p) => p.status === 'active')
       .map((p) => p.player_id),
   )
-  const availablePlayers = (players ?? []).filter(
+  const availablePlayers = (members ?? []).filter(
     (player) => !activeParticipantIds.has(player.id),
   )
 
@@ -448,28 +446,11 @@ function ParticipantsCard({
                 <option value="" disabled>
                   {t('manage.addParticipantPlaceholder')}
                 </option>
-                {availablePlayers.map((player) => {
-                  // Fail open while stats are still loading (`stats ===
-                  // undefined`) so options aren't disabled during the brief
-                  // window before usePlayerStatsList resolves.
-                  const hasLevel =
-                    stats === undefined ||
-                    statsByPlayerId.get(player.id)?.self_selected_level != null
-                  return (
-                    <option
-                      key={player.id}
-                      value={player.id}
-                      disabled={!hasLevel}
-                      title={
-                        hasLevel
-                          ? undefined
-                          : t('tournaments.form.participantMissingLevel')
-                      }
-                    >
-                      {player.name}
-                    </option>
-                  )
-                })}
+                {availablePlayers.map((player) => (
+                  <option key={player.id} value={player.id}>
+                    {player.name}
+                  </option>
+                ))}
               </select>
             </label>
             <button

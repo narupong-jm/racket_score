@@ -36,10 +36,8 @@
     "remove": "ลบ",
     "removeDisabledHint": "สมาชิกคนนี้เคยลงแข่งในกีฬานี้แล้ว จึงไม่สามารถลบได้",
     "confirmRemoveTitle": "ลบ {{name}} ออกจาก{{sport}}หรือไม่?",
-    "confirmRemoveBody": "การลบนี้จะลบสมาชิกออกอย่างถาวรและไม่สามารถย้อนกลับได้",
     "confirmRemoveButton": "ใช่ ลบ",
     "removeFailed": "ไม่สามารถลบสมาชิกคนนี้ได้ อาจเนื่องจากเคยลงแข่งแล้วหรืออยู่ในทัวร์นาเมนต์ที่กำลังดำเนินอยู่",
-    "levelNotSet": "ยังไม่ได้ตั้งค่า",
     "addExistingHeading": "เพิ่มสมาชิกเดิม",
     "addExistingSelectLabel": "สมาชิก",
     "addExistingPlaceholder": "เลือกสมาชิก...",
@@ -135,7 +133,6 @@
       "deuceCap": "เพดานดิวซ์: {{cap}}",
       "participantsLegend": "ผู้เข้าร่วม",
       "notEnoughSelected": "เลือกผู้เล่นอย่างน้อย {{needed}} คน (เลือกแล้ว {{selected}} คน)",
-      "participantMissingLevel": "สมาชิกคนนี้ยังไม่ได้ตั้งระดับสำหรับกีฬานี้ -- ไปตั้งค่าที่แท็บสมาชิกก่อน",
       "noMembers": "ยังไม่มีสมาชิกในกีฬานี้ ไปเพิ่มที่แท็บสมาชิกก่อน",
       "submit": "สร้างทัวร์นาเมนต์"
     },

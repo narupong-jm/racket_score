@@ -1,13 +1,15 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactElement } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CreatePlayerForm } from './CreatePlayerForm'
 import * as playersApi from './playersApi'
+import type { Player } from './playersApi'
 
 vi.mock('./playersApi', () => ({
   createPlayer: vi.fn(),
+  listPlayers: vi.fn(),
 }))
 
 vi.mock('../passphrase/usePassphraseGate', () => ({
@@ -29,7 +31,24 @@ function renderWithClient(ui: ReactElement) {
   )
 }
 
+const existingPlayer: Player = {
+  id: 'p1',
+  name: 'Existing Player',
+  gender: 'male',
+  badminton_self_selected_level: 'beginner',
+  tennis_self_selected_level: null,
+  created_at: '2026-01-01T00:00:00Z',
+}
+
 describe('CreatePlayerForm', () => {
+  beforeEach(() => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([])
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('blocks submit when name is empty', () => {
     renderWithClient(<CreatePlayerForm />)
 
@@ -69,5 +88,21 @@ describe('CreatePlayerForm', () => {
         'test-passphrase',
       )
     })
+  })
+
+  it('blocks submit and shows a message for a name that conflicts with an existing member', async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([existingPlayer])
+    const user = userEvent.setup()
+    renderWithClient(<CreatePlayerForm />)
+
+    await user.type(screen.getByLabelText(/name/i), '  existing player  ')
+
+    expect(
+      await screen.findByText(
+        'Someone already has this name. Use "Add an existing member" instead.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /add member/i })).toBeDisabled()
+    expect(playersApi.createPlayer).not.toHaveBeenCalled()
   })
 })

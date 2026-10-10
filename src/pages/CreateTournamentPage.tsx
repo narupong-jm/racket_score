@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { usePlayers } from '../features/players/usePlayers'
+import { useSportMembers } from '../features/players/useSportMembers'
 import { usePlayerStatsList } from '../features/players/usePlayerStatsList'
 import { useCreateTournamentWithFirstDraw } from '../features/tournaments/useCreateTournamentWithFirstDraw'
 import { FirstMatchDrawnPopup } from '../features/tournaments/FirstMatchDrawnPopup'
@@ -45,7 +45,7 @@ export function CreateTournamentPage() {
     string[]
   >([])
 
-  const { data: players } = usePlayers()
+  const { data: members } = useSportMembers(sport!)
   const { data: statsList } = usePlayerStatsList(sport!)
   const { mutate, isPending, data: result } = useCreateTournamentWithFirstDraw()
 
@@ -54,7 +54,7 @@ export function CreateTournamentPage() {
   )
   const rosterPlayers: RosterPlayer[] = submittedParticipantIds.flatMap(
     (id) => {
-      const player = players?.find((p) => p.id === id)
+      const player = members?.find((p) => p.id === id)
       if (!player || (player.gender !== 'male' && player.gender !== 'female'))
         return []
       return [{ id: player.id, name: player.name, gender: player.gender }]
@@ -197,38 +197,34 @@ export function CreateTournamentPage() {
 
         <fieldset className="participant-checklist">
           <legend>{t('tournaments.form.participantsLegend')}</legend>
-          <ul className="avatar-list">
-            {(players ?? []).map((player) => {
-              const stats = statsByPlayerId.get(player.id)
-              const level = stats?.effective_level ?? stats?.self_selected_level
-              const hasLevel = statsList === undefined || level != null
-              return (
-                <li key={player.id} className="avatar-list-item">
-                  <label
-                    className="checklist-row"
-                    title={
-                      hasLevel
-                        ? undefined
-                        : t('tournaments.form.participantMissingLevel')
-                    }
-                  >
-                    <input
-                      type="checkbox"
-                      aria-label={player.name}
-                      checked={selectedIds.has(player.id)}
-                      disabled={!hasLevel}
-                      onChange={() => toggleParticipant(player.id)}
-                    />
-                    <Avatar name={player.name} size={32} />
-                    <span className="checklist-name">{player.name}</span>
-                    <span className="checklist-level">
-                      {level ? t(`level.${level}`) : t('member.levelNotSet')}
-                    </span>
-                  </label>
-                </li>
-              )
-            })}
-          </ul>
+          {members && members.length === 0 ? (
+            <p className="empty-state">{t('tournaments.form.noMembers')}</p>
+          ) : (
+            <ul className="avatar-list">
+              {(members ?? []).map((player) => {
+                const stats = statsByPlayerId.get(player.id)
+                const level =
+                  stats?.effective_level ?? stats?.self_selected_level
+                return (
+                  <li key={player.id} className="avatar-list-item">
+                    <label className="checklist-row">
+                      <input
+                        type="checkbox"
+                        aria-label={player.name}
+                        checked={selectedIds.has(player.id)}
+                        onChange={() => toggleParticipant(player.id)}
+                      />
+                      <Avatar name={player.name} size={32} />
+                      <span className="checklist-name">{player.name}</span>
+                      <span className="checklist-level">
+                        {level ? t(`level.${level}`) : null}
+                      </span>
+                    </label>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
         </fieldset>
 
         {notEnoughSelected && (

@@ -36,10 +36,8 @@
     "remove": "Remove",
     "removeDisabledHint": "This member has already played matches in this sport and can't be removed.",
     "confirmRemoveTitle": "Remove {{name}} from {{sport}}?",
-    "confirmRemoveBody": "This permanently deletes them. This can't be undone.",
     "confirmRemoveButton": "Yes, remove",
     "removeFailed": "Couldn't remove that member. They may already be in a match or an active tournament.",
-    "levelNotSet": "Not set yet",
     "addExistingHeading": "Add an existing member",
     "addExistingSelectLabel": "Member",
     "addExistingPlaceholder": "Select a member...",
@@ -135,7 +133,6 @@
       "deuceCap": "Deuce cap: {{cap}}",
       "participantsLegend": "Participants",
       "notEnoughSelected": "Select at least {{needed}} players ({{selected}} selected).",
-      "participantMissingLevel": "This member hasn't set a level for this sport yet -- set one on the Member tab first.",
       "noMembers": "No members in this sport yet. Add one from the Member tab first.",
       "submit": "Create tournament"
     },

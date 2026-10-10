@@ -85,23 +85,30 @@ function renderPage() {
   )
 }
 
-function makePlayer(id: string, name: string): Player {
+function makePlayer(
+  id: string,
+  name: string,
+  sport: 'badminton' | 'tennis' = 'badminton',
+): Player {
   return {
     id,
     name,
     gender: 'male',
-    badminton_self_selected_level: 'beginner',
-    tennis_self_selected_level: null,
+    badminton_self_selected_level: sport === 'badminton' ? 'beginner' : null,
+    tennis_self_selected_level: sport === 'tennis' ? 'beginner' : null,
     created_at: '',
   }
 }
 
-function makeStats(playerId: string): PlayerStats {
+function makeStats(
+  playerId: string,
+  sport: 'badminton' | 'tennis' = 'badminton',
+): PlayerStats {
   return {
     player_id: playerId,
     name: playerId,
     gender: 'male',
-    sport: 'badminton',
+    sport,
     self_selected_level: 'beginner',
     total_matches: 0,
     total_wins: 0,
@@ -115,6 +122,13 @@ const players: Player[] = [
   makePlayer('p2', 'Bob'),
   makePlayer('p3', 'Carol'),
   makePlayer('p4', 'Dave'),
+]
+
+const tennisPlayers: Player[] = [
+  makePlayer('p1', 'Alice', 'tennis'),
+  makePlayer('p2', 'Bob', 'tennis'),
+  makePlayer('p3', 'Carol', 'tennis'),
+  makePlayer('p4', 'Dave', 'tennis'),
 ]
 
 const tournament: Tournament = {
@@ -499,14 +513,54 @@ describe('CreateTournamentPage', () => {
     expect(getQueue('t1')).toHaveLength(2)
   })
 
-  it('tennis: disables the Points per game field at a fixed value of 4', async () => {
+  it('omits a badminton-only member from a Tennis workspace checklist', async () => {
+    vi.mocked(useSportModule.useSport).mockReturnValue({
+      sport: 'tennis',
+      setSport: vi.fn(),
+    })
+    const mixedPlayers = [
+      makePlayer('p1', 'Alice', 'tennis'),
+      makePlayer('p2', 'Bob', 'badminton'),
+    ]
+    vi.mocked(playersApi.listPlayers).mockResolvedValue(mixedPlayers)
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue([
+      makeStats('p1', 'tennis'),
+    ])
+
+    renderPage()
+
+    expect(
+      await screen.findByRole('checkbox', { name: 'Alice' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox', { name: 'Bob' })).toBeNull()
+  })
+
+  it('shows the empty state when the active sport has no members', async () => {
     vi.mocked(useSportModule.useSport).mockReturnValue({
       sport: 'tennis',
       setSport: vi.fn(),
     })
     vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue([])
+
+    renderPage()
+
+    expect(
+      await screen.findByText(
+        'No members in this sport yet. Add one from the Member tab first.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('checkbox')).toBeNull()
+  })
+
+  it('tennis: disables the Points per game field at a fixed value of 4', async () => {
+    vi.mocked(useSportModule.useSport).mockReturnValue({
+      sport: 'tennis',
+      setSport: vi.fn(),
+    })
+    vi.mocked(playersApi.listPlayers).mockResolvedValue(tennisPlayers)
     vi.mocked(playersApi.listPlayerStats).mockResolvedValue(
-      players.map((p) => makeStats(p.id)),
+      tennisPlayers.map((p) => makeStats(p.id, 'tennis')),
     )
     vi.mocked(tournamentsApi.createTournament).mockResolvedValue({
       ...tournament,

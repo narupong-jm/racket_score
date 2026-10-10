@@ -1,17 +1,18 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactElement } from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { PlayerList } from './PlayerList'
 import * as playersApi from './playersApi'
+import * as useSportModule from '../sport/useSport'
 import type { Player, PlayerStats } from './playersApi'
 
 vi.mock('./playersApi', () => ({
   listPlayers: vi.fn(),
   listPlayerStats: vi.fn(),
   updatePlayer: vi.fn(),
-  deletePlayer: vi.fn(),
+  removePlayerFromSport: vi.fn(),
 }))
 
 vi.mock('../passphrase/usePassphraseGate', () => ({
@@ -21,7 +22,7 @@ vi.mock('../passphrase/usePassphraseGate', () => ({
 }))
 
 vi.mock('../sport/useSport', () => ({
-  useSport: () => ({ sport: 'badminton', setSport: vi.fn() }),
+  useSport: vi.fn(),
 }))
 
 function renderWithClient(ui: ReactElement) {
@@ -32,6 +33,17 @@ function renderWithClient(ui: ReactElement) {
     <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
   )
 }
+
+beforeEach(() => {
+  vi.mocked(useSportModule.useSport).mockReturnValue({
+    sport: 'badminton',
+    setSport: vi.fn(),
+  })
+})
+
+afterEach(() => {
+  vi.clearAllMocks()
+})
 
 const editablePlayer: Player = {
   id: 'p1',
@@ -93,25 +105,66 @@ const noHistoryStats: PlayerStats = {
   effective_level: 'beginner',
 }
 
-const noLevelPlayer: Player = {
+const tennisOnlyPlayer: Player = {
   id: 'p4',
-  name: 'No Level Player',
+  name: 'Tennis Only Player',
   gender: 'female',
   badminton_self_selected_level: null,
   tennis_self_selected_level: 'beginner',
   created_at: '2026-01-01T00:00:00Z',
 }
-const noLevelStats: PlayerStats = {
-  player_id: 'p4',
-  name: 'No Level Player',
-  gender: 'female',
+
+const bothSportsPlayer: Player = {
+  id: 'p5',
+  name: 'Both Sports Player',
+  gender: 'male',
+  badminton_self_selected_level: 'beginner',
+  tennis_self_selected_level: 'intermediate',
+  created_at: '2026-01-01T00:00:00Z',
+}
+const bothSportsStats: PlayerStats = {
+  player_id: 'p5',
+  name: 'Both Sports Player',
+  gender: 'male',
   sport: 'badminton',
-  self_selected_level: null,
+  self_selected_level: 'beginner',
   total_matches: 0,
   total_wins: 0,
-  win_rate: null,
-  effective_level: null,
+  win_rate: 0,
+  effective_level: 'beginner',
 }
+
+describe('PlayerList per-sport membership', () => {
+  it('a tennis-only person is absent from the badminton list and vice versa', async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([
+      editablePlayer,
+      tennisOnlyPlayer,
+    ])
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue([editableStats])
+
+    renderWithClient(<PlayerList />)
+
+    expect(await screen.findByText('Editable Player')).toBeInTheDocument()
+    expect(screen.queryByText('Tennis Only Player')).toBeNull()
+  })
+
+  it('a badminton-only person is absent from the tennis list', async () => {
+    vi.mocked(useSportModule.useSport).mockReturnValue({
+      sport: 'tennis',
+      setSport: vi.fn(),
+    })
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([
+      editablePlayer,
+      tennisOnlyPlayer,
+    ])
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue([])
+
+    renderWithClient(<PlayerList />)
+
+    expect(await screen.findByText('Tennis Only Player')).toBeInTheDocument()
+    expect(screen.queryByText('Editable Player')).toBeNull()
+  })
+})
 
 describe('PlayerList level editability', () => {
   it('shows an editable level control for a player with fewer than 3 matches', async () => {
@@ -168,32 +221,6 @@ describe('PlayerList level editability', () => {
       expect(playersApi.updatePlayer).toHaveBeenCalledWith(
         'p1',
         { sport: 'badminton', self_selected_level: 'advanced' },
-        'test-passphrase',
-      )
-    })
-  })
-
-  it('shows a "not set" prompt for a player with no level in the active sport, and saves a chosen level', async () => {
-    vi.mocked(playersApi.listPlayers).mockResolvedValue([noLevelPlayer])
-    vi.mocked(playersApi.listPlayerStats).mockResolvedValue([noLevelStats])
-    vi.mocked(playersApi.updatePlayer).mockResolvedValue({
-      ...noLevelPlayer,
-      badminton_self_selected_level: 'beginner',
-    })
-
-    const user = userEvent.setup()
-    renderWithClient(<PlayerList />)
-
-    expect(await screen.findByText('Not set yet')).toBeInTheDocument()
-    screen.getByRole('combobox', {
-      name: /level for no level player/i,
-    })
-    await user.click(screen.getByRole('button', { name: /save/i }))
-
-    await waitFor(() => {
-      expect(playersApi.updatePlayer).toHaveBeenCalledWith(
-        'p4',
-        { sport: 'badminton', self_selected_level: 'beginner' },
         'test-passphrase',
       )
     })
@@ -267,6 +294,98 @@ describe('PlayerList name editing', () => {
       )
     })
   })
+
+  it('blocks a name that conflicts with an existing member (differing only by case/padding) and never calls updatePlayer', async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([
+      lockedPlayer,
+      editablePlayer,
+    ])
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue([lockedStats])
+
+    const user = userEvent.setup()
+    renderWithClient(<PlayerList />)
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: /edit name for locked player/i,
+      }),
+    )
+    const input = screen.getByRole('textbox', {
+      name: /new name for locked player/i,
+    })
+    await user.clear(input)
+    await user.type(input, '  editable player  ')
+
+    expect(
+      await screen.findByText('Someone already has this name.'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /save/i })).toBeDisabled()
+    expect(playersApi.updatePlayer).not.toHaveBeenCalled()
+  })
+
+  it('still allows renaming a person to a case/padding variant of their own current name', async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([lockedPlayer])
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue([lockedStats])
+    vi.mocked(playersApi.updatePlayer).mockResolvedValue({
+      ...lockedPlayer,
+      name: 'locked player',
+    })
+
+    const user = userEvent.setup()
+    renderWithClient(<PlayerList />)
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: /edit name for locked player/i,
+      }),
+    )
+    const input = screen.getByRole('textbox', {
+      name: /new name for locked player/i,
+    })
+    await user.clear(input)
+    await user.type(input, 'locked player')
+
+    expect(
+      screen.queryByText('Someone already has this name.'),
+    ).toBeNull()
+    await user.click(screen.getByRole('button', { name: /save/i }))
+
+    await waitFor(() => {
+      expect(playersApi.updatePlayer).toHaveBeenCalledWith(
+        'p2',
+        { name: 'locked player' },
+        'test-passphrase',
+      )
+    })
+  })
+
+  it('shows the name-taken message when a server name_taken rejection slips through a race', async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([lockedPlayer])
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue([lockedStats])
+    vi.mocked(playersApi.updatePlayer).mockRejectedValue(
+      new Error('name_taken'),
+    )
+
+    const user = userEvent.setup()
+    renderWithClient(<PlayerList />)
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: /edit name for locked player/i,
+      }),
+    )
+    const input = screen.getByRole('textbox', {
+      name: /new name for locked player/i,
+    })
+    await user.clear(input)
+    await user.type(input, 'Brand New Name')
+    await user.click(screen.getByRole('button', { name: /save/i }))
+
+    expect(
+      await screen.findByText('Someone already has this name.'),
+    ).toBeInTheDocument()
+    expect(playersApi.updatePlayer).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('PlayerList remove member', () => {
@@ -290,7 +409,7 @@ describe('PlayerList remove member', () => {
     expect(await screen.findByRole('button', { name: /remove/i })).toBeEnabled()
   })
 
-  it('opens a confirm dialog with the player name when Remove is clicked', async () => {
+  it('shows the single-sport body ("permanently deletes their record") for a person in only this sport', async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue([noHistoryPlayer])
     vi.mocked(playersApi.listPlayerStats).mockResolvedValue([noHistoryStats])
 
@@ -300,11 +419,23 @@ describe('PlayerList remove member', () => {
     await user.click(await screen.findByRole('button', { name: /remove/i }))
 
     expect(
-      screen.getByText(/remove no history player from the member pool/i),
+      screen.getByText(/permanently deletes their record/i),
     ).toBeInTheDocument()
   })
 
-  it('closes the dialog without deleting when Cancel is clicked', async () => {
+  it('shows the other-sport body ("stays a member of Tennis") for a person in both sports', async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([bothSportsPlayer])
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue([bothSportsStats])
+
+    const user = userEvent.setup()
+    renderWithClient(<PlayerList />)
+
+    await user.click(await screen.findByRole('button', { name: /remove/i }))
+
+    expect(screen.getByText(/stay a member of Tennis/i)).toBeInTheDocument()
+  })
+
+  it('closes the dialog without removing when Cancel is clicked', async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue([noHistoryPlayer])
     vi.mocked(playersApi.listPlayerStats).mockResolvedValue([noHistoryStats])
 
@@ -315,15 +446,15 @@ describe('PlayerList remove member', () => {
     await user.click(screen.getByRole('button', { name: /cancel/i }))
 
     expect(
-      screen.queryByText(/remove no history player from the member pool/i),
+      screen.queryByText(/permanently deletes their record/i),
     ).toBeNull()
-    expect(playersApi.deletePlayer).not.toHaveBeenCalled()
+    expect(playersApi.removePlayerFromSport).not.toHaveBeenCalled()
   })
 
-  it('deletes the player and closes the dialog when Confirm is clicked', async () => {
+  it('removes the member from this sport and closes the dialog when Confirm is clicked', async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue([noHistoryPlayer])
     vi.mocked(playersApi.listPlayerStats).mockResolvedValue([noHistoryStats])
-    vi.mocked(playersApi.deletePlayer).mockResolvedValue(undefined)
+    vi.mocked(playersApi.removePlayerFromSport).mockResolvedValue(true)
 
     const user = userEvent.setup()
     renderWithClient(<PlayerList />)
@@ -332,22 +463,23 @@ describe('PlayerList remove member', () => {
     await user.click(screen.getByRole('button', { name: /yes, remove/i }))
 
     await waitFor(() => {
-      expect(playersApi.deletePlayer).toHaveBeenCalledWith(
+      expect(playersApi.removePlayerFromSport).toHaveBeenCalledWith(
         'p3',
+        'badminton',
         'test-passphrase',
       )
     })
     await waitFor(() => {
       expect(
-        screen.queryByText(/remove no history player from the member pool/i),
+        screen.queryByText(/permanently deletes their record/i),
       ).toBeNull()
     })
   })
 
-  it('shows a generic error and keeps the dialog open when deletion fails', async () => {
+  it('shows the player_has_matches message and keeps the dialog open when removal fails that way', async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue([noHistoryPlayer])
     vi.mocked(playersApi.listPlayerStats).mockResolvedValue([noHistoryStats])
-    vi.mocked(playersApi.deletePlayer).mockRejectedValue(
+    vi.mocked(playersApi.removePlayerFromSport).mockRejectedValue(
       new Error('player_has_matches'),
     )
 
@@ -358,10 +490,32 @@ describe('PlayerList remove member', () => {
     await user.click(screen.getByRole('button', { name: /yes, remove/i }))
 
     expect(
-      await screen.findByText(/couldn't remove that member/i),
+      await screen.findByText(
+        /this member has already played matches in this sport/i,
+      ),
     ).toBeInTheDocument()
     expect(
-      screen.getByText(/remove no history player from the member pool/i),
+      screen.getByText(/permanently deletes their record/i),
+    ).toBeInTheDocument()
+  })
+
+  it('shows the player_in_tournament message when removal fails that way', async () => {
+    vi.mocked(playersApi.listPlayers).mockResolvedValue([noHistoryPlayer])
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue([noHistoryStats])
+    vi.mocked(playersApi.removePlayerFromSport).mockRejectedValue(
+      new Error('player_in_tournament'),
+    )
+
+    const user = userEvent.setup()
+    renderWithClient(<PlayerList />)
+
+    await user.click(await screen.findByRole('button', { name: /remove/i }))
+    await user.click(screen.getByRole('button', { name: /yes, remove/i }))
+
+    expect(
+      await screen.findByText(
+        /this member is on an active tournament's roster in this sport/i,
+      ),
     ).toBeInTheDocument()
   })
 })

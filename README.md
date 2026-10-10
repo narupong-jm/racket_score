@@ -29,16 +29,25 @@ works identically per sport.
   configurable scoring engine as badminton (see [Design
   decisions](#design-decisions--intentional-limitations)) — the two sports
   never share match history or stats for the same person.
-- Central, persistent player pool with generated placeholder avatars
-  (initials + name-derived color); a member can be renamed or removed, though
-  removal is blocked server-side if they have any match history or are still
-  on an active tournament's roster
+- Central, persistent player pool shared across both sports — one record
+  per person (name, gender, generated placeholder avatar: initials + a
+  name-derived color) — but **membership is tracked independently per
+  sport**: a person appears in a sport's Member tab, Create Tournament
+  checklist and Add-participant picker only if they're a member of that
+  sport (having a level in it *is* being a member — there's no separate
+  flag). The Member tab's **"Add an existing member"** dropdown lets the
+  organizer bring anyone already in the system into the active sport, with
+  a level chosen for it (never copied from their other sport). New or
+  renamed names must be unique across the whole system, regardless of
+  sport.
 - Self-selected skill level until 3 matches are played, then an
   automatically computed win-rate-derived effective level — tracked
   **independently per sport**, so a player's Badminton and Tennis levels
-  never affect each other. A member with no level yet in the active sport
-  can't be selected as a tournament participant until one is set on the
-  Member tab.
+  never affect each other. **Remove** on the Member tab removes a person
+  from the active sport only (their other sport's membership is
+  untouched); if that was their only sport, the person record itself is
+  deleted. It's blocked, per sport, if they have any match history or are
+  still on an active tournament's roster in that sport.
 - **Multi-court tournaments** — pick 1-8 courts when creating a tournament
   (fixed afterward). Each court runs its own in-progress match and saves its
   own result independently; a free court shows a one-tap Start button for
@@ -239,6 +248,19 @@ current rather than relying on batch recomputation:
   additional scoping is needed here)
 - `player_match_history` — cross-tournament match history for the Overall
   Scoreboard, tagged with `sport`
+
+**Per-sport membership:** `players.badminton_self_selected_level` and
+`tennis_self_selected_level` are separate nullable columns — being a member
+of a sport *is* having a non-null level in it, which is also what the
+`player_stats` scoping above drives (which sport's Member tab, Create
+Tournament checklist and Add-participant picker a person shows up in).
+`remove_player_from_sport(p_id, p_sport, p_passphrase)` nulls that sport's
+level column, or deletes the person row outright if it was their only
+sport. **Pending a merge-time migration** (Phase 25 in
+[`docs/PLAN.md`](docs/PLAN.md), not yet applied as of this note): dropping
+the now-superseded `delete_player` RPC, and adding
+`CHECK (badminton_self_selected_level IS NOT NULL OR
+tennis_self_selected_level IS NOT NULL)`.
 
 Multi-court support adds `tournaments.court_count` (1–8) and
 `matches.court_number`. A match with `status = 'queued'` is the one **in

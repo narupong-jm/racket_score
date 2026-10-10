@@ -15,6 +15,19 @@ notes instead). Do not assume from old conversation history or partial doc reads
 is still in flight — check `docs/PLAN.md`'s phase checkboxes (all `[x]` through Phase 24) and `src/`
 directly if in doubt.
 
+**Currently in progress — Phase 25, per-sport membership** (on this branch/worktree,
+`phase-25-per-sport-members`; **not yet merged to `main`**): steps 1-12 of its `docs/PLAN.md` entry
+are done (schema/RPC migrations A and B applied, `playerMembership.ts` helpers, the
+`remove_player_from_sport` RPC + `useRemovePlayerFromSport`/`useSportMembers`/`useNonSportMembers`
+hooks, the per-sport Member list + two-variant Remove dialog, "Add an existing member", the rename/
+create name-conflict guard, the Create-tournament checklist and both Add-participant pickers scoped
+to sport membership, the Overall Scoreboard filtered the same way, and this doc pass). **Step 13 —
+full regression, merge, deploy, then the destructive migration (Migration C) and live verification —
+is still outstanding.** Until step 13 runs: `delete_player` still exists in the live DB (unused by the
+app since step 7) and there is **no** DB-level CHECK yet preventing a person from having both sport
+levels null. See the domain-model bullet below and `docs/PLAN.md`'s Phase 25 entry for the full
+step-by-step record (each step has a "Done" outcome note).
+
 **Most recent phase — Phase 24, multi-court tournaments:** replaces the single-court model.
 A tournament now has `court_count` (1-8, chosen on the Create form, fixed afterward; pre-existing
 tournaments = 1) and `matches.court_number`; `matches.status = 'queued'` still means *in progress*
@@ -166,10 +179,22 @@ surfaced real pre-existing errors once actually run.
   effective level). As of Phase 20, level and stats are tracked **independently per sport** —
   `players.badminton_self_selected_level`/`tennis_self_selected_level` are separate nullable
   columns (there is no single `self_selected_level` column anymore), and `player_stats` is a
-  sport-scoped view (2 rows per player: `sport` is part of its key, along with `player_id`).
-  Displayed everywhere with a **generated placeholder avatar** (initials + name-derived color) —
-  there is no photo upload or `players.photo`/`avatar_url` column; don't add one without the user
-  explicitly asking, per `docs/SPEC.md` §3's deferral.
+  sport-scoped view (2 rows per player: `sport` is part of its key, along with `player_id`). As of
+  Phase 25, **membership is per sport and *is* having a non-null level in that sport** — there's no
+  separate membership flag; a person appears in a sport's Member tab, Create Tournament checklist
+  and Add-participant picker only if that sport's level column is non-null for them. The Member tab's
+  **"Add an existing member"** control (`AddExistingMemberForm.tsx`) brings anyone already in the
+  system into the active sport with a freshly chosen level (never copied from their other sport).
+  `remove_player_from_sport(p_id, p_sport, p_passphrase)` nulls that sport's level column, or deletes
+  the person row outright if it was their last sport, replacing `delete_player` for this purpose; new/
+  renamed names must be unique across the whole system regardless of sport (`findNameConflict`
+  pre-check client-side, a friendly `name_taken` rejection server-side). **Still pending (Phase 25
+  step 13, not yet applied as of this note):** the merge-time destructive migration that drops the
+  now-unused `delete_player` RPC and adds `CHECK (badminton_self_selected_level IS NOT NULL OR
+  tennis_self_selected_level IS NOT NULL)` — until then `delete_player` still exists live but has no
+  app-layer caller. Displayed everywhere with a **generated placeholder avatar** (initials +
+  name-derived color) — there is no photo upload or `players.photo`/`avatar_url` column; don't add
+  one without the user explicitly asking, per `docs/SPEC.md` §3's deferral.
 - **Doubles pairs/teams are never persisted** — every tournament re-pairs individuals from the pool.
 - **Participants start from a roster chosen once at tournament-creation time**, but — as of Phase
   18 (`docs/IMPROVEMENT3.md`), a **deliberate reversal** of the original "never after" rule that

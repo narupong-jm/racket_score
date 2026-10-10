@@ -51,6 +51,10 @@ export async function assembleDrawInputs(
     .filter((participant) => participant.status === 'active')
     .flatMap((participant) => {
       const stats = statsById.get(participant.player_id)
+      // As of Phase 25, every active participant is a member of this sport
+      // (CreateTournamentPage / Add-participant only ever offer sport
+      // members), so `self_selected_level` should always be non-null here --
+      // this filter is now a defensive safety net, not a reachable path.
       if (!stats || !stats.gender || !stats.self_selected_level) return []
 
       return [

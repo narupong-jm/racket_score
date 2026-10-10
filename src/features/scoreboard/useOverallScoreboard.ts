@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { listPlayers } from '../players/playersApi'
+import { isMemberOfSport } from '../players/playerMembership'
 import { listPlayerMatchHistory } from './scoreboardApi'
 import {
   aggregateScoreboard,
@@ -35,7 +36,19 @@ export async function fetchOverallScoreboard(
     listPlayers(),
   ])
 
-  return aggregateScoreboard(rows, players)
+  // Defensive, provably non-hiding filter: a player who has history rows in
+  // this result set is kept even if they're no longer a member of `sport`
+  // (e.g. removed after playing), so real match data is never dropped from
+  // the board.
+  const playerIdsWithHistory = new Set(
+    rows.flatMap((row) => (row.player_id ? [row.player_id] : [])),
+  )
+  const members = players.filter(
+    (player) =>
+      isMemberOfSport(player, sport) || playerIdsWithHistory.has(player.id),
+  )
+
+  return aggregateScoreboard(rows, members)
 }
 
 function startOfCurrentMonthIso(): string {

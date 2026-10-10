@@ -3240,7 +3240,7 @@ commits per step, subjects "Phase 25 step N: ...") and this section.
    `CreateTournamentPage.tsx`) and correctly left in place with their original copy — steps 7 and 10 delete
    each once they remove its last reference. `PHASE_25_KEYS` added (16 entries). Non-integration suite
    unaffected in file/test count (i18n-only change; `src/i18n` suite itself: 2 files / 59 tests).
-7. [ ] **Member list goes per-sport, with the two-variant Remove dialog.** `PlayerList.tsx` →
+7. [x] **Member list goes per-sport, with the two-variant Remove dialog.** `PlayerList.tsx` →
    `useSportMembers(sport!)`; `membershipSports` decides `isLastSport` → which confirm body; failures mapped
    through `removeMemberErrorKey`; Remove calls `useRemovePlayerFromSport` with `{ id, sport }`; sport-aware
    empty state; the `hasHistory` pre-check keeps reading the active sport's `total_matches` (the RPC stays the
@@ -3250,7 +3250,17 @@ commits per step, subjects "Phase 25 step N: ...") and this section.
    the dialog says "stays a member of Tennis" for a both-sports person and "permanently deletes their record"
    for a single-sport one; `player_has_matches` / `player_in_tournament` render their specific messages; delete
    the obsolete "not set" test.
-8. [ ] **"Add an existing member" section + the new-member name guard.** New
+   **Done (2026-10-10):** implemented as specified; also deleted `useDeletePlayer.ts` per step 5's ruling (its
+   only consumer, `PlayerList.tsx`, no longer calls it — `playersApi.deletePlayer` and the `delete_player` RPC
+   stay until step 13) and dropped `deletePlayer` from `PlayerList.test.tsx`'s mock factory. Since
+   `PlayerList.tsx` was `confirmRemoveBody`'s only reference (per step 6's note) and is now gone, also deleted
+   the now-dead `member.confirmRemoveBody` key from both `en.json`/`th.json` (`member.levelNotSet` stays —
+   `CreateTournamentPage.tsx` still references it; step 10 to delete). `tsc -b` and lint clean. Non-integration
+   suite: 59 files / 459 tests, 457 passing — the 2 pre-existing failures (`MemberPage.test.tsx`,
+   `TournamentDetail.test.tsx`) predate this step (introduced by step 6's i18n text changes) and are unrelated
+   to this step's scope; confirmed via a stash-and-rerun against the pre-step-7 tree. Steps 10/12 own fixing
+   them.
+8. [x] **"Add an existing member" section + the new-member name guard.** New
    `src/features/players/AddExistingMemberForm.tsx`: `useNonSportMembers(sport!)`, option labels via
    `member.addExistingOption` using the other sport's `effective_level` from
    `usePlayerStatsList(otherSport(sport))`, a `PLAYER_LEVELS` dropdown defaulting to Beginner (never copied from
@@ -3264,11 +3274,31 @@ commits per step, subjects "Phase 25 step N: ...") and this section.
    `updatePlayer(id, {sport, self_selected_level}, 'test-passphrase')`, the empty state, and a failed add shows
    its message; update `MemberPage.test.tsx` for both headings; `CreatePlayerForm.test.tsx` needs
    `listPlayers: vi.fn()` added to its mock factory plus a duplicate-name case.
-9. [ ] **Rename guard.** `EditablePlayerName` gains the same `findNameConflict` pre-check and `isNameTakenError`
+   **Done (2026-10-10):** implemented as specified. `AddExistingMemberForm` looks up the candidate's *other*
+   sport via `otherSport(sport!)`, maps `usePlayerStatsList(other)` by `player_id` for the option label's
+   `effective_level`, and falls back to `addExistingOptionPlain` if that sport has no stats row yet. Fixing
+   `MemberPage.test.tsx`'s headings (`"Add member"` → `"Add a new member"`) and its empty-state text (`"No
+   players yet."` → `"No members in this sport yet."`) incidentally resolved that file's pre-existing failure
+   from step 6 noted in step 7 — only `TournamentDetail.test.tsx`'s remains, still owned by steps 10/12.
+   `tsc -b` and lint clean. Non-integration suite: 60 files / 465 tests, all passing except that one
+   pre-existing `TournamentDetail.test.tsx` failure.
+9. [x] **Rename guard.** `EditablePlayerName` gains the same `findNameConflict` pre-check and `isNameTakenError`
    handling. _Test:_ a conflicting name (differing only by case/padding) blocks and shows the message with
    `updatePlayer` never called; renaming a person to its own name still works; a server `name_taken` that slips
    through a race renders the same message.
-10. [ ] **Create checklist + Add-participant picker.** `CreateTournamentPage.tsx` → `useSportMembers(sport!)`,
+   **Done (2026-10-10):** implemented as specified, mirroring `CreatePlayerForm`'s step-8 pattern:
+   `usePlayers()` + `findNameConflict(players, trimmed, player.id)` (the `excludeId` is what lets renaming to
+   a case/padding variant of the player's own current name through, since self is excluded from the conflict
+   search) blocks Save and shows `players.editableName.nameTaken`; a mutation `onError` checking
+   `isNameTakenError` covers the server-race case with the same message. Returns a `Fragment` now (the
+   `<span className="editable-name">` row for the controls, the error `<p>` as a sibling below it) so the
+   message doesn't become an extra flex item inside that row. No dedicated test file exists for this component
+   (tested through `PlayerList.test.tsx`'s "name editing" suite, which already shares that file's mocked
+   `['players']` cache with `PlayerList`'s own `useSportMembers` query) — added the three specified cases
+   there instead of a new file. `tsc -b` and lint clean. Non-integration suite: 60 files / 468 tests, all
+   passing except the one pre-existing `TournamentDetail.test.tsx` failure (unchanged, still owned by step
+   10/12).
+10. [x] **Create checklist + Add-participant picker.** `CreateTournamentPage.tsx` → `useSportMembers(sport!)`,
     deleting `hasLevel` / `disabled` / the `participantMissingLevel` title / the `levelNotSet` fallback, and
     adding a `tournaments.form.noMembers` empty state under the legend. `TournamentDetail.tsx` →
     `ParticipantsCard` calls `useSportMembers(sport)` itself (sport from `tournament.sport`, which may differ
@@ -3282,17 +3312,62 @@ commits per step, subjects "Phase 25 step N: ...") and this section.
     assert a Badminton tournament's picker is unaffected while the active workspace is Tennis, and keep
     Leave/rejoin green including that a left, since-removed member's **name still renders** in their greyed-out
     row (the R3 regression).
-11. [ ] **Filter the Overall Scoreboard to the active sport's members.** `fetchOverallScoreboard` keeps a player
+    **Done (2026-10-10):** implemented as specified. `CreateTournamentPage.tsx`'s checklist now wraps in a
+    `members && members.length === 0` branch showing `tournaments.form.noMembers` in place of the `<ul>`.
+    `ParticipantsCard` no longer takes a `players` prop or calls `usePlayerStatsList` (both now dead there —
+    `useSportMembers(sport)` replaces the level lookup that fed the old `disabled`/`title` pair). Since both
+    the `CreateTournamentPage.tsx` and `TournamentDetail.tsx` references to `tournaments.form
+    .participantMissingLevel` died in this same step (the two referencers step 6 named), and `CreateTournamentPage
+    .tsx`'s was `member.levelNotSet`'s last reference after step 7 removed `EditablePlayerLevel`'s, deleted both
+    now-dead keys from `en.json`/`th.json`. `useDrawInputs.ts`'s null-level filter got an added comment (none
+    existed before) noting it's now a defensive-only path. Added a `sport` param to
+    `CreateTournamentPage.test.tsx`'s `makePlayer`/`makeStats` helpers and fixed the pre-existing tennis test
+    (was silently rendering an empty checklist); added the badminton-only-omitted-from-Tennis and no-members
+    cases. Rewrote `TournamentDetail.test.tsx`'s level-gating test as the non-member-omission test (`Participants
+    Card` never calls `useSport()` — it only ever reads `tournament.sport` — so the "Badminton tournament
+    unaffected by an active Tennis workspace" guarantee holds structurally, not because any workspace sport was
+    mocked; the test comment explains this). Also fixed that file's one pre-existing failure left over from
+    step 6's `manage.noPlayersToAdd` copy change (noted as owned by this step back in step 7/8/9) by updating
+    the expected text to "Everyone in this sport's member pool is already active in this tournament." Leave/
+    rejoin tests needed no changes and stayed green, confirming the R3 regression guard (`playerNameById` still
+    sourced from unfiltered `usePlayers()`). `tsc -b` and lint clean. Non-integration suite: **60 files / 470
+    tests, all passing — zero known failures remain.**
+11. [x] **Filter the Overall Scoreboard to the active sport's members.** `fetchOverallScoreboard` keeps a player
     when `isMemberOfSport(p, sport)` **or** they have history rows in the result set — the defensive form makes
     it provably non-hiding (I1) — and passes only those into `aggregateScoreboard`, which stays pure and
     untouched. _Test:_ `OverallScoreboardPage.test.tsx` mocks `fetchOverallScoreboard` wholesale, so this needs
     its **own new** `useOverallScoreboard.test.ts` (mocking `listPlayers` / `listPlayerMatchHistory`) or it ships
     untested: a tennis-only person is absent from the badminton board and vice versa, and a player with history
     rows is never filtered out.
-12. [ ] **Docs.** Flip `docs/SPEC.md`'s 2026-10-10 note to implemented; update `README.md` (Features, Design
+    **Done (2026-10-10):** implemented as specified. `fetchOverallScoreboard` builds a `Set` of player ids
+    present in the fetched `rows` (already sport/period/type-filtered by `listPlayerMatchHistory`) and keeps a
+    player when `isMemberOfSport(player, sport)` **or** their id is in that set, before handing the filtered
+    list to the untouched `aggregateScoreboard`. New `useOverallScoreboard.test.ts` mocks `playersApi.listPlayers`
+    and `scoreboardApi.listPlayerMatchHistory` and exercises the real (unmocked) `fetchOverallScoreboard`
+    directly — the three specified cases: tennis-only omitted from the badminton board, badminton-only omitted
+    from the tennis board, and a player removed from a sport but with existing history rows there is still
+    kept (and their match counted) rather than hidden. `OverallScoreboardPage.test.tsx` was left untouched, as
+    expected, since it mocks this module wholesale. `tsc -b` and lint clean. Non-integration suite: 61 files /
+    473 tests, all passing.
+12. [x] **Docs.** Flip `docs/SPEC.md`'s 2026-10-10 note to implemented; update `README.md` (Features, Design
     decisions, the per-sport notes under Database setup) and `CLAUDE.md` (project status, the shared-pool
     domain-model bullet, membership = non-null per-sport level, the ≥1-sport CHECK, `remove_player_from_sport`,
     `delete_player` gone); tick this phase's boxes with outcomes. _Test:_ none (docs-only).
+    **Done (2026-10-10):** `docs/SPEC.md`'s 2026-10-10 note flipped to "Implemented (Phase 25 in
+    `docs/PLAN.md`)" — matching the established precedent (commit `5da24ad`, Phase 24's own doc-sync step),
+    which also flips before the final merge/migration step runs, since `docs/PLAN.md`'s checkboxes, not
+    `docs/SPEC.md`'s notes, are the authoritative shipped/in-flight record. `README.md`: rewrote the player-
+    pool and skill-level Features bullets for per-sport membership/Remove/Add-existing-member, and added a
+    "Per-sport membership" paragraph under Database setup (schema columns, `remove_player_from_sport`, and
+    the still-pending CHECK + `delete_player` drop called out explicitly as not yet applied). Did **not** add
+    a Design-decisions bullet about the existing-data Tennis-level clear, since that migration is step 13's
+    job and hasn't run even on this branch yet — would have been a false claim; left that section as-is.
+    `CLAUDE.md`: added a new "Currently in progress — Phase 25" project-status paragraph (explicit that this
+    branch isn't merged, steps 1-12 done, step 13 outstanding, `delete_player` still live with no caller, no
+    CHECK yet) and rewrote the shared-pool domain-model bullet for per-sport membership,
+    `remove_player_from_sport`, the name-uniqueness guard, and the same pending-migration caveat. Verified
+    `tsc -b` and `npm run lint` stay clean after the docs-only changes (no source touched). _Test:_ none, as
+    specified.
 13. [ ] **Full regression, merge, deploy, then the destructive migration, then live verification.**
     `npm run build`, `npm run lint`, the full `npx vitest run` (integration included). Then merge and **confirm
     the Vercel production deploy is READY before** applying **Migration C (destructive, merge-time only)**:

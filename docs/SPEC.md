@@ -91,8 +91,8 @@ Member tab, the Create Tournament checklist and mid-tournament Add
 participant list only the active sport's members; **Remove** now removes a
 person from the active sport only; new-member names must be unique across
 the whole system. Existing members all become Badminton-only (their
-placeholder Tennis levels are cleared). Not yet implemented as of this
-note.
+placeholder Tennis levels are cleared). Implemented (Phase 25 in
+`docs/PLAN.md`).
 
 ## 1. Overview
 

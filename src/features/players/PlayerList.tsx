@@ -1,24 +1,24 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { usePlayers } from './usePlayers'
+import { useSportMembers } from './useSportMembers'
 import { usePlayerStatsList } from './usePlayerStatsList'
-import { useDeletePlayer } from './useDeletePlayer'
+import { useRemovePlayerFromSport } from './useRemovePlayerFromSport'
+import { membershipSports, otherSport } from './playerMembership'
+import { removeMemberErrorKey } from './playerErrors'
 import { EditablePlayerLevel } from './EditablePlayerLevel'
 import { EditablePlayerName } from './EditablePlayerName'
 import { Avatar } from '../../components/Avatar'
 import { Modal } from '../../components/Modal'
 import { useSport } from '../sport/useSport'
+import type { Player } from './playersApi'
 
 export function PlayerList() {
   const { t } = useTranslation()
   const { sport } = useSport()
-  const { data: players, isLoading, isError } = usePlayers()
+  const { data: players, isLoading, isError } = useSportMembers(sport!)
   const { data: statsList } = usePlayerStatsList(sport!)
-  const deletePlayer = useDeletePlayer()
-  const [removingPlayer, setRemovingPlayer] = useState<{
-    id: string
-    name: string
-  } | null>(null)
+  const removeMember = useRemovePlayerFromSport()
+  const [removingPlayer, setRemovingPlayer] = useState<Player | null>(null)
 
   if (isLoading) return <p className="empty-state">{t('players.loading')}</p>
   if (isError) return <p className="field-error">{t('players.loadError')}</p>
@@ -31,10 +31,18 @@ export function PlayerList() {
 
   function handleConfirmRemove() {
     if (!removingPlayer) return
-    deletePlayer.mutate(removingPlayer.id, {
-      onSuccess: () => setRemovingPlayer(null),
-    })
+    removeMember.mutate(
+      { id: removingPlayer.id, sport: sport! },
+      { onSuccess: () => setRemovingPlayer(null) },
+    )
   }
+
+  const isLastSport = removingPlayer
+    ? membershipSports(removingPlayer).length === 1
+    : false
+  const removeErrorKey = removeMember.isError
+    ? removeMemberErrorKey(removeMember.error)
+    : null
 
   return (
     <div className="scoreboard-table-wrap card">
@@ -52,8 +60,8 @@ export function PlayerList() {
             const stats = statsByPlayerId.get(player.id) ?? undefined
             // Fast, imperfect pre-check: total_matches only counts completed
             // matches and says nothing about active-tournament-roster-only
-            // entries -- the delete_player RPC's server-side check is the
-            // real authority and is what actually blocks those cases.
+            // entries -- the remove_player_from_sport RPC's server-side check
+            // is the real authority and is what actually blocks those cases.
             const hasHistory = (stats?.total_matches ?? 0) > 0
             return (
               <tr key={player.id}>
@@ -79,9 +87,7 @@ export function PlayerList() {
                     title={
                       hasHistory ? t('member.removeDisabledHint') : undefined
                     }
-                    onClick={() =>
-                      setRemovingPlayer({ id: player.id, name: player.name })
-                    }
+                    onClick={() => setRemovingPlayer(player)}
                   >
                     {t('member.remove')}
                   </button>
@@ -97,11 +103,24 @@ export function PlayerList() {
         onClose={() => setRemovingPlayer(null)}
       >
         <h3>
-          {t('member.confirmRemoveTitle', { name: removingPlayer?.name ?? '' })}
+          {t('member.confirmRemoveTitle', {
+            name: removingPlayer?.name ?? '',
+            sport: t(`sport.${sport}`),
+          })}
         </h3>
-        <p>{t('member.confirmRemoveBody')}</p>
-        {deletePlayer.isError && (
-          <p className="field-error">{t('member.removeFailed')}</p>
+        {removingPlayer && (
+          <p>
+            {isLastSport
+              ? t('member.confirmRemoveBodyLast', {
+                  sport: t(`sport.${sport}`),
+                })
+              : t('member.confirmRemoveBodySport', {
+                  otherSport: t(`sport.${otherSport(sport!)}`),
+                })}
+          </p>
+        )}
+        {removeErrorKey && (
+          <p className="field-error">{t(removeErrorKey)}</p>
         )}
         <div className="modal-actions">
           <button
@@ -115,7 +134,7 @@ export function PlayerList() {
             type="button"
             className="danger"
             onClick={handleConfirmRemove}
-            disabled={deletePlayer.isPending}
+            disabled={removeMember.isPending}
           >
             {t('member.confirmRemoveButton')}
           </button>

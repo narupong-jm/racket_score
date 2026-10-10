@@ -22,7 +22,6 @@ export function EditablePlayerLevel({
   const currentLevel = stats?.self_selected_level as
     PlayerLevel | null | undefined
   const totalMatches = stats?.total_matches ?? 0
-  const isNotSet = stats !== undefined && currentLevel == null
   const isEditable = totalMatches < 3
   const [level, setLevel] = useState<PlayerLevel>(
     currentLevel ?? PLAYER_LEVELS[0],
@@ -37,9 +36,6 @@ export function EditablePlayerLevel({
 
   return (
     <span>
-      {isNotSet && (
-        <span className="field-hint">{t('member.levelNotSet')}</span>
-      )}
       <select
         aria-label={t('players.editableLevel.ariaLabel', {
           name: playerName,
@@ -55,7 +51,7 @@ export function EditablePlayerLevel({
       </select>
       <button
         type="button"
-        disabled={isPending || (!isNotSet && level === currentLevel)}
+        disabled={isPending || level === currentLevel}
         onClick={() =>
           mutate({
             id: playerId,

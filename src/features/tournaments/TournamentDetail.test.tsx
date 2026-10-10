@@ -1755,7 +1755,7 @@ describe('TournamentDetail: Add participant', () => {
 
     expect(
       await screen.findByText(
-        'Everyone in the member pool is already active in this tournament.',
+        "Everyone in this sport's member pool is already active in this tournament.",
       ),
     ).toBeInTheDocument()
     expect(screen.queryByRole('combobox')).toBeNull()
@@ -1790,8 +1790,14 @@ describe('TournamentDetail: Add participant', () => {
     ).toBeInTheDocument()
   })
 
-  it('disables a member with no level in this sport, with a tooltip, while a member with a level stays selectable', async () => {
-    const playerWithoutLevel: Player = {
+  it("omits a non-member of the tournament's sport from the picker, using the tournament's own sport regardless of the active workspace", async () => {
+    // Carol is a tennis-only member -- not a badminton member -- and
+    // `activeTournament.sport` is 'badminton'. `ParticipantsCard` reads
+    // `tournament.sport` directly (it never calls `useSport()`), so this
+    // also demonstrates that a Badminton tournament's picker stays scoped
+    // to Badminton members regardless of whatever sport workspace is
+    // active elsewhere in the app.
+    const tennisOnlyPlayer: Player = {
       id: 'p3',
       name: 'Carol',
       gender: 'female',
@@ -1805,21 +1811,7 @@ describe('TournamentDetail: Add participant', () => {
     setupCommonMocks()
     vi.mocked(playersApi.listPlayers).mockResolvedValue([
       ...players,
-      playerWithoutLevel,
-    ])
-    vi.mocked(playersApi.listPlayerStats).mockResolvedValue([
-      ...playerStats,
-      {
-        player_id: 'p3',
-        name: 'Carol',
-        gender: 'female',
-        sport: 'badminton',
-        self_selected_level: null,
-        total_matches: 0,
-        total_wins: 0,
-        win_rate: null,
-        effective_level: null,
-      },
+      tennisOnlyPlayer,
     ])
     vi.mocked(tournamentsApi.listParticipants).mockResolvedValue([
       makeParticipant('p1', 'left'),
@@ -1831,15 +1823,12 @@ describe('TournamentDetail: Add participant', () => {
     renderWithClient(<TournamentDetail tournamentId="t1" />)
 
     const select = await screen.findByRole('combobox')
-    const carolOption = within(select).getByRole('option', { name: 'Carol' })
-    const bobOption = within(select).getByRole('option', { name: 'Bob' })
-
-    await waitFor(() => expect(carolOption).toBeDisabled())
-    expect(carolOption).toHaveAttribute(
-      'title',
-      "This member hasn't set a level for this sport yet -- set one on the Member tab first.",
-    )
-    expect(bobOption).not.toBeDisabled()
+    expect(
+      within(select).queryByRole('option', { name: 'Carol' }),
+    ).toBeNull()
+    expect(
+      within(select).getByRole('option', { name: 'Bob' }),
+    ).not.toBeDisabled()
   })
 })
 

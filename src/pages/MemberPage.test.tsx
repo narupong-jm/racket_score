@@ -9,6 +9,7 @@ vi.mock('../features/players/playersApi', () => ({
   listPlayerStats: vi.fn(),
   createPlayer: vi.fn(),
   updatePlayer: vi.fn(),
+  removePlayerFromSport: vi.fn(),
 }))
 
 vi.mock('../features/passphrase/usePassphraseGate', () => ({
@@ -33,7 +34,7 @@ function renderWithClient() {
 }
 
 describe('MemberPage', () => {
-  it('renders the heading, add-member form, and member list', async () => {
+  it('renders both headings, the add-member forms, and the member list', async () => {
     vi.mocked(playersApi.listPlayers).mockResolvedValue([])
     vi.mocked(playersApi.listPlayerStats).mockResolvedValue([])
 
@@ -41,11 +42,16 @@ describe('MemberPage', () => {
 
     expect(screen.getByRole('heading', { name: 'Member' })).toBeInTheDocument()
     expect(
-      screen.getByRole('heading', { name: 'Add member' }),
+      screen.getByRole('heading', { name: 'Add a new member' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: 'Add an existing member' }),
     ).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: /add member/i }),
     ).toBeInTheDocument()
-    expect(await screen.findByText('No players yet.')).toBeInTheDocument()
+    expect(
+      await screen.findByText('No members in this sport yet.'),
+    ).toBeInTheDocument()
   })
 })
