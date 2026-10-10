@@ -53,6 +53,25 @@ const PHASE_24_KEYS = [
   'active.matchLabel',
 ]
 
+const PHASE_25_KEYS = [
+  'member.addExistingHeading',
+  'member.addExistingSelectLabel',
+  'member.addExistingPlaceholder',
+  'member.addExistingOption',
+  'member.addExistingOptionPlain',
+  'member.addExistingLevelLabel',
+  'member.addExistingButton',
+  'member.addExistingEmpty',
+  'member.addExistingFailed',
+  'member.confirmRemoveBodySport',
+  'member.confirmRemoveBodyLast',
+  'member.removeFailedHasMatches',
+  'member.removeFailedInTournament',
+  'players.form.nameTaken',
+  'players.editableName.nameTaken',
+  'tournaments.form.noMembers',
+]
+
 describe('locale parity', () => {
   const enFlat = flatten(en)
   const thFlat = flatten(th)
@@ -62,6 +81,13 @@ describe('locale parity', () => {
   })
 
   it.each(PHASE_24_KEYS)('%s is a non-empty string in both locales', (key) => {
+    for (const flat of [enFlat, thFlat]) {
+      expect(typeof flat[key]).toBe('string')
+      expect((flat[key] as string).trim().length).toBeGreaterThan(0)
+    }
+  })
+
+  it.each(PHASE_25_KEYS)('%s is a non-empty string in both locales', (key) => {
     for (const flat of [enFlat, thFlat]) {
       expect(typeof flat[key]).toBe('string')
       expect((flat[key] as string).trim().length).toBeGreaterThan(0)

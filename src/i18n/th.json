@@ -32,14 +32,27 @@
   },
   "member": {
     "heading": "สมาชิก",
-    "addHeading": "เพิ่มสมาชิก",
+    "addHeading": "เพิ่มสมาชิกใหม่",
     "remove": "ลบ",
-    "removeDisabledHint": "สมาชิกคนนี้เคยลงแข่งแล้ว จึงไม่สามารถลบได้",
-    "confirmRemoveTitle": "ลบ {{name}} ออกจากรายชื่อสมาชิกหรือไม่?",
+    "removeDisabledHint": "สมาชิกคนนี้เคยลงแข่งในกีฬานี้แล้ว จึงไม่สามารถลบได้",
+    "confirmRemoveTitle": "ลบ {{name}} ออกจาก{{sport}}หรือไม่?",
     "confirmRemoveBody": "การลบนี้จะลบสมาชิกออกอย่างถาวรและไม่สามารถย้อนกลับได้",
     "confirmRemoveButton": "ใช่ ลบ",
     "removeFailed": "ไม่สามารถลบสมาชิกคนนี้ได้ อาจเนื่องจากเคยลงแข่งแล้วหรืออยู่ในทัวร์นาเมนต์ที่กำลังดำเนินอยู่",
-    "levelNotSet": "ยังไม่ได้ตั้งค่า"
+    "levelNotSet": "ยังไม่ได้ตั้งค่า",
+    "addExistingHeading": "เพิ่มสมาชิกเดิม",
+    "addExistingSelectLabel": "สมาชิก",
+    "addExistingPlaceholder": "เลือกสมาชิก...",
+    "addExistingOption": "{{name}} ({{sport}}: {{level}})",
+    "addExistingOptionPlain": "{{name}}",
+    "addExistingLevelLabel": "ระดับ",
+    "addExistingButton": "เพิ่ม",
+    "addExistingEmpty": "ทุกคนในระบบเป็นสมาชิกกีฬานี้อยู่แล้ว",
+    "addExistingFailed": "เพิ่มสมาชิกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
+    "confirmRemoveBodySport": "พวกเขาจะยังเป็นสมาชิกของ{{otherSport}}อยู่ คุณสามารถเพิ่มกลับมาได้ภายหลังจาก \"เพิ่มสมาชิกเดิม\"",
+    "confirmRemoveBodyLast": "{{sport}}เป็นกีฬาเดียวที่พวกเขาเล่น การลบนี้จะลบข้อมูลของพวกเขาออกอย่างถาวรและไม่สามารถย้อนกลับได้",
+    "removeFailedHasMatches": "สมาชิกคนนี้เคยลงแข่งในกีฬานี้แล้ว จึงไม่สามารถลบได้",
+    "removeFailedInTournament": "สมาชิกคนนี้อยู่ในรายชื่อของทัวร์นาเมนต์ที่กำลังดำเนินอยู่ในกีฬานี้ จึงไม่สามารถลบได้"
   },
   "active": {
     "loading": "กำลังโหลดทัวร์นาเมนต์...",
@@ -87,7 +100,7 @@
   "players": {
     "loading": "กำลังโหลดรายชื่อผู้เล่น...",
     "loadError": "โหลดรายชื่อผู้เล่นไม่สำเร็จ",
-    "empty": "ยังไม่มีผู้เล่น",
+    "empty": "ยังไม่มีสมาชิกในกีฬานี้",
     "columnAvatar": "รูป",
     "columnName": "ชื่อ",
     "columnGender": "เพศ",
@@ -96,7 +109,8 @@
       "nameLabel": "ชื่อ",
       "genderLabel": "เพศ",
       "levelLabel": "ระดับ",
-      "submit": "เพิ่มสมาชิก"
+      "submit": "เพิ่มสมาชิก",
+      "nameTaken": "มีคนใช้ชื่อนี้อยู่แล้ว ให้ใช้ \"เพิ่มสมาชิกเดิม\" แทน"
     },
     "editableLevel": {
       "ariaLabel": "ระดับของ {{name}}",
@@ -106,7 +120,8 @@
       "edit": "แก้ไข",
       "editAriaLabel": "แก้ไขชื่อของ {{name}}",
       "inputAriaLabel": "ชื่อใหม่ของ {{name}}",
-      "save": "บันทึก"
+      "save": "บันทึก",
+      "nameTaken": "มีคนใช้ชื่อนี้อยู่แล้ว"
     },
     "columnActions": "การจัดการ"
   },
@@ -121,6 +136,7 @@
       "participantsLegend": "ผู้เข้าร่วม",
       "notEnoughSelected": "เลือกผู้เล่นอย่างน้อย {{needed}} คน (เลือกแล้ว {{selected}} คน)",
       "participantMissingLevel": "สมาชิกคนนี้ยังไม่ได้ตั้งระดับสำหรับกีฬานี้ -- ไปตั้งค่าที่แท็บสมาชิกก่อน",
+      "noMembers": "ยังไม่มีสมาชิกในกีฬานี้ ไปเพิ่มที่แท็บสมาชิกก่อน",
       "submit": "สร้างทัวร์นาเมนต์"
     },
     "list": {
@@ -222,7 +238,7 @@
     "addParticipant": "เพิ่มผู้เล่น",
     "addParticipantPlaceholder": "เลือกผู้เล่น...",
     "addParticipantButton": "เพิ่ม",
-    "noPlayersToAdd": "สมาชิกทั้งหมดอยู่ในทัวร์นาเมนต์นี้แล้ว",
+    "noPlayersToAdd": "สมาชิกทั้งหมดในกีฬานี้อยู่ในทัวร์นาเมนต์นี้แล้ว",
     "addParticipantFailed": "เพิ่มผู้เล่นไม่สำเร็จ กรุณาลองใหม่อีกครั้ง",
     "deleteLastMatchButton": "ลบแมตช์ล่าสุด",
     "courtsHeading": "สนาม",

@@ -32,14 +32,27 @@
   },
   "member": {
     "heading": "Member",
-    "addHeading": "Add member",
+    "addHeading": "Add a new member",
     "remove": "Remove",
-    "removeDisabledHint": "This member has already played matches and can't be removed.",
-    "confirmRemoveTitle": "Remove {{name}} from the member pool?",
+    "removeDisabledHint": "This member has already played matches in this sport and can't be removed.",
+    "confirmRemoveTitle": "Remove {{name}} from {{sport}}?",
     "confirmRemoveBody": "This permanently deletes them. This can't be undone.",
     "confirmRemoveButton": "Yes, remove",
     "removeFailed": "Couldn't remove that member. They may already be in a match or an active tournament.",
-    "levelNotSet": "Not set yet"
+    "levelNotSet": "Not set yet",
+    "addExistingHeading": "Add an existing member",
+    "addExistingSelectLabel": "Member",
+    "addExistingPlaceholder": "Select a member...",
+    "addExistingOption": "{{name}} ({{sport}}: {{level}})",
+    "addExistingOptionPlain": "{{name}}",
+    "addExistingLevelLabel": "Level",
+    "addExistingButton": "Add",
+    "addExistingEmpty": "Everyone in the system is already a member of this sport.",
+    "addExistingFailed": "Couldn't add that member. Please try again.",
+    "confirmRemoveBodySport": "They'll stay a member of {{otherSport}}. You can add them back here later from \"Add an existing member\".",
+    "confirmRemoveBodyLast": "{{sport}} is their only sport, so this permanently deletes their record. This can't be undone.",
+    "removeFailedHasMatches": "This member has already played matches in this sport and can't be removed.",
+    "removeFailedInTournament": "This member is on an active tournament's roster in this sport and can't be removed."
   },
   "active": {
     "loading": "Loading tournaments...",
@@ -87,7 +100,7 @@
   "players": {
     "loading": "Loading players...",
     "loadError": "Failed to load players.",
-    "empty": "No players yet.",
+    "empty": "No members in this sport yet.",
     "columnAvatar": "Photo",
     "columnName": "Name",
     "columnGender": "Gender",
@@ -96,7 +109,8 @@
       "nameLabel": "Name",
       "genderLabel": "Gender",
       "levelLabel": "Level",
-      "submit": "Add member"
+      "submit": "Add member",
+      "nameTaken": "Someone already has this name. Use \"Add an existing member\" instead."
     },
     "editableLevel": {
       "ariaLabel": "Level for {{name}}",
@@ -106,7 +120,8 @@
       "edit": "Edit",
       "editAriaLabel": "Edit name for {{name}}",
       "inputAriaLabel": "New name for {{name}}",
-      "save": "Save"
+      "save": "Save",
+      "nameTaken": "Someone already has this name."
     },
     "columnActions": "Actions"
   },
@@ -121,6 +136,7 @@
       "participantsLegend": "Participants",
       "notEnoughSelected": "Select at least {{needed}} players ({{selected}} selected).",
       "participantMissingLevel": "This member hasn't set a level for this sport yet -- set one on the Member tab first.",
+      "noMembers": "No members in this sport yet. Add one from the Member tab first.",
       "submit": "Create tournament"
     },
     "list": {
@@ -222,7 +238,7 @@
     "addParticipant": "Add participant",
     "addParticipantPlaceholder": "Select a player...",
     "addParticipantButton": "Add",
-    "noPlayersToAdd": "Everyone in the member pool is already active in this tournament.",
+    "noPlayersToAdd": "Everyone in this sport's member pool is already active in this tournament.",
     "addParticipantFailed": "Couldn't add that participant. Please try again.",
     "deleteLastMatchButton": "Delete last match",
     "courtsHeading": "Courts",
