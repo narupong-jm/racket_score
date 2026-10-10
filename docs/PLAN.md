@@ -3166,7 +3166,7 @@ only (deleting the person row when it was their last sport); and names must be u
    `delete_player` still exists at this point).
    **Done (2026-10-10, commit 18d971d):** `tsc -b` and the full non-integration suite (56 files / 421 tests)
    stayed green, as expected since `delete_player` is untouched.
-5. [ ] **API + hooks + error mapping.** `playersApi.removePlayerFromSport(id, sport, passphrase)` replacing
+5. [x] **API + hooks + error mapping.** `playersApi.removePlayerFromSport(id, sport, passphrase)` replacing
    `deletePlayer`; `useDeletePlayer` → `useRemovePlayerFromSport` (`mutate({ id, sport })`, invalidating
    `['players']`, `['playerStats']` and `['overallScoreboard']` — add that last key to
    `useCreatePlayer`/`useUpdatePlayer` too, which leave the scoreboard stale today: harmless before, visible
@@ -3184,6 +3184,14 @@ only (deleting the person row when it was their last sport); and names must be u
    last-sport delete, history in the other sport does not block); add a `name_taken` case on create and on
    rename to `playersApi.integration.test.ts`; swap the `delete_player` cleanup call in
    `matchesApi.integration.test.ts`. Controller runs the UUID-regex fixture cleanup afterwards.
+   **Done (2026-10-10, commit a6835bf, fix b7c738a):** task-reviewed CLEAN. **Ruling:** the brief wrongly
+   assumed `useDeletePlayer` had no live consumer — `PlayerList.tsx` depends on it. The implementer correctly
+   deferred that rewiring to step 7 (its own entry in this plan) rather than touching `PlayerList.tsx` here;
+   `useDeletePlayer.ts`/`playersApi.deletePlayer` and `PlayerList.test.tsx`'s mock factory are untouched,
+   and `useRemovePlayerFromSport.ts` sits unused until step 7 wires it in. **Step 7 must additionally delete
+   `useDeletePlayer.ts` (and its test, if any) and drop `deletePlayer` from `PlayerList.test.tsx`'s mock
+   factory** once `PlayerList.tsx` no longer calls it — `playersApi.deletePlayer` itself and the RPC stay
+   until step 13's merge-time migration regardless. Non-integration suite 56→59 files / 421→440 tests.
 6. [ ] **i18n (before every UI step).** New: `member.addExistingHeading`, `addExistingSelectLabel`,
    `addExistingPlaceholder`, `addExistingOption` ("{{name}} ({{sport}}: {{level}})"), `addExistingOptionPlain`,
    `addExistingLevelLabel`, `addExistingButton`, `addExistingEmpty`, `addExistingFailed`,
