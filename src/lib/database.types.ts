@@ -484,10 +484,6 @@ export type Database = {
         Args: { p_match_id: string; p_passphrase: string }
         Returns: undefined
       }
-      delete_player: {
-        Args: { p_id: string; p_passphrase: string }
-        Returns: undefined
-      }
       end_tournament: {
         Args: { p_passphrase: string; p_tournament_id: string }
         Returns: {
