@@ -80,6 +80,19 @@ now count planned matches (§5), and match labels change from "Round N" to
 "Match N" with a court name (§9). A tournament created before this change
 is a 1-court tournament and behaves as before. Implemented (Phase 24 in
 `docs/PLAN.md`).
+Updated: 2026-10-10 — **members are now per sport** (§1, §3, §4, §9): a
+person is still one shared record (name, gender, avatar), but *being a
+member* of Badminton or Tennis is tracked separately — someone added in the
+Badminton workspace does not appear in Tennis (and vice versa) until they
+are added there. The Member tab gains an **"Add an existing member"** dropdown
+(pick anyone already in the system who is not yet in this sport, plus their
+level for this sport) alongside the unchanged "add a new member" form. The
+Member tab, the Create Tournament checklist and mid-tournament Add
+participant list only the active sport's members; **Remove** now removes a
+person from the active sport only; new-member names must be unique across
+the whole system. Existing members all become Badminton-only (their
+placeholder Tennis levels are cleared). Not yet implemented as of this
+note.
 
 ## 1. Overview
 
@@ -87,11 +100,11 @@ A web app for running racket-sport "battle" sessions — currently
 **Badminton and Tennis** — using **balanced random matchmaking** — not a
 fixed round-robin bracket where every pair must meet exactly once, but a
 generator that draws one match at a time based on fairness rules. Includes
-a central player pool, shared across both sports, with cross-tournament
-history/stats and standings within each tournament. The organizer chooses
-which sport's "workspace" to work in (§9); every tournament belongs to
-exactly one sport, and a player's stats/level are tracked separately per
-sport (§3).
+a central set of people, each of whom can be a member of one or both
+sports, with cross-tournament history/stats and standings within each
+tournament. The organizer chooses which sport's "workspace" to work in
+(§9); every tournament belongs to exactly one sport, and membership and a
+player's stats/level are tracked separately per sport (§3).
 
 ## 2. Technology & Hosting
 
@@ -137,11 +150,42 @@ sport (§3).
 
 ## 3. Player Pool (central, persistent)
 
-- Players are created once in a shared pool and reused across
-  tournaments **and across both sports** — the same person is the same
-  member record whether they're playing Badminton or Tennis. Only their
-  skill level and stats are tracked separately per sport (below);
-  everything else about a member (name, gender, avatar) is shared.
+- A person is created once and is **one record across both sports** —
+  the same person whether they play Badminton or Tennis. Their name,
+  gender and avatar are shared; their **membership, skill level and stats
+  are tracked separately per sport** (below).
+- **Membership is per sport.** Each sport has its own member list. A
+  person appears in a sport's Member tab, Create Tournament checklist and
+  Add participant picker (§4, §9) **only if they are a member of that
+  sport**. Being a member of a sport *is* having a level in that sport —
+  there is no separate flag, and "no level" means "not a member". A
+  person can be a member of Badminton only, Tennis only, or both, with an
+  independent level in each. Someone added in one sport's workspace does
+  **not** automatically appear in the other.
+  - **Adding a brand-new person** (name, gender, level) from a sport's
+    Member tab makes them a member of **that sport only**.
+  - **Adding an existing person to the active sport.** The Member tab also
+    offers a dropdown of every person already in the system who is **not
+    yet a member of the active sport** (regardless of which other sport
+    they belong to), with each option showing their level in the other
+    sport, e.g. "Nim (Badminton: Beginner)". The organizer picks the
+    person and a level for the active sport (a dropdown defaulting to
+    Beginner — a level is never copied across sports automatically) and
+    taps Add. This is a separate section from the new-person form; it never
+    creates a new person.
+  - **Names are unique across the whole system** (compared ignoring upper/
+    lower case and leading/trailing spaces). Creating a new person — or
+    renaming an existing one — to a name that already belongs to someone
+    else is rejected with a message pointing to "Add an existing member".
+  - **Editing a person's name or gender applies to every sport they are a
+    member of** (it is one record); editing their **level** only affects
+    the active sport.
+  - **Remove** (Member tab) removes the person **from the active sport
+    only**; their membership and level in the other sport are untouched. It
+    is blocked, as before, if the person has any recorded match or is on
+    the roster of any tournament **in that sport** (history in the other
+    sport does not block it). If removing them leaves them a member of
+    **no** sport, the person record itself is deleted.
 - Fields: **name, gender, skill level (per sport)**. A photo is displayed
   everywhere a player/member is listed (member list, tournament
   participant checklist, scoreboards), but for now this is always a
@@ -163,11 +207,18 @@ sport (§3).
     **win rate in that sport** and displayed instead of the
     self-selected value, using the same fixed win-rate bands as before,
     applied per sport.
-  - A member who has never played (or been given a self-selected level
-    for) one of the two sports has **no level in that sport** until an
-    organizer sets one from the Member tab (§9). Such a member cannot be
-    selected as a participant in that sport's tournaments until a level
-    is set.
+  - A person who is not a member of a sport has no level in it and is not
+    offered in that sport's lists at all (see "Membership is per sport"
+    above). Every person a sport's lists do show has a level, so the
+    earlier rule "a member without a level shown disabled in the Create
+    Tournament checklist" no longer applies.
+- **Existing data when per-sport membership is introduced (2026-10-10).**
+  Everyone already in the system becomes a **Badminton-only** member: their
+  Tennis level, which was only a placeholder (no Tennis tournament had ever
+  been created), is cleared, and the Tennis member list starts empty. This
+  clearing is not reversible; anyone can afterwards be added to Tennis via
+  "Add an existing member" with a freshly chosen level. Existing
+  Badminton tournaments, matches and stats are untouched.
 - **Doubles pairs are never persisted as a standing entity.** Every
   tournament re-pairs players from the individual pool; there is no
   reusable "team" object.
@@ -215,8 +266,8 @@ sport (§3).
     cap: N" line only renders once a points-per-game value is resolved
     (always true for Tennis, since it's fixed; shown for Badminton once
     the organizer has entered a value).
-- **Participants are selected at creation time, from the member pool** —
-  this remains the *only* way to build the initial roster. Once the
+- **Participants are selected at creation time, from the members of the
+  tournament's sport (§3)** — this remains the *only* way to build the initial roster. Once the
   tournament is running, the roster can still change in two narrow,
   explicitly-gated ways (below); there is still no general-purpose "edit
   the roster" screen. (An earlier draft of this spec allowed late joins at
@@ -240,8 +291,8 @@ sport (§3).
   replacements).
 - **Add participant (mid-tournament: late arrival or rejoin).** The
   organizer can add someone to an in-progress tournament's active roster
-  from the member pool, minus whoever is already active on this
-  tournament. This covers two cases with one action:
+  from the tournament sport's members (§3), minus whoever is already
+  active on this tournament. This covers two cases with one action:
   - **A genuinely new participant** for this tournament: added with a
     **fairness offset** equal to the lowest `matchesPlayedInTournament`
     among currently-active participants, so the Match Generator (§5) treats
@@ -530,12 +581,11 @@ at every screen size (not a responsive top-nav on wider viewports):
 1. **Create** — create a new tournament: name, type (§4), **number of
    courts** (1-8, a stepper like games per match; defaults to 1 and cannot
    be changed after creation, §4), games per
-   match, points per game, and a checklist of all members to select as
-   participants (each row shows photo/avatar, name, level for the active
-   sport — this is the **only** place participants are ever chosen, per
-   §4). A member with **no level yet in the active sport** (§3) appears
-   disabled in this checklist, with an explanation that they need a level
-   set on the Member tab first before they can be selected. On submit: the
+   match, points per game, and a checklist of the **active sport's
+   members** to select as participants (each row shows photo/avatar, name,
+   level for the active sport — this is the **only** place participants
+   are ever chosen, per §4). People who are not members of the active
+   sport (§3) do not appear. On submit: the
    tournament and its participants are created, the **first n matches**
    (n = number of courts) are drawn immediately per the Match Generator
    (§5), one after another so each counts toward the next's planned counts,
@@ -565,7 +615,7 @@ at every screen size (not a responsive top-nav on wider viewports):
      is in the in-progress match of any court; participants who left show greyed out
      in the same list rather than a separate section. An **Add
      participant** entry point above/near the list opens a picker over the
-     member pool (minus everyone already active on this tournament — which
+     active sport's members (minus everyone already active on this tournament — which
      includes anyone who left, letting them be picked again to rejoin, §4)
      and goes straight to the passphrase prompt with no extra confirm.
      Both Leave and Add participant are hidden/disabled once the
@@ -639,16 +689,29 @@ at every screen size (not a responsive top-nav on wider viewports):
    **collapsed** (heading only — no peek of items) so the organizer
    opts in to scrolling through history rather than it being forced on
    page load.
-5. **Member** — the central player pool, shared across both sports (§3):
-   an "add member" form (name, gender as an icon-toggle, level as a
-   dropdown **for the active sport only**, no photo upload per §3) above
-   a list of **all** current members regardless of sport (photo/avatar,
-   name, level for the active sport). A member with no level yet in the
-   active sport shows a distinct "not set" state with the same dropdown
-   used to set one for the first time — this is how a member becomes
-   eligible for that sport's tournaments (§4/tab 1, above). This tab is
-   **only** for managing the member pool — it has no tournament-
-   participation controls (see §4's create-time-only rule).
+5. **Member** — the **active sport's** member list (§3), with two separate
+   add sections above it:
+   - **Add a new member** — the form as before (name, gender as an
+     icon-toggle, level as a dropdown for the active sport only, no photo
+     upload per §3). It creates a brand-new person who is a member of the
+     active sport only. A name that already belongs to anyone in the
+     system (either sport, §3) is rejected with a message directing the
+     organizer to the section below.
+   - **Add an existing member** — a dropdown of every person not yet a
+     member of the active sport (options show their level in the other
+     sport, e.g. "Nim (Badminton: Beginner)"), a level dropdown for the
+     active sport defaulting to Beginner, and an **Add** button. When there
+     is nobody left to add, the section shows an empty-state message
+     instead of the dropdown.
+
+   Below them, the list shows only the active sport's members (photo/
+   avatar, name, level for the active sport, Remove). Name and gender are
+   editable in place and change the person in every sport; the level is
+   editable in place for the active sport only. **Remove** takes the
+   person out of the active sport only and is blocked as described in §3
+   (with an explanatory hint); if it leaves them in no sport the person is
+   deleted. This tab is **only** for managing members — it has no
+   tournament-participation controls (see §4's create-time-only rule).
 
 ## Out of scope / explicitly deferred
 
@@ -660,6 +723,9 @@ at every screen size (not a responsive top-nav on wider viewports):
   taps Start match per court. Cross-device sharing of the queue (it is
   browser-local, §9).
 - Persistent doubles "teams" as a first-class entity.
+- Merging two person records, or adding someone to **both** sports in one
+  step — adding to a second sport is the explicit "Add an existing member"
+  action in that sport's workspace (§3, §9).
 - Live, point-by-point scoreboard mode.
 - Real player photo upload/storage — placeholder avatars only for now
   (§3).

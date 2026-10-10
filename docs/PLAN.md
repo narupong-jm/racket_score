@@ -3067,3 +3067,194 @@ Thai wording nits (`reusedWarning`, `removeFromQueue`); `manage.done` is kept on
   in-progress matches are not counted. Revisit if late joiners are over-drawn on multi-court nights.
 - The reuse warning fires whenever a drawn player is already in an in-progress or queued match, which can be
   expected on small rosters.
+
+## Phase 25 — Per-Sport Membership (Badminton / Tennis)
+
+`docs/SPEC.md` (Updated 2026-10-10) makes **membership per sport**. A person stays ONE record (name, gender,
+avatar shared) but *being a member* of Badminton or Tennis is independent: someone added in the Badminton
+workspace does not appear in Tennis until they are explicitly added there, and vice versa. One person can hold
+a Badminton level *and* a Tennis level. **Being a member of a sport *is* having a non-null level in that
+sport** — no new table and no new flag. The Member tab gains an "Add an existing member" dropdown (anyone in
+the system not yet in this sport, labelled with their level in the other sport) beside the unchanged
+new-member form; the Member list, Create Tournament checklist, mid-tournament Add participant picker and the
+Overall Scoreboard all show only the active sport's members; **Remove** removes a person from the active sport
+only (deleting the person row when it was their last sport); and names must be unique across the whole system.
+
+**Findings that shape this phase (from exploration, 2026-10-10):**
+- `update_player(p_id, p_passphrase, p_name, p_gender, p_sport, p_self_selected_level)` **already implements
+  "add an existing person to a sport"** — it writes only the named sport's level column — so that feature needs
+  no new RPC and no new `playersApi` export. It cannot *null* a level (its `sport_level_pair_required` guard),
+  which is why Remove does need one. Do **not** add a "must not already be a member" guard to it: the level
+  editor uses the same path.
+- `delete_player` checks match/roster history **across all sports**, so it cannot express a per-sport Remove.
+- `player_stats` is a view over `players CROSS JOIN (badminton, tennis)`: it returns a row per person per sport
+  **even for non-members** (that sport's levels are null). Membership must be read from the `players` row, not
+  from the stats list — any future "a stats row exists, so they are a member" inference is wrong. The same view
+  usefully supplies the *other* sport's `effective_level` for the dropdown label.
+- `listPlayers()` also backs the **name lookups** in History, the Manage screen and the delete-impact modal, so
+  it must stay unfiltered; the per-sport list is a filtered view over the same `['players']` query. A left,
+  history-free participant can legitimately be removed from the sport afterwards, so a filtered name map would
+  render raw UUIDs in their greyed-out roster row.
+- Verified on the live project before planning: 0 case-insensitive duplicate names, 0 tennis tournaments /
+  matches / roster rows, 12 people carrying a placeholder tennis level.
+- An **empty Tennis workspace becomes a reachable state** (no members at all): the Member list, the Create
+  checklist, the Add participant picker and the Overall Scoreboard each need a real empty state, not just
+  "doesn't crash".
+- Component tests assert real English copy, so i18n lands before the UI steps (the Phase 23/24 ordering lesson).
+
+**Invariants this phase must preserve:**
+- **I1 — has history in a sport ⇒ is a member of that sport.** This is what makes it safe to filter the
+  pickers and delete the old "no level ⇒ shown disabled" UI: a filter can never hide someone who actually
+  played. Held by three independent facts: `create_player` always sets the sport's level, `update_player`
+  cannot null a level, and `remove_player_from_sport` refuses while history exists in that sport. Assert it in
+  SQL during steps 3 and 13.
+- **I2 — every person is a member of at least one sport** (promoted to a DB `CHECK` in step 13). Consequence:
+  `remove_player_from_sport` must **branch to `DELETE`** rather than null-then-delete, because a row-level
+  CHECK rejects the intermediate all-null state. Getting this backwards fails exactly on the "remove their
+  last sport" path.
+
+1. [ ] **Pure membership + name helpers.** New `src/features/players/playerMembership.ts`: `LEVEL_COLUMN`,
+   `sportLevel(player, sport)`, `isMemberOfSport(player, sport)`, `otherSport(sport)`,
+   `membershipSports(player)`, `otherSportMembership(player, activeSport)` (drives the dropdown label),
+   `normalizePlayerName(name)` (trim + lowercase) and `findNameConflict(players, name, excludeId?)`.
+   Framework- and DB-free, like `playerLevels.ts`. _Test:_ new `playerMembership.test.ts` — badminton-only /
+   tennis-only / both / neither; false for null and true for every level value; `otherSportMembership` returns
+   the other sport's level or null; `findNameConflict` matches case-insensitively and trimmed, ignores the
+   excluded id, and returns null for a free name.
+2. [ ] **Migration A — name uniqueness + friendly `name_taken` (additive, safe before deploy).** Re-verify
+   `select lower(btrim(name)), count(*) ... having count(*) > 1` returns 0 rows, then add unique index
+   `players_name_ci_unique on players (lower(btrim(name)))`, and `create or replace` `create_player` /
+   `update_player` with **unchanged argument lists** (so this is not a signature change and the live old build
+   keeps working): each trims the incoming name, pre-checks a normalized collision excluding its own row →
+   `raise exception 'name_taken'`, and traps `unique_violation` → `name_taken` for the race. Every other
+   behaviour stays identical (`sport_level_pair_required`, `coalesce`, passphrase first). _Test:_ `execute_sql`
+   — duplicate create rejected; rename onto another person rejected; renaming a person to a different case of
+   its *own* name allowed; trailing spaces stripped; the level-pair guard still raises; index present;
+   `get_advisors` shows no new advisory classes. Note the index takes effect on the **live old build**
+   immediately: a duplicate name there now fails with a raw Postgres error instead of silently succeeding —
+   accepted as a fix, not a regression.
+3. [ ] **Migration B — per-sport removal RPC (additive).** New `remove_player_from_sport(p_id, p_sport,
+   p_passphrase) returns boolean` (true = the person row was deleted because it was their last sport):
+   passphrase first, then `invalid_sport`, `player_not_found`, `not_a_member` when that sport's level is
+   already null, then `player_has_matches` / `player_in_tournament` evaluated **joined through
+   `matches`/`tournaments` and `tournament_participants`/`tournaments` filtered to `p_sport`** (keeping today's
+   `status <> 'left'` rule, so someone who left a tournament does not block removal), then **either** delete the
+   `players` row (last sport) **or** null that one column — never null-then-delete (see I2). `delete_player` is
+   left untouched until step 13. _Test:_ `execute_sql` on disposable rows — a both-sports person loses only the
+   named sport and keeps the other level; a single-sport person's row is deleted; badminton match history blocks
+   badminton removal but **not** tennis removal; a tennis roster row blocks tennis only; a wrong passphrase
+   fails before any other check; `not_a_member` on a second call; then assert I1 across the whole table.
+4. [ ] **Regenerate `src/lib/database.types.ts`.** _Test:_ `npx tsc -b` (nothing should break yet —
+   `delete_player` still exists at this point).
+5. [ ] **API + hooks + error mapping.** `playersApi.removePlayerFromSport(id, sport, passphrase)` replacing
+   `deletePlayer`; `useDeletePlayer` → `useRemovePlayerFromSport` (`mutate({ id, sport })`, invalidating
+   `['players']`, `['playerStats']` and `['overallScoreboard']` — add that last key to
+   `useCreatePlayer`/`useUpdatePlayer` too, which leave the scoreboard stale today: harmless before, visible
+   once it is membership-filtered); new `src/features/players/playerErrors.ts` with `removeMemberErrorKey(error)`
+   and `isNameTakenError(error)`, mirroring the existing `src/features/tournaments/startMatchError.ts` pattern;
+   new `src/features/players/useSportMembers.ts` exporting `useSportMembers(sport)` and
+   `useNonSportMembers(sport)`, both over the existing `['players']` query with a `useCallback`-stable `select`
+   (one cache entry, prefix invalidation still works, and `tournament.sport` can differ from `useSport()`);
+   `usePlayers`/`listPlayers` stay unfiltered with a docblock saying so. Reuse `useUpdatePlayer` for "add to
+   sport". _Test:_ unit tests for `playerErrors.ts` (each code → key, `passphrase_cancelled` → null, unknown →
+   generic, `23505` → name-taken) and `useSportMembers.test.tsx` (each hook returns its sport's members, the
+   non-member hooks return the exact complements, both hooks share one `listPlayers` call, selected-array
+   identity stable across a re-render); rename `deletePlayer.integration.test.ts` →
+   `removePlayerFromSport.integration.test.ts` and rewrite it against the live project (per-sport scoping,
+   last-sport delete, history in the other sport does not block); add a `name_taken` case on create and on
+   rename to `playersApi.integration.test.ts`; swap the `delete_player` cleanup call in
+   `matchesApi.integration.test.ts`. Controller runs the UUID-regex fixture cleanup afterwards.
+6. [ ] **i18n (before every UI step).** New: `member.addExistingHeading`, `addExistingSelectLabel`,
+   `addExistingPlaceholder`, `addExistingOption` ("{{name}} ({{sport}}: {{level}})"), `addExistingOptionPlain`,
+   `addExistingLevelLabel`, `addExistingButton`, `addExistingEmpty`, `addExistingFailed`,
+   `confirmRemoveBodySport` (stays in the other sport) and `confirmRemoveBodyLast` (deletes the person),
+   `removeFailedHasMatches`, `removeFailedInTournament`, `players.form.nameTaken`,
+   `players.editableName.nameTaken`, `tournaments.form.noMembers`. Copy-changed, keys kept:
+   `member.addHeading` → "Add a new member", `member.confirmRemoveTitle` (+`{{sport}}`),
+   `member.removeDisabledHint` (+"in this sport"), `players.empty`, `manage.noPlayersToAdd`. Removed as dead:
+   `member.levelNotSet`, `member.confirmRemoveBody`, `tournaments.form.participantMissingLevel`. Mirror
+   everything in `th.json` with real Thai and identical `{{placeholders}}`. _Test:_ `npx vitest run src/i18n` —
+   identical key sets, placeholder parity (`confirmRemoveTitle` gains `{{sport}}` in both locales or the test
+   fails), and a new `PHASE_25_KEYS` non-empty list beside `PHASE_24_KEYS`; `grep` confirms the three deleted
+   keys are unreferenced.
+7. [ ] **Member list goes per-sport, with the two-variant Remove dialog.** `PlayerList.tsx` →
+   `useSportMembers(sport!)`; `membershipSports` decides `isLastSport` → which confirm body; failures mapped
+   through `removeMemberErrorKey`; Remove calls `useRemovePlayerFromSport` with `{ id, sport }`; sport-aware
+   empty state; the `hasHistory` pre-check keeps reading the active sport's `total_matches` (the RPC stays the
+   authority) with its comment updated. Delete `EditablePlayerLevel`'s now-dead `isNotSet` branch and simplify
+   its disabled condition. _Test:_ rework `PlayerList.test.tsx` — a tennis-only person is absent from the
+   badminton list and vice versa; Remove calls `removePlayerFromSport('p3', 'badminton', 'test-passphrase')`;
+   the dialog says "stays a member of Tennis" for a both-sports person and "permanently deletes their record"
+   for a single-sport one; `player_has_matches` / `player_in_tournament` render their specific messages; delete
+   the obsolete "not set" test.
+8. [ ] **"Add an existing member" section + the new-member name guard.** New
+   `src/features/players/AddExistingMemberForm.tsx`: `useNonSportMembers(sport!)`, option labels via
+   `member.addExistingOption` using the other sport's `effective_level` from
+   `usePlayerStatsList(otherSport(sport))`, a `PLAYER_LEVELS` dropdown defaulting to Beginner (never copied from
+   the other sport), an Add button calling `useUpdatePlayer` with `{sport, self_selected_level}`, and
+   `member.addExistingEmpty` replacing the controls when nobody is left. Rendered on `MemberPage` between the
+   new-member form and the list. `CreatePlayerForm` gains `usePlayers()` + `findNameConflict` as a **pre-submit**
+   check (the passphrase prompt fires before the write, so without it the organizer types the passphrase only to
+   be rejected) plus `isNameTakenError` on the server error. _Test:_ new `AddExistingMemberForm.test.tsx` — a
+   tennis-only person appears as "Nim (Tennis: Beginner)" in the Badminton workspace, badminton members do not
+   appear, the level select defaults to Beginner and a chosen level is respected, Add calls
+   `updatePlayer(id, {sport, self_selected_level}, 'test-passphrase')`, the empty state, and a failed add shows
+   its message; update `MemberPage.test.tsx` for both headings; `CreatePlayerForm.test.tsx` needs
+   `listPlayers: vi.fn()` added to its mock factory plus a duplicate-name case.
+9. [ ] **Rename guard.** `EditablePlayerName` gains the same `findNameConflict` pre-check and `isNameTakenError`
+   handling. _Test:_ a conflicting name (differing only by case/padding) blocks and shows the message with
+   `updatePlayer` never called; renaming a person to its own name still works; a server `name_taken` that slips
+   through a race renders the same message.
+10. [ ] **Create checklist + Add-participant picker.** `CreateTournamentPage.tsx` → `useSportMembers(sport!)`,
+    deleting `hasLevel` / `disabled` / the `participantMissingLevel` title / the `levelNotSet` fallback, and
+    adding a `tournaments.form.noMembers` empty state under the legend. `TournamentDetail.tsx` →
+    `ParticipantsCard` calls `useSportMembers(sport)` itself (sport from `tournament.sport`, which may differ
+    from the active workspace), its now-unused `players` prop is dropped, and the option's `disabled`/`title` go;
+    `playerNameById` in the parent **stays on unfiltered `usePlayers()`**. `useDrawInputs`'s silent null-level
+    drop becomes unreachable but is kept as a safety net with an updated comment. _Test:_
+    `CreateTournamentPage.test.tsx` — a badminton-only person is absent from a Tennis checklist (**the existing
+    tennis test passes badminton-level `makePlayer`/`makeStats` fixtures and must switch to tennis-level ones or
+    it will render an empty list**), plus a no-members case; `TournamentDetail.test.tsx` — replace "disables a
+    member with no level in this sport" with "omits a non-member of the tournament's sport from the picker",
+    assert a Badminton tournament's picker is unaffected while the active workspace is Tennis, and keep
+    Leave/rejoin green including that a left, since-removed member's **name still renders** in their greyed-out
+    row (the R3 regression).
+11. [ ] **Filter the Overall Scoreboard to the active sport's members.** `fetchOverallScoreboard` keeps a player
+    when `isMemberOfSport(p, sport)` **or** they have history rows in the result set — the defensive form makes
+    it provably non-hiding (I1) — and passes only those into `aggregateScoreboard`, which stays pure and
+    untouched. _Test:_ `OverallScoreboardPage.test.tsx` mocks `fetchOverallScoreboard` wholesale, so this needs
+    its **own new** `useOverallScoreboard.test.ts` (mocking `listPlayers` / `listPlayerMatchHistory`) or it ships
+    untested: a tennis-only person is absent from the badminton board and vice versa, and a player with history
+    rows is never filtered out.
+12. [ ] **Docs.** Flip `docs/SPEC.md`'s 2026-10-10 note to implemented; update `README.md` (Features, Design
+    decisions, the per-sport notes under Database setup) and `CLAUDE.md` (project status, the shared-pool
+    domain-model bullet, membership = non-null per-sport level, the ≥1-sport CHECK, `remove_player_from_sport`,
+    `delete_player` gone); tick this phase's boxes with outcomes. _Test:_ none (docs-only).
+13. [ ] **Full regression, merge, deploy, then the destructive migration, then live verification.**
+    `npm run build`, `npm run lint`, the full `npx vitest run` (integration included). Then merge and **confirm
+    the Vercel production deploy is READY before** applying **Migration C (destructive, merge-time only)**:
+    re-verify 0 tennis tournaments / matches / roster rows, record the 12 `(id, tennis_self_selected_level)`
+    pre-image pairs in this step's notes, then `update players set tennis_self_selected_level = null`; add
+    `check (badminton_self_selected_level is not null or tennis_self_selected_level is not null)`; `drop
+    function delete_player(uuid, text)`; regenerate `database.types.ts` and re-run `tsc -b` + the suite.
+    **Why merge-time and not earlier:** clearing the levels while the old build is still live would leave its
+    Tennis workspace showing all 16 members as "Not set yet" with an unusable Create checklist. Then a Playwright
+    pass on the real project: Badminton still lists 16 with their levels; Tennis shows the empty member list,
+    the no-members Create checklist and "Add an existing member" listing everyone as "(Badminton: …)"; adding
+    one at Intermediate puts them in the Tennis list, checklist and picker with Badminton unchanged; renaming
+    them shows the new name in both sports; a duplicate name is rejected on create and on rename; Remove from
+    Tennis says "stays a member of Badminton" and leaves Badminton intact; Remove on a Badminton member with
+    match history is blocked with the specific hint; a disposable Tennis-only person Removed has their row
+    deleted (verified in SQL). Finish with the operational-note fixture cleanup (UUID-regex pass over all six
+    tables, re-queried to zero), assert I1 again, and re-verify the live counts.
+
+**Risks / notes for this phase:**
+- Migration C is irreversible, but verified harmless — no tennis tournament has ever existed, so nothing
+  depends on those 12 placeholder levels, and the pre-image pairs are recorded before the update.
+- Dropping `delete_player` before the new build is live would break the deployed Remove button (Phase 24's
+  lesson), which is why it sits in step 13 with the other destructive work.
+- Every `vi.mock('.../playersApi', ...)` factory lists its functions explicitly, so a missed factory makes the
+  new API `undefined` at runtime instead of failing to compile. Deriving membership client-side and reusing
+  `update_player` keeps this to one renamed export plus one added `listPlayers` stub.
+- Integration tests cannot delete their own `players` fixtures (anon has no DELETE grant), so the controller's
+  UUID-regex cleanup is mandatory after any run that touches the live project.
