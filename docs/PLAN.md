@@ -2857,30 +2857,13 @@ phase is a 1-court tournament.
 order: 1-4 (data), 5-7 (pure logic + store + hooks), **10 (i18n) before 8-9** (their tests assert real rendered
 copy, per the Phase 23 ordering lesson), then 8, 9, 11, 12. The checkbox numbering below is unchanged by that order.
 
-**Implementation status (2026-10-09, end of session 3):** being built via `superpowers:subagent-driven-development` in an
-isolated worktree at `.claude/worktrees/phase-24-multi-court` (branch `worktree-phase-24-multi-court`, based on `main` @
-`17af775`) — **not merged to `main`**. Steps 1-11 are complete and each was independently task-reviewed (9a by an opus
-reviewer); step 12 (full regression + live verification) is **also done** (see its note); what is left is the final
-whole-branch review and the merge. Branch state at the stop of session 3: `tsc -b` clean, non-integration suite
-53 files / 377 tests passing, worktree clean (step 12 later added one test, 378). The live database carries migrations A and B (additive, old overloads still present);
-fixtures from integration runs were cleaned and re-verified (9 tournaments / 106 matches / 0 queued / 0 UUID-named rows).
-Note for step 12: `matchesApi.integration.test.ts` hit its 5 s default timeout on its first test once (16/17 passing;
-suspected network latency, not re-run) — re-run it and consider a `testTimeout` bump if it recurs.
-
-**To resume:** `cd` into the worktree (or `EnterWorktree` with `path: .claude/worktrees/phase-24-multi-court`), read the
-git-ignored SDD workspace `.superpowers/sdd/phase24/` — `progress.md` (ledger: every task outcome, all rulings and deferred
-minors), `contracts.md` (binding cross-task interfaces C1-C6), `task-<N>-brief.md` / `-report.md` per task — then: (1) step 12:
-`npm run build`, `npm run lint`, the whole vitest suite including integration files (clean fixtures with the UUID-regex
-`execute_sql` pass afterwards — controller only), then a Playwright pass on the dev server against the real project using a
-disposable UUID-named tournament (2-court create shows 2 drawn matches; Start on each court; per-court Save lock; Fill queue
-to n+1; start-blocked when a player is on the other court; Leave blocked on either court and discards queued entries;
-Match/Court labels in Manage, Active and History; quick-undo targets the most recently confirmed result; a 1-court
-tournament still works; also check the deferred `useRecordMatchResult` invalidation race), (2) final whole-branch review on
-the most capable model with the ledger's deferred minors as its triage list, (3) `superpowers:finishing-a-development-branch`,
-discarding the duplicate uncommitted SPEC/PLAN edits left in the main checkout first, and, only at merge time, migration 2b
-(drop the old `create_tournament`/`create_match` overloads, add the unique index on `(tournament_id, sequence_number)`),
-then edit CLAUDE.md to say Phase 24 shipped. If `.superpowers/` is gone, rebuild from `git log` (one commit per step,
-subjects "Phase 24 step N: ...") and this section.
+**Implementation status (2026-10-10): DONE — merged and shipped.** Built via `superpowers:subagent-driven-development` in an
+isolated worktree (branch `worktree-phase-24-multi-court`, based on `main` @ `17af775`), fast-forward merged to `main`
+(`17af775..46879d3`) and deployed to Vercel production. All 12 steps are complete and task-reviewed, the final whole-branch
+review (most capable model) found 0 Critical / 2 Important / 11 Minor and its blocking items were fixed or turned into the
+2b checklist, and migration 2b is applied (see step 2b). Final state: build + lint clean, 62 test files / 421 tests passing
+including integration; live DB back to 9 tournaments / 16 players / 106 matches / 0 in progress / 0 fixture rows. The
+git-ignored SDD workspace `.superpowers/sdd/phase24/` (ledger, briefs, reports) holds the full task history and can be deleted.
 
 **Rulings made during execution (all recorded in the ledger as `Ruling:`; cost if wrong in parentheses):**
 - Supabase branching is Pro-only and the org is on the free plan, so migrations A/B were applied **additively to the live
@@ -2934,6 +2917,15 @@ Thai wording nits (`reusedWarning`, `removeFromQueue`); `manage.done` is kept on
    `get_advisors` (security) — only the expected anon-executable `SECURITY DEFINER` advisories.
    **2b. (at merge time, not before)** Migration C: drop the old `create_tournament` / `create_match` overloads and add
    a unique index on `(tournament_id, sequence_number)`. _Test:_ old-signature call now fails, new flows unaffected.
+   **2b done (2026-10-10):** merged to `main` first (fast-forward `17af775..46879d3`), Vercel production deploy for
+   `46879d3` confirmed READY, then applied `phase24_drop_old_overloads_and_sequence_index` (backfill of NULL-court
+   in-progress rows — there were none —, drop of the old `create_match`/`create_tournament` overloads, unique index
+   `matches_tournament_sequence_unique`). Pre-checks: 0 duplicate `(tournament_id, sequence_number)` groups, 0 in-progress
+   rows with a NULL court. Verified: one overload of each function left, index present, 106 matches / 9 tournaments
+   untouched, advisories unchanged (only the expected anon `SECURITY DEFINER` ones), full vitest incl. integration green
+   (62 files / 421 tests; the first `matchesApi` integration test got an explicit 20 s timeout after flaking twice at the
+   5 s default under network latency). `database.types.ts` collapsed to the single remaining overloads. Completed matches
+   from before Phase 24 keep `court_number = NULL` (cosmetic; UI treats it as court 1).
    **Merge checklist (final review, 2026-10-09):** (a) merge and confirm the Vercel production deploy is live BEFORE
    applying 2b (the old build's Create/Start calls use the old overloads); (b) right before the index, re-run
    `select tournament_id, sequence_number, count(*) ... having count(*) > 1` — the old build still computes sequence
@@ -3060,7 +3052,7 @@ Thai wording nits (`reusedWarning`, `removeFromQueue`); `manage.done` is kept on
     follow-up (not blocking): generic Start error copy + no refetch on failure, End while other courts are in progress,
     games-played table includes the fairness offset, create-popup reuse warning not re-derived after edits, dismissing the
     create popup loses the drawn queue, non-integer court count, index-keyed Edit popup, two dead locale keys
-    (`manage.courtHeading`, `manage.done`), a few weak tests. **Remaining:** merge + migration 2b + CLAUDE.md "shipped".
+    (`manage.courtHeading`, `manage.done`), a few weak tests. **Phase 24 is merged and shipped (2026-10-10).**
 
 **Known limitations carried into this phase (deliberate):**
 - The queue is browser-local (SPEC §9), so a second device won't see it.

@@ -100,7 +100,8 @@ describe('matchesApi: manually_adjusted flag (real project, anon key)', () => {
       await supabase.from('tournaments').delete().eq('id', tournament.id)
       await supabase.from('players').delete().in('id', [playerA.id, playerB.id])
     }
-  })
+    // ~10 sequential real-network calls: the 5 s default flakes on a cold start.
+  }, 20_000)
 })
 
 describe('matchesApi (real project, anon key)', () => {

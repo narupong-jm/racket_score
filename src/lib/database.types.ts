@@ -400,57 +400,31 @@ export type Database = {
         Args: { p_passphrase: string }
         Returns: undefined
       }
-      create_match:
-        | {
-            Args: {
-              p_court_number: number
-              p_manually_adjusted?: boolean
-              p_participants: Json
-              p_passphrase: string
-              p_tournament_id: string
-            }
-            Returns: {
-              completed_at: string | null
-              court_number: number | null
-              created_at: string
-              id: string
-              manually_adjusted: boolean
-              sequence_number: number
-              status: string
-              tournament_id: string
-            }
-            SetofOptions: {
-              from: '*'
-              to: 'matches'
-              isOneToOne: true
-              isSetofReturn: false
-            }
-          }
-        | {
-            Args: {
-              p_manually_adjusted?: boolean
-              p_participants: Json
-              p_passphrase: string
-              p_sequence_number: number
-              p_tournament_id: string
-            }
-            Returns: {
-              completed_at: string | null
-              court_number: number | null
-              created_at: string
-              id: string
-              manually_adjusted: boolean
-              sequence_number: number
-              status: string
-              tournament_id: string
-            }
-            SetofOptions: {
-              from: '*'
-              to: 'matches'
-              isOneToOne: true
-              isSetofReturn: false
-            }
-          }
+      create_match: {
+        Args: {
+          p_court_number: number
+          p_manually_adjusted?: boolean
+          p_participants: Json
+          p_passphrase: string
+          p_tournament_id: string
+        }
+        Returns: {
+          completed_at: string | null
+          court_number: number | null
+          created_at: string
+          id: string
+          manually_adjusted: boolean
+          sequence_number: number
+          status: string
+          tournament_id: string
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'matches'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_player: {
         Args: {
           p_gender: string
@@ -474,70 +448,38 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      create_tournament:
-        | {
-            Args: {
-              p_court_count: number
-              p_games_per_match: number
-              p_name: string
-              p_passphrase: string
-              p_points_per_game: number
-              p_sport: string
-              p_type: string
-              p_win_by?: number
-            }
-            Returns: {
-              court_count: number
-              created_at: string
-              ended_at: string | null
-              games_per_match: number
-              id: string
-              name: string
-              point_cap: number | null
-              points_per_game: number
-              sport: string
-              status: string
-              type: string
-              win_by: number
-            }
-            SetofOptions: {
-              from: '*'
-              to: 'tournaments'
-              isOneToOne: true
-              isSetofReturn: false
-            }
-          }
-        | {
-            Args: {
-              p_games_per_match: number
-              p_name: string
-              p_passphrase: string
-              p_points_per_game: number
-              p_sport: string
-              p_type: string
-              p_win_by?: number
-            }
-            Returns: {
-              court_count: number
-              created_at: string
-              ended_at: string | null
-              games_per_match: number
-              id: string
-              name: string
-              point_cap: number | null
-              points_per_game: number
-              sport: string
-              status: string
-              type: string
-              win_by: number
-            }
-            SetofOptions: {
-              from: '*'
-              to: 'tournaments'
-              isOneToOne: true
-              isSetofReturn: false
-            }
-          }
+      create_tournament: {
+        Args: {
+          p_court_count: number
+          p_games_per_match: number
+          p_name: string
+          p_passphrase: string
+          p_points_per_game: number
+          p_sport: string
+          p_type: string
+          p_win_by?: number
+        }
+        Returns: {
+          court_count: number
+          created_at: string
+          ended_at: string | null
+          games_per_match: number
+          id: string
+          name: string
+          point_cap: number | null
+          points_per_game: number
+          sport: string
+          status: string
+          type: string
+          win_by: number
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'tournaments'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       delete_match_result: {
         Args: { p_match_id: string; p_passphrase: string }
         Returns: undefined
