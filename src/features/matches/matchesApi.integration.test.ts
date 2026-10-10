@@ -277,7 +277,7 @@ describe('matchesApi: deleteMatchResult (real project, anon key)', () => {
     // has no direct DELETE privilege on `tournaments`/`tournament_participants`
     // (Phase 16), so these raw deletes are known no-ops left in place only
     // for documentation purposes -- matching the same known gap described in
-    // `deletePlayer.integration.test.ts`'s own `afterAll`.
+    // `removePlayerFromSport.integration.test.ts`'s own `afterAll`.
     if (tournamentId) {
       await supabase
         .from('tournament_participants')
