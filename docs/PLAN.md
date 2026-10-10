@@ -3113,7 +3113,7 @@ only (deleting the person row when it was their last sport); and names must be u
   CHECK rejects the intermediate all-null state. Getting this backwards fails exactly on the "remove their
   last sport" path.
 
-1. [ ] **Pure membership + name helpers.** New `src/features/players/playerMembership.ts`: `LEVEL_COLUMN`,
+1. [x] **Pure membership + name helpers.** New `src/features/players/playerMembership.ts`: `LEVEL_COLUMN`,
    `sportLevel(player, sport)`, `isMemberOfSport(player, sport)`, `otherSport(sport)`,
    `membershipSports(player)`, `otherSportMembership(player, activeSport)` (drives the dropdown label),
    `normalizePlayerName(name)` (trim + lowercase) and `findNameConflict(players, name, excludeId?)`.
@@ -3121,6 +3121,9 @@ only (deleting the person row when it was their last sport); and names must be u
    tennis-only / both / neither; false for null and true for every level value; `otherSportMembership` returns
    the other sport's level or null; `findNameConflict` matches case-insensitively and trimmed, ignores the
    excluded id, and returns null for a free name.
+   **Done (2026-10-10, commit a46d02b):** all 8 exports present with the frozen contract names/signatures;
+   `it.each(PLAYER_LEVELS)` coverage for `isMemberOfSport`. Task-reviewed CLEAN (one Minor nit: the commit
+   trailer's model name doesn't match the project's current attribution convention — not a blocker).
 2. [x] **Migration A — name uniqueness + friendly `name_taken` (additive, safe before deploy).** Re-verify
    `select lower(btrim(name)), count(*) ... having count(*) > 1` returns 0 rows, then add unique index
    `players_name_ci_unique on players (lower(btrim(name)))`, and `create or replace` `create_player` /
@@ -3159,8 +3162,10 @@ only (deleting the person row when it was their last sport); and names must be u
    immediately after and the restore verified. `get_advisors`: `remove_player_from_sport` joined the existing
    anon `SECURITY DEFINER` list, no new advisory class. Fixtures cleaned (16 players / 9 tournaments / 106
    matches unchanged).
-4. [ ] **Regenerate `src/lib/database.types.ts`.** _Test:_ `npx tsc -b` (nothing should break yet —
+4. [x] **Regenerate `src/lib/database.types.ts`.** _Test:_ `npx tsc -b` (nothing should break yet —
    `delete_player` still exists at this point).
+   **Done (2026-10-10, commit 18d971d):** `tsc -b` and the full non-integration suite (56 files / 421 tests)
+   stayed green, as expected since `delete_player` is untouched.
 5. [ ] **API + hooks + error mapping.** `playersApi.removePlayerFromSport(id, sport, passphrase)` replacing
    `deletePlayer`; `useDeletePlayer` → `useRemovePlayerFromSport` (`mutate({ id, sport })`, invalidating
    `['players']`, `['playerStats']` and `['overallScoreboard']` — add that last key to
