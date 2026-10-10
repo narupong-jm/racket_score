@@ -550,6 +550,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      remove_player_from_sport: {
+        Args: { p_id: string; p_passphrase: string; p_sport: string }
+        Returns: boolean
+      }
       update_player: {
         Args: {
           p_gender?: string
