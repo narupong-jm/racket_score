@@ -3368,7 +3368,7 @@ commits per step, subjects "Phase 25 step N: ...") and this section.
     `remove_player_from_sport`, the name-uniqueness guard, and the same pending-migration caveat. Verified
     `tsc -b` and `npm run lint` stay clean after the docs-only changes (no source touched). _Test:_ none, as
     specified.
-13. [ ] **Full regression, merge, deploy, then the destructive migration, then live verification.**
+13. [x] **Full regression, merge, deploy, then the destructive migration, then live verification.**
     `npm run build`, `npm run lint`, the full `npx vitest run` (integration included). Then merge and **confirm
     the Vercel production deploy is READY before** applying **Migration C (destructive, merge-time only)**:
     re-verify 0 tennis tournaments / matches / roster rows, record the 12 `(id, tennis_self_selected_level)`
@@ -3385,6 +3385,55 @@ commits per step, subjects "Phase 25 step N: ...") and this section.
     match history is blocked with the specific hint; a disposable Tennis-only person Removed has their row
     deleted (verified in SQL). Finish with the operational-note fixture cleanup (UUID-regex pass over all six
     tables, re-queried to zero), assert I1 again, and re-verify the live counts.
+    **Done (2026-10-10):** Committed the uncommitted steps 7-12 work first (`43f4ea5`). Full regression:
+    `npm run build` ✓, `npm run lint` ✓, `npx vitest run --testTimeout=30000` (the default 5s timeout produced
+    spurious integration-test timeouts/`fetch failed` against the live project on three separate runs —
+    confirmed transient by re-running the affected files alone, each passed clean) — final clean run: 69
+    files / 514 tests, all passing. Pre-migration fixture cleanup found **95 of 111 `players` and 41 of 50
+    `tournaments` were leftover UUID-named fixtures** from this and prior sessions' integration-test runs
+    (first `execute_sql` DELETE attempt was auto-blocked by the permission classifier; user approved, re-run
+    succeeded) — cleaned to 16 real players / 9 real tournaments, re-verified 0 remaining UUID matches.
+    Fast-forward-pushed `worktree-phase-25-per-sport-members` directly to `origin/main` (user approved
+    push-without-PR) as `43f4ea5`; confirmed Vercel production READY for that commit before touching the
+    database. **Migration C pre-image** (16 real players, not the originally-estimated 12 — 4 already had a
+    null Tennis level from earlier manual testing): Dragon/`aef925d8…`, คิ้ตตี้คาวาอิ้/`81d4a74e…`,
+    เคจร/`4252905e…`, โค้ดบ่าวอีสาน/`25693d16…`, จูน/`d159b25f…`, ชาอึนเอ็ม/`defd425e…`, โดราเอเต้ย/`2c5bcf0c…`,
+    นิ่ม/`fa4c1998…`, โนบิตังค์/`d4a87392…`, ปังคุง/`bcdbbaef…`, พ่อหลวง/`ba39da26…`, ส้ม/`f186f08e…` — all 12
+    were `beginner`; โค้ดบ่าวอีสาน's mom/`d249505a…`, นนลูกพ่อตั้ม/`614caa2f…`, น้องหนู/`72de23e6…`,
+    อายอาริกาโตะ/`c8d1fc8a…` were already `null`. Re-verified 0 tennis tournaments/matches/roster rows
+    immediately before running it. Applied via `apply_migration` (`phase25_migration_c_check_and_cleanup`):
+    nulled `tennis_self_selected_level` for all 16, added `players_at_least_one_sport` CHECK, dropped
+    `delete_player` (confirmed absent from `get_advisors` and a fresh `generate_typescript_types` afterward).
+    Regenerated `database.types.ts` (clean diff — only `delete_player`'s signature removed); `tsc -b` then
+    failed on `playersApi.ts`'s now-orphaned `deletePlayer` (the RPC it called no longer exists) — deleted
+    that function too (step 5/7 had deliberately kept it until this exact step); `tsc -b` and lint clean
+    after. Full suite re-run clean (69/514 again, after one more transient `fetch failed` burst). Committed
+    (`b3c3aa9`) and pushed; confirmed Vercel READY for it too. Ran the mandatory fixture cleanup again
+    post-migration (the re-runs added more UUID fixtures) — clean to 16/9 again. **Live Playwright pass**
+    against `racket-score-ten.vercel.app`: Badminton Member tab lists all 16 with levels; Tennis Member tab
+    empty ("No members in this sport yet."), Tennis Create checklist shows `tournaments.form.noMembers`,
+    Tennis "Add an existing member" lists all 16 as "(Badminton: *level*)"; added นิ่ม to Tennis at
+    Intermediate — appeared in Tennis member list and Create checklist, Badminton's นิ่ม row unchanged
+    (still Beginner); renaming her to "นิ่มทดสอบ" showed the new name in both sports immediately; a duplicate
+    name was rejected both on create (typed into Tennis's "Add a new member" with extra padding) and on
+    rename (tried renaming Dragon to her name in Badminton) — both showed `nameTaken` and left the write
+    button disabled; created a disposable Tennis-only `Phase25 Disposable Tester`, Removed her — dialog said
+    "Tennis is their only sport, so this permanently deletes their record," and a SQL check confirmed the row
+    was gone; Removed นิ่ม from Tennis — dialog said "They'll stay a member of Badminton," confirmed via SQL
+    her Badminton level was untouched. (The mid-tournament Add-participant **picker** check from this step's
+    own text was intentionally skipped live — no real Tennis tournament exists yet and creating a throwaway
+    one just for this would pollute real data; that exact code path is already covered by step 10's
+    `TournamentDetail.test.tsx` cases.) Restored นิ่ม's name back to "นิ่ม" afterward (the rename was a live
+    test against a real person's record, not a disposable fixture) — her final state (Badminton: Beginner,
+    Tennis: null) matches what Migration C gave everyone else. One incidental observation, not a Phase 25
+    regression: `EditablePlayerLevel`'s level `<select>` briefly showed the just-saved level's *previous*
+    default (a `useState(currentLevel ?? …)` initial-value staleness on the same page, pre-existing from
+    before this phase) until a fresh page load — confirmed the underlying DB value was correct throughout.
+    Final fixture cleanup: 0 leftover UUID rows in `players`/`tournaments`; final live counts: 16 players, 9
+    tournaments, 106 matches, 106 match_games, 424 match_participants, 76 tournament_participants, **0**
+    players with a non-null Tennis level, **0** Tennis tournaments, **0** players that are a member of
+    neither sport (I1 reconfirmed) — and the `players_at_least_one_sport` CHECK now enforces I1 at the
+    database level going forward, not just in application logic.
 
 **Risks / notes for this phase:**
 - Migration C is irreversible, but verified harmless — no tennis tournament has ever existed, so nothing
