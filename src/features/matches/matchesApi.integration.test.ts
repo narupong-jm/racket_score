@@ -13,7 +13,7 @@ import {
   endTournament,
   leaveParticipant,
 } from '../tournaments/tournamentsApi'
-import { createPlayer, deletePlayer } from '../players/playersApi'
+import { createPlayer, removePlayerFromSport } from '../players/playersApi'
 import { supabase } from '../../lib/supabaseClient'
 import { testWritePassphrase } from '../../test/testPassphrase'
 
@@ -268,7 +268,7 @@ describe('matchesApi: deleteMatchResult (real project, anon key)', () => {
     }
     for (const playerId of playerIds) {
       try {
-        await deletePlayer(playerId, testWritePassphrase)
+        await removePlayerFromSport(playerId, 'badminton', testWritePassphrase)
       } catch {
         // best-effort cleanup only
       }

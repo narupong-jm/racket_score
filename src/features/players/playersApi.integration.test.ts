@@ -11,10 +11,14 @@ import { testWritePassphrase } from '../../test/testPassphrase'
 describe('playersApi (real project, anon key)', () => {
   const testPlayerName = `Players API Test ${crypto.randomUUID()}`
   let createdId: string | undefined
+  let disposableId: string | undefined
 
   afterAll(async () => {
     if (createdId) {
       await supabase.from('players').delete().eq('id', createdId)
+    }
+    if (disposableId) {
+      await supabase.from('players').delete().eq('id', disposableId)
     }
   })
 
@@ -49,5 +53,37 @@ describe('playersApi (real project, anon key)', () => {
       testWritePassphrase,
     )
     expect(updated.badminton_self_selected_level).toBe('advanced')
+  })
+
+  it('rejects creating or renaming a player onto a name that collides case/whitespace-insensitively', async () => {
+    if (!createdId) throw new Error('createdId not set from previous test')
+
+    await expect(
+      createPlayer(
+        {
+          name: `  ${testPlayerName.toUpperCase()}  `,
+          gender: 'male',
+          sport: 'badminton',
+          self_selected_level: 'beginner',
+        },
+        testWritePassphrase,
+      ),
+    ).rejects.toThrow('name_taken')
+
+    const disposableName = `Players API Test Disposable ${crypto.randomUUID()}`
+    const disposable = await createPlayer(
+      {
+        name: disposableName,
+        gender: 'female',
+        sport: 'badminton',
+        self_selected_level: 'beginner',
+      },
+      testWritePassphrase,
+    )
+    disposableId = disposable.id
+
+    await expect(
+      updatePlayer(createdId, { name: disposableName }, testWritePassphrase),
+    ).rejects.toThrow('name_taken')
   })
 })

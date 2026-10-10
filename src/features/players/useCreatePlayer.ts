@@ -13,6 +13,7 @@ export function useCreatePlayer() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['players'] })
       queryClient.invalidateQueries({ queryKey: ['playerStats'] })
+      queryClient.invalidateQueries({ queryKey: ['overallScoreboard'] })
     },
   })
 }

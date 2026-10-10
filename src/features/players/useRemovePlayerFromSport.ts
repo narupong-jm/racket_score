@@ -1,20 +1,15 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { updatePlayer, type UpdatePlayerInput } from './playersApi'
+import { removePlayerFromSport } from './playersApi'
 import { usePassphraseGate } from '../passphrase/usePassphraseGate'
+import type { Sport } from '../sport/sportTypes'
 
-export function useUpdatePlayer() {
+export function useRemovePlayerFromSport() {
   const queryClient = useQueryClient()
   const { getPassphrase } = usePassphraseGate()
   return useMutation({
-    mutationFn: async ({
-      id,
-      updates,
-    }: {
-      id: string
-      updates: UpdatePlayerInput
-    }) => {
+    mutationFn: async ({ id, sport }: { id: string; sport: Sport }) => {
       const passphrase = await getPassphrase()
-      return updatePlayer(id, updates, passphrase)
+      return removePlayerFromSport(id, sport, passphrase)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['players'] })

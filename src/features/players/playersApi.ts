@@ -72,6 +72,23 @@ export async function deletePlayer(
   if (error) throw error
 }
 
+// Returns true when the person's row was deleted because this was their
+// last sport; false when only that sport's level was nulled and they remain
+// a member of the other sport.
+export async function removePlayerFromSport(
+  id: string,
+  sport: Sport,
+  passphrase: string,
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc('remove_player_from_sport', {
+    p_id: id,
+    p_sport: sport,
+    p_passphrase: passphrase,
+  })
+  if (error) throw error
+  return data
+}
+
 export async function getPlayerStats(
   playerId: string,
   sport: Sport,
