@@ -44,6 +44,7 @@ const row: RecentCompletedMatch = {
   },
   tournamentName: 'Spring Open',
   courtCount: 1,
+  tennisScoringMode: null,
   participants: [
     { match_id: 'm1', player_id: 'p1', team: 1 },
     { match_id: 'm1', player_id: 'p2', team: 2 },

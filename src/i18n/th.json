@@ -128,6 +128,7 @@
       "nameLabel": "ชื่อ",
       "typeLabel": "ประเภท",
       "gamesPerMatchLabel": "จำนวนเกมต่อแมตช์",
+      "scoringModeLabel": "โหมดการนับคะแนน",
       "pointsPerGameLabel": "คะแนนต่อเกม",
       "courtsLabel": "จำนวนสนาม",
       "deuceCap": "เพดานดิวซ์: {{cap}}",

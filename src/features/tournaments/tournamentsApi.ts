@@ -15,6 +15,11 @@ export interface CreateTournamentInput {
   win_by?: number
   /** Number of courts, 1..8; fixed at creation. */
   court_count: number
+  /**
+   * Tennis-only scoring mode ('standard' fixes points per game at 4,
+   * 'freestyle' lets the organizer enter it). Null/omitted for Badminton.
+   */
+  tennis_scoring_mode?: 'standard' | 'freestyle' | null
 }
 
 export async function createTournament(
@@ -30,6 +35,7 @@ export async function createTournament(
     p_court_count: input.court_count,
     p_win_by: input.win_by,
     p_passphrase: passphrase,
+    p_tennis_scoring_mode: input.tennis_scoring_mode ?? null,
   })
   if (error) throw error
   return data

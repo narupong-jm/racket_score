@@ -14,6 +14,19 @@ import { useSport } from '../features/sport/useSport'
 import type { Sport } from '../features/sport/sportTypes'
 import type { RecentCompletedMatch } from '../features/matches/matchesApi'
 
+function ScoringModeBadge({
+  mode,
+}: {
+  mode: 'standard' | 'freestyle' | null
+}) {
+  if (!mode) return null
+  return (
+    <span className="badge">
+      {mode === 'standard' ? 'Standard' : 'Freestyle'}
+    </span>
+  )
+}
+
 function SectionToggle({
   collapsed,
   onToggle,
@@ -85,6 +98,7 @@ function ByMatchSection({
                   match,
                   tournamentName,
                   courtCount,
+                  tennisScoringMode,
                   participants,
                   games,
                 } = row
@@ -103,6 +117,7 @@ function ByMatchSection({
                           {t('history.manuallyAdjustedBadge')}
                         </span>
                       )}
+                      <ScoringModeBadge mode={tennisScoringMode} />
                     </span>
                     <span className="round-matchup">
                       <span className={team1Won ? 'round-winner' : undefined}>
@@ -174,6 +189,14 @@ function ByTournamentSection({ sport }: { sport: Sport }) {
                   <li key={tournament.id}>
                     <span className="link-list-row">
                       <span>{tournament.name}</span>
+                      <ScoringModeBadge
+                        mode={
+                          tournament.tennis_scoring_mode as
+                            | 'standard'
+                            | 'freestyle'
+                            | null
+                        }
+                      />
                       <span className="badge">
                         {t('tournamentStatus.cancelled')}
                       </span>
@@ -186,6 +209,14 @@ function ByTournamentSection({ sport }: { sport: Sport }) {
                       to={`/tournaments/${tournament.id}/scoreboard`}
                     >
                       <span>{tournament.name}</span>
+                      <ScoringModeBadge
+                        mode={
+                          tournament.tennis_scoring_mode as
+                            | 'standard'
+                            | 'freestyle'
+                            | null
+                        }
+                      />
                       <span className="link-list-meta">
                         {t(`tournamentType.${tournament.type}`)}
                       </span>

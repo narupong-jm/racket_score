@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: '14.5'
+    PostgrestVersion: "14.15"
   }
   public: {
     Tables: {
@@ -50,11 +50,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'match_games_match_id_fkey'
-            columns: ['match_id']
+            foreignKeyName: "match_games_match_id_fkey"
+            columns: ["match_id"]
             isOneToOne: false
-            referencedRelation: 'matches'
-            referencedColumns: ['id']
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -76,25 +76,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'match_participants_match_id_fkey'
-            columns: ['match_id']
+            foreignKeyName: "match_participants_match_id_fkey"
+            columns: ["match_id"]
             isOneToOne: false
-            referencedRelation: 'matches'
-            referencedColumns: ['id']
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'match_participants_player_id_fkey'
-            columns: ['player_id']
+            foreignKeyName: "match_participants_player_id_fkey"
+            columns: ["player_id"]
             isOneToOne: false
-            referencedRelation: 'player_stats'
-            referencedColumns: ['player_id']
+            referencedRelation: "player_stats"
+            referencedColumns: ["player_id"]
           },
           {
-            foreignKeyName: 'match_participants_player_id_fkey'
-            columns: ['player_id']
+            foreignKeyName: "match_participants_player_id_fkey"
+            columns: ["player_id"]
             isOneToOne: false
-            referencedRelation: 'players'
-            referencedColumns: ['id']
+            referencedRelation: "players"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -131,11 +131,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'matches_tournament_id_fkey'
-            columns: ['tournament_id']
+            foreignKeyName: "matches_tournament_id_fkey"
+            columns: ["tournament_id"]
             isOneToOne: false
-            referencedRelation: 'tournaments'
-            referencedColumns: ['id']
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -190,25 +190,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'tournament_participants_player_id_fkey'
-            columns: ['player_id']
+            foreignKeyName: "tournament_participants_player_id_fkey"
+            columns: ["player_id"]
             isOneToOne: false
-            referencedRelation: 'player_stats'
-            referencedColumns: ['player_id']
+            referencedRelation: "player_stats"
+            referencedColumns: ["player_id"]
           },
           {
-            foreignKeyName: 'tournament_participants_player_id_fkey'
-            columns: ['player_id']
+            foreignKeyName: "tournament_participants_player_id_fkey"
+            columns: ["player_id"]
             isOneToOne: false
-            referencedRelation: 'players'
-            referencedColumns: ['id']
+            referencedRelation: "players"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'tournament_participants_tournament_id_fkey'
-            columns: ['tournament_id']
+            foreignKeyName: "tournament_participants_tournament_id_fkey"
+            columns: ["tournament_id"]
             isOneToOne: false
-            referencedRelation: 'tournaments'
-            referencedColumns: ['id']
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -224,6 +224,7 @@ export type Database = {
           points_per_game: number
           sport: string
           status: string
+          tennis_scoring_mode: string | null
           type: string
           win_by: number
         }
@@ -238,6 +239,7 @@ export type Database = {
           points_per_game: number
           sport?: string
           status?: string
+          tennis_scoring_mode?: string | null
           type: string
           win_by?: number
         }
@@ -252,6 +254,7 @@ export type Database = {
           points_per_game?: number
           sport?: string
           status?: string
+          tennis_scoring_mode?: string | null
           type?: string
           win_by?: number
         }
@@ -272,32 +275,32 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'match_participants_match_id_fkey'
-            columns: ['match_id']
+            foreignKeyName: "match_participants_match_id_fkey"
+            columns: ["match_id"]
             isOneToOne: false
-            referencedRelation: 'matches'
-            referencedColumns: ['id']
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'match_participants_player_id_fkey'
-            columns: ['player_id']
+            foreignKeyName: "match_participants_player_id_fkey"
+            columns: ["player_id"]
             isOneToOne: false
-            referencedRelation: 'player_stats'
-            referencedColumns: ['player_id']
+            referencedRelation: "player_stats"
+            referencedColumns: ["player_id"]
           },
           {
-            foreignKeyName: 'match_participants_player_id_fkey'
-            columns: ['player_id']
+            foreignKeyName: "match_participants_player_id_fkey"
+            columns: ["player_id"]
             isOneToOne: false
-            referencedRelation: 'players'
-            referencedColumns: ['id']
+            referencedRelation: "players"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'matches_tournament_id_fkey'
-            columns: ['tournament_id']
+            foreignKeyName: "matches_tournament_id_fkey"
+            columns: ["tournament_id"]
             isOneToOne: false
-            referencedRelation: 'tournaments'
-            referencedColumns: ['id']
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -329,25 +332,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: 'tournament_participants_player_id_fkey'
-            columns: ['player_id']
+            foreignKeyName: "tournament_participants_player_id_fkey"
+            columns: ["player_id"]
             isOneToOne: false
-            referencedRelation: 'player_stats'
-            referencedColumns: ['player_id']
+            referencedRelation: "player_stats"
+            referencedColumns: ["player_id"]
           },
           {
-            foreignKeyName: 'tournament_participants_player_id_fkey'
-            columns: ['player_id']
+            foreignKeyName: "tournament_participants_player_id_fkey"
+            columns: ["player_id"]
             isOneToOne: false
-            referencedRelation: 'players'
-            referencedColumns: ['id']
+            referencedRelation: "players"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: 'tournament_participants_tournament_id_fkey'
-            columns: ['tournament_id']
+            foreignKeyName: "tournament_participants_tournament_id_fkey"
+            columns: ["tournament_id"]
             isOneToOne: false
-            referencedRelation: 'tournaments'
-            referencedColumns: ['id']
+            referencedRelation: "tournaments"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -367,8 +370,8 @@ export type Database = {
           tournament_id: string
         }
         SetofOptions: {
-          from: '*'
-          to: 'tournament_participants'
+          from: "*"
+          to: "tournament_participants"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -386,12 +389,13 @@ export type Database = {
           points_per_game: number
           sport: string
           status: string
+          tennis_scoring_mode: string | null
           type: string
           win_by: number
         }
         SetofOptions: {
-          from: '*'
-          to: 'tournaments'
+          from: "*"
+          to: "tournaments"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -419,8 +423,8 @@ export type Database = {
           tournament_id: string
         }
         SetofOptions: {
-          from: '*'
-          to: 'matches'
+          from: "*"
+          to: "matches"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -442,8 +446,8 @@ export type Database = {
           tennis_self_selected_level: string | null
         }
         SetofOptions: {
-          from: '*'
-          to: 'players'
+          from: "*"
+          to: "players"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -456,6 +460,7 @@ export type Database = {
           p_passphrase: string
           p_points_per_game: number
           p_sport: string
+          p_tennis_scoring_mode?: string
           p_type: string
           p_win_by?: number
         }
@@ -470,12 +475,13 @@ export type Database = {
           points_per_game: number
           sport: string
           status: string
+          tennis_scoring_mode: string | null
           type: string
           win_by: number
         }
         SetofOptions: {
-          from: '*'
-          to: 'tournaments'
+          from: "*"
+          to: "tournaments"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -497,12 +503,13 @@ export type Database = {
           points_per_game: number
           sport: string
           status: string
+          tennis_scoring_mode: string | null
           type: string
           win_by: number
         }
         SetofOptions: {
-          from: '*'
-          to: 'tournaments'
+          from: "*"
+          to: "tournaments"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -521,8 +528,8 @@ export type Database = {
           tournament_id: string
         }
         SetofOptions: {
-          from: '*'
-          to: 'tournament_participants'
+          from: "*"
+          to: "tournament_participants"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -540,8 +547,8 @@ export type Database = {
           tournament_id: string
         }
         SetofOptions: {
-          from: '*'
-          to: 'matches'
+          from: "*"
+          to: "matches"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -568,8 +575,8 @@ export type Database = {
           tennis_self_selected_level: string | null
         }
         SetofOptions: {
-          from: '*'
-          to: 'players'
+          from: "*"
+          to: "players"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -588,33 +595,33 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, 'public'>]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] &
-        DefaultSchema['Views'])
-    ? (DefaultSchema['Tables'] &
-        DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -623,22 +630,23 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
-    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -647,22 +655,23 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
-    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -671,35 +680,36 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    keyof DefaultSchema['Enums'] | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
-    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema['CompositeTypes']
+    | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
-    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {

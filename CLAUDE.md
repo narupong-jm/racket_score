@@ -4,31 +4,55 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Phases 1-24 of `docs/PLAN.md` are complete and shipped (Phase 24, multi-court, merged to `main`
-2026-10-10 — see its paragraph below). Shipped work includes Phase 13's 5-tab bottom-nav overhaul (Create / Active / Scoreboard /
+Phases 1-26 of `docs/PLAN.md` are complete and shipped (Phase 26, Tennis scoring mode, merged
+2026-10-12 — see its paragraph below; Phase 25, per-sport membership, merged earlier the same day).
+Shipped work includes Phase 13's 5-tab bottom-nav overhaul (Create / Active / Scoreboard /
 History / Member) and every IMPROVEMENT-doc-driven patch
 (`docs/IMPROVEMENT.md` through `docs/IMPROVEMENT4.md` — all four are fully absorbed into shipped
 phases: IMPROVEMENT.md → Phase 13, IMPROVEMENT2.md → Phase 14, IMPROVEMENT3.md → Phase 18,
-IMPROVEMENT4.md → Phase 20; nothing in any of them is still outstanding). Phases 21-24 then shipped
+IMPROVEMENT4.md → Phase 20; nothing in any of them is still outstanding). Phases 21-26 then shipped
 without a numbered IMPROVEMENT doc of their own (driven directly by `docs/SPEC.md`'s dated "Updated"
 notes instead). Do not assume from old conversation history or partial doc reads that any of this
-is still in flight — check `docs/PLAN.md`'s phase checkboxes (all `[x]` through Phase 24) and `src/`
+is still in flight — check `docs/PLAN.md`'s phase checkboxes (all `[x]` through Phase 26) and `src/`
 directly if in doubt.
 
-**Currently in progress — Phase 25, per-sport membership** (on this branch/worktree,
-`phase-25-per-sport-members`; **not yet merged to `main`**): steps 1-12 of its `docs/PLAN.md` entry
-are done (schema/RPC migrations A and B applied, `playerMembership.ts` helpers, the
-`remove_player_from_sport` RPC + `useRemovePlayerFromSport`/`useSportMembers`/`useNonSportMembers`
-hooks, the per-sport Member list + two-variant Remove dialog, "Add an existing member", the rename/
-create name-conflict guard, the Create-tournament checklist and both Add-participant pickers scoped
-to sport membership, the Overall Scoreboard filtered the same way, and this doc pass). **Step 13 —
-full regression, merge, deploy, then the destructive migration (Migration C) and live verification —
-is still outstanding.** Until step 13 runs: `delete_player` still exists in the live DB (unused by the
-app since step 7) and there is **no** DB-level CHECK yet preventing a person from having both sport
-levels null. See the domain-model bullet below and `docs/PLAN.md`'s Phase 25 entry for the full
-step-by-step record (each step has a "Done" outcome note).
+**Most recent phase — Phase 26, Tennis scoring mode (Standard / Freestyle):** lets a Tennis
+tournament choose its scoring mode at creation — **Standard** (points per game fixed at 4, the
+sport's original fixed-only behavior) or **Freestyle** (organizer enters points per game, exactly
+like Badminton) — via a two-option radio control (literal "Standard"/"Freestyle" labels, not
+translated/localized) shown only when the active sport is Tennis, defaulting to Standard. New
+nullable `tournaments.tennis_scoring_mode` column (`'standard' | 'freestyle'`, always `NULL` for
+Badminton, backfilled to `'standard'` for any pre-existing Tennis row — there were none live).
+`create_tournament` gained a 9th parameter `p_tennis_scoring_mode`, added via `DROP FUNCTION` +
+`CREATE FUNCTION` in one migration rather than `CREATE OR REPLACE` (which would have left the old
+8-arg overload alongside a new 9-arg one — the same overload-duplication trap Phase 24 hit). The
+chosen mode is shown as a small "Standard"/"Freestyle" badge in both History sections (by-match and
+by-tournament) next to Tennis rows only; Badminton is completely unaffected — no control, no badge.
+No change was needed to the Overall Scoreboard, `computePointCap`, or `validateGameScore`: all three
+already operate purely on whatever `points_per_game` value is resolved, with zero knowledge of this
+new mode concept (Badminton already varies `points_per_game` today without issue). **Migrations:**
+`phase26_tennis_scoring_mode_column` and `phase26_create_tournament_scoring_mode`, both applied to
+the live DB. Full regression and a live Playwright pass against the real project were done at each
+step. `docs/SPEC.md`'s "Updated: 2026-10-12" note (§4, §9) describes the built behavior.
 
-**Most recent phase — Phase 24, multi-court tournaments:** replaces the single-court model.
+**Phase 25, per-sport membership:** being a *member* of Badminton or Tennis is now tracked
+separately per person, independent of the Phase 20 per-sport level columns — a non-null
+`badminton_self_selected_level`/`tennis_self_selected_level` *is* membership in that sport, with
+**no new column**. New `remove_player_from_sport(p_id, p_sport, p_passphrase)` RPC (nulls that one
+level column, or hard-deletes the person if it was their last sport) replaced `delete_player`
+(dropped from the live DB by this phase's destructive migration C); `playersApi.removePlayerFromSport`
++ `useRemovePlayerFromSport` + `useSportMembers`/`useNonSportMembers` are the client-side pieces.
+`PlayerList.tsx`'s Remove dialog is two-variant (stays a member of the other sport vs. deletes the
+person entirely); a new "Add an existing member" section on the Member tab reuses `useUpdatePlayer`
+to add a sport-level to someone already in the system; names are now unique system-wide (case/
+whitespace-insensitive), enforced by migration A's `name_taken` guard reused on both create and
+rename. The Create-tournament checklist, both Add-participant pickers, and the Overall Scoreboard
+are all filtered to the active sport's members via `useSportMembers`. **Migrations:**
+`phase25_player_name_unique_ci`, `phase25_remove_player_from_sport`, and the destructive
+`phase25_migration_c_check_and_cleanup` (drops `delete_player`, adds the ≥1-sport-level CHECK) are
+all applied to the live DB. `docs/SPEC.md`'s 2026-10-10 note describes the built behavior.
+
+**Phase 24, multi-court tournaments:** replaces the single-court model.
 A tournament now has `court_count` (1-8, chosen on the Create form, fixed afterward; pre-existing
 tournaments = 1) and `matches.court_number`; `matches.status = 'queued'` still means *in progress*
 (at most one per court, via a partial unique index). RPCs: `create_tournament(... p_court_count ...)`

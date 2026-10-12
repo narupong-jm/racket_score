@@ -93,6 +93,20 @@ person from the active sport only; new-member names must be unique across
 the whole system. Existing members all become Badminton-only (their
 placeholder Tennis levels are cleared). Implemented (Phase 25 in
 `docs/PLAN.md`).
+Updated: 2026-10-12 — adds a **Tennis scoring mode** choice (§4, §9):
+Tennis tournaments can now choose **Standard** (points per game fixed at
+4, the sport's previous fixed-only behavior) or **Freestyle** (organizer
+picks points per game, exactly like Badminton) at creation time, via a
+two-option control shown verbatim ("Standard" / "Freestyle", not
+translated) only when the active sport is Tennis, defaulting to
+**Standard**. The chosen mode is fixed for the life of the tournament and
+persisted so it can be shown as a small badge in both History sections
+(§9) next to Tennis matches/tournaments; Badminton rows show no such
+badge, and Badminton itself is otherwise unaffected. A Tennis tournament
+created before this choice existed is treated as Standard. The Overall
+Scoreboard (§8) needs no change: win/loss and total-points-scored already
+don't depend on a fixed points-per-game, since Badminton already varies
+this value today. Implemented (Phase 26 in `docs/PLAN.md`).
 
 ## 1. Overview
 
@@ -237,9 +251,9 @@ player's stats/level are tracked separately per sport (§3).
   described below applies to both sports identically. This is a
   deliberate simplification: Tennis tournaments do **not** use real
   tennis scoring (no sets, no 40-40/advantage deuce, no tie-break at 6
-  games). The one difference is **points per game is not
-  organizer-configurable for Tennis** (below) — Badminton is the only
-  sport where the organizer picks this value.
+  games). **Points per game is organizer-configurable for Tennis only via
+  its Freestyle scoring mode** (below) — by default (**Standard** mode)
+  it is fixed at 4, matching the sport's original fixed-only behavior.
 - A tournament is **one match type only**: singles OR doubles, chosen at
   creation. Running both requires two separate tournaments.
 - **Number of courts (set at creation, 1-8).** Chosen on the Create
@@ -254,18 +268,33 @@ player's stats/level are tracked separately per sport (§3).
     Games per match / Points per game inputs start **blank** (no
     prefilled default) and are edited with a stepper control (−/+
     buttons, floor of 1, no ceiling) or by typing a number directly.
-  - Target points per game (e.g. 15 / 21 / 25) — **organizer-defined
-    for Badminton only**. For Tennis, this is **fixed at 4** (not
-    editable): the Create Tournament form still shows the field for
-    visibility, but rendered disabled/faded at its fixed value rather
-    than hidden, so the fixed target stays legible instead of silently
-    disappearing.
+  - Target points per game (e.g. 15 / 21 / 25) — **organizer-defined for
+    Badminton always**, and for Tennis **only when its Freestyle scoring
+    mode is chosen** (below); otherwise (Tennis's default, **Standard**
+    mode) this is **fixed at 4** and the Create Tournament form shows
+    the field disabled/faded at its fixed value rather than hidden, so
+    the fixed target stays legible instead of silently disappearing.
+  - **Tennis scoring mode — Standard or Freestyle (Tennis only).** A
+    two-option control ("Standard" / "Freestyle", shown verbatim, not
+    translated) appears on the Create Tournament form only when the
+    active sport is Tennis, defaulting to **Standard**. **Standard**
+    fixes points per game at 4, exactly as Tennis always behaved before
+    this choice existed. **Freestyle** opens the points-per-game field
+    for organizer entry, identical in every respect (blank by default,
+    stepper input, feeds the same BWF-ratio deuce cap below) to how
+    Badminton's field already works. The chosen mode is fixed for the
+    life of the tournament, like every other per-tournament scoring
+    setting, and is persisted so it can be shown later in History (§9).
+    A Tennis tournament created before this choice existed is treated
+    as **Standard**. Badminton has no such control — its points-per-game
+    field is always organizer-entered.
   - Deuce rule: must win by 2 points, capped at a ceiling scaled to the
     target (mirrors BWF's 21-point-target/30-cap ratio). Score entry is
     validated against this rule. The Create Tournament form's "Deuce
     cap: N" line only renders once a points-per-game value is resolved
-    (always true for Tennis, since it's fixed; shown for Badminton once
-    the organizer has entered a value).
+    (always true for Tennis's Standard mode, since it's fixed; for
+    Tennis's Freestyle mode and for Badminton, shown once the organizer
+    has entered a value).
 - **Participants are selected at creation time, from the members of the
   tournament's sport (§3)** — this remains the *only* way to build the initial roster. Once the
   tournament is running, the roster can still change in two narrow,
@@ -581,8 +610,9 @@ at every screen size (not a responsive top-nav on wider viewports):
 1. **Create** — create a new tournament: name, type (§4), **number of
    courts** (1-8, a stepper like games per match; defaults to 1 and cannot
    be changed after creation, §4), games per
-   match, points per game, and a checklist of the **active sport's
-   members** to select as participants (each row shows photo/avatar, name,
+   match, points per game (preceded, for Tennis only, by the **Standard /
+   Freestyle** scoring-mode control from §4), and a checklist of the
+   **active sport's members** to select as participants (each row shows photo/avatar, name,
    level for the active sport — this is the **only** place participants
    are ever chosen, per §4). People who are not members of the active
    sport (§3) do not appear. On submit: the
@@ -688,7 +718,9 @@ at every screen size (not a responsive top-nav on wider viewports):
    heading (top-right), independent of the other; both default to
    **collapsed** (heading only — no peek of items) so the organizer
    opts in to scrolling through history rather than it being forced on
-   page load.
+   page load. Both sections show a small **Standard**/**Freestyle**
+   badge (§4) next to any Tennis match or tournament, reflecting the
+   scoring mode it was created with; Badminton rows show no such badge.
 5. **Member** — the **active sport's** member list (§3), with two separate
    add sections above it:
    - **Add a new member** — the form as before (name, gender as an

@@ -37,6 +37,7 @@ const cancelledTournament: Tournament = {
   points_per_game: 21,
   win_by: 2,
   point_cap: 30,
+  tennis_scoring_mode: null,
   status: 'cancelled',
   court_count: 1,
   created_at: '2026-01-01T00:00:00Z',

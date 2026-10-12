@@ -38,6 +38,9 @@ export function CreateTournamentPage() {
   const [type, setType] = useState<TournamentType>('singles')
   const [gamesPerMatch, setGamesPerMatch] = useState<number | ''>('')
   const [pointsPerGame, setPointsPerGame] = useState<number | ''>('')
+  const [tennisScoringMode, setTennisScoringMode] = useState<
+    'standard' | 'freestyle'
+  >('standard')
   const [courtCount, setCourtCount] = useState<number | ''>(MIN_COURTS)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [submittedType, setSubmittedType] = useState<TournamentType>('singles')
@@ -62,9 +65,10 @@ export function CreateTournamentPage() {
   )
 
   const isTennis = sport === 'tennis'
-  const effectivePointsPerGame = isTennis
-    ? TENNIS_POINTS_PER_GAME
-    : pointsPerGame
+  const effectivePointsPerGame =
+    isTennis && tennisScoringMode === 'standard'
+      ? TENNIS_POINTS_PER_GAME
+      : pointsPerGame
 
   const trimmedName = name.trim()
   const cap =
@@ -109,6 +113,7 @@ export function CreateTournamentPage() {
         points_per_game: effectivePointsPerGame,
         sport,
         court_count: courtCount,
+        tennis_scoring_mode: isTennis ? tennisScoringMode : null,
       },
       participantIds: [...selectedIds],
     })
@@ -153,6 +158,36 @@ export function CreateTournamentPage() {
           onChange={setType}
         />
 
+        {isTennis && (
+          <fieldset className="field">
+            <legend className="field-label">
+              {t('tournaments.form.scoringModeLabel')}
+            </legend>
+            <div className="scoring-mode-options">
+              <label>
+                <input
+                  type="radio"
+                  name="tennis-scoring-mode"
+                  value="standard"
+                  checked={tennisScoringMode === 'standard'}
+                  onChange={() => setTennisScoringMode('standard')}
+                />
+                Standard
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="tennis-scoring-mode"
+                  value="freestyle"
+                  checked={tennisScoringMode === 'freestyle'}
+                  onChange={() => setTennisScoringMode('freestyle')}
+                />
+                Freestyle
+              </label>
+            </div>
+          </fieldset>
+        )}
+
         <div className="field-row">
           <div className="field">
             <label className="field-label" htmlFor="games-per-match">
@@ -173,7 +208,7 @@ export function CreateTournamentPage() {
               id="points-per-game"
               value={effectivePointsPerGame}
               onChange={setPointsPerGame}
-              disabled={isTennis}
+              disabled={isTennis && tennisScoringMode === 'standard'}
             />
           </div>
         </div>

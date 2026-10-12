@@ -265,6 +265,9 @@ export function TournamentDetail({
         playerNameById={playerNameById}
         sport={sport}
         tournamentName={tournament.name}
+        tennisScoringMode={
+          tournament.tennis_scoring_mode as 'standard' | 'freestyle' | null
+        }
       />
 
       <ParticipantsCard
@@ -554,6 +557,7 @@ interface RoundsPlayedListProps {
   playerNameById: Map<string, string>
   sport: Sport
   tournamentName: string
+  tennisScoringMode: 'standard' | 'freestyle' | null
 }
 
 function RoundsPlayedList({
@@ -564,6 +568,7 @@ function RoundsPlayedList({
   playerNameById,
   sport,
   tournamentName,
+  tennisScoringMode,
 }: RoundsPlayedListProps) {
   const { t } = useTranslation()
   const [deletingRow, setDeletingRow] = useState<RecentCompletedMatch | null>(
@@ -611,6 +616,7 @@ function RoundsPlayedList({
                         match,
                         tournamentName,
                         courtCount,
+                        tennisScoringMode,
                         participants,
                         games: matchGames,
                       })

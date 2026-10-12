@@ -86,6 +86,7 @@ const recentMatch: RecentCompletedMatch = {
   },
   tournamentName: 'Sunday Smash',
   courtCount: 1,
+  tennisScoringMode: null,
   participants: [
     { match_id: 'm1', player_id: 'p1', team: 1 },
     { match_id: 'm1', player_id: 'p2', team: 2 },
@@ -102,6 +103,7 @@ const activeTournament: Tournament = {
   points_per_game: 21,
   win_by: 2,
   point_cap: 30,
+  tennis_scoring_mode: null,
   status: 'active',
   court_count: 1,
   created_at: '2026-01-01T00:00:00Z',
@@ -375,6 +377,94 @@ describe('HistoryPage', () => {
 
       expect(await screen.findByText('Match 2')).toBeInTheDocument()
       expect(screen.getByText('Manually adjusted')).toBeInTheDocument()
+    })
+  })
+
+  describe('scoring mode badge', () => {
+    it('does not show a Standard or Freestyle badge for a badminton match or tournament', async () => {
+      vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([
+        recentMatch,
+      ])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+        activeTournament,
+      ])
+
+      const user = userEvent.setup()
+      renderPage()
+
+      const toggles = screen.getAllByRole('button', { name: 'Show more' })
+      await user.click(toggles[0])
+      await user.click(toggles[1])
+
+      await screen.findByText('Match 2')
+      await screen.findAllByText('Sunday Smash')
+      expect(screen.queryByText('Standard')).toBeNull()
+      expect(screen.queryByText('Freestyle')).toBeNull()
+    })
+
+    it('shows a Standard badge for a tennis match and tournament created in standard mode', async () => {
+      vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([
+        { ...recentMatch, tennisScoringMode: 'standard' },
+      ])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+        { ...activeTournament, tennis_scoring_mode: 'standard' },
+      ])
+
+      const user = userEvent.setup()
+      renderPage()
+
+      const toggles = screen.getAllByRole('button', { name: 'Show more' })
+      await user.click(toggles[0])
+      await user.click(toggles[1])
+
+      await screen.findByText('Match 2')
+      await screen.findAllByText('Sunday Smash')
+      expect(screen.getAllByText('Standard')).toHaveLength(2)
+      expect(screen.queryByText('Freestyle')).toBeNull()
+    })
+
+    it('shows a Freestyle badge for a tennis match and tournament created in freestyle mode', async () => {
+      vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([
+        { ...recentMatch, tennisScoringMode: 'freestyle' },
+      ])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+        { ...activeTournament, tennis_scoring_mode: 'freestyle' },
+      ])
+
+      const user = userEvent.setup()
+      renderPage()
+
+      const toggles = screen.getAllByRole('button', { name: 'Show more' })
+      await user.click(toggles[0])
+      await user.click(toggles[1])
+
+      await screen.findByText('Match 2')
+      await screen.findAllByText('Sunday Smash')
+      expect(screen.getAllByText('Freestyle')).toHaveLength(2)
+      expect(screen.queryByText('Standard')).toBeNull()
+    })
+
+    it('keeps showing the Cancelled badge alongside the scoring-mode badge on a cancelled tennis tournament', async () => {
+      vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+      vi.mocked(matchesApi.listRecentCompletedMatches).mockResolvedValue([])
+      vi.mocked(tournamentsApi.listTournaments).mockResolvedValue([
+        { ...cancelledTournament, tennis_scoring_mode: 'freestyle' },
+      ])
+
+      const user = userEvent.setup()
+      renderPage()
+
+      await user.click(
+        screen.getByRole('heading', { name: 'By tournament' })
+          .parentElement!.querySelector('button')!,
+      )
+
+      expect(await screen.findByText('Rained Out Cup')).toBeInTheDocument()
+      expect(screen.getByText('Cancelled')).toBeInTheDocument()
+      expect(screen.getByText('Freestyle')).toBeInTheDocument()
     })
   })
 

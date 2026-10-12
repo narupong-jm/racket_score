@@ -3445,3 +3445,268 @@ commits per step, subjects "Phase 25 step N: ...") and this section.
   `update_player` keeps this to one renamed export plus one added `listPlayers` stub.
 - Integration tests cannot delete their own `players` fixtures (anon has no DELETE grant), so the controller's
   UUID-regex cleanup is mandatory after any run that touches the live project.
+
+## Phase 26 — Tennis Scoring Mode (Standard / Freestyle)
+
+`docs/SPEC.md` (Updated 2026-10-12) adds a **Tennis scoring mode** choice, revising §4 and §9: Tennis
+tournaments can now choose **Standard** (points per game fixed at 4, the sport's previous fixed-only
+behavior) or **Freestyle** (organizer enters points per game, exactly like Badminton already works), via a
+two-option control shown verbatim ("Standard" / "Freestyle", not translated/localized) next to the Tennis
+Points-per-game field, defaulting to **Standard**. The chosen mode is fixed for the life of the tournament;
+a tournament created before this choice existed is treated as Standard. Badminton is completely unaffected —
+no control, no visible difference. This is not yet implemented as of that note.
+
+**Findings that shape this phase (from exploration, 2026-10-12):**
+- The current tennis-fixed behavior lives entirely in `src/pages/CreateTournamentPage.tsx`:
+  `TENNIS_POINTS_PER_GAME = 4` (line 28), `isTennis = sport === 'tennis'` (line 64),
+  `effectivePointsPerGame = isTennis ? TENNIS_POINTS_PER_GAME : pointsPerGame` (lines 65-67), and the Points
+  per game `NumberStepper`'s `disabled={isTennis}` (lines 172-178); `handleSubmit` (lines 98-115) builds the
+  `mutate()` payload with no `tennis_scoring_mode` field today.
+- `tournamentsApi.createTournament` (`src/features/tournaments/tournamentsApi.ts` lines 20-36) calls
+  `supabase.rpc('create_tournament', {...})`; the live RPC (confirmed via Supabase MCP, project
+  `ceaisqynlsrqgiabegvv`) has no mode parameter and no column to write one to.
+- `tournaments` table has no mode column today. `point_cap` exists but is always NULL — the real deuce cap is
+  always computed client-side via `computePointCap` in `src/features/tournaments/computePointCap.ts`, which
+  is unaffected by this feature (it already handles any `points_per_game` value, varying or fixed).
+- `player_match_history` (feeds the Overall Scoreboard) derives win/loss purely from games-won count and sums
+  raw `match_games` scores, with zero dependency on `points_per_game` being fixed — Badminton already varies
+  it (15/21/25) today without issue. This feature is purely additive: no view/RPC changes needed there.
+- History is two sections on one page (`src/pages/HistoryPage.tsx`): `ByMatchSection` (lines 47-141, data from
+  `useRecentCompletedMatches(sport)` → `RecentCompletedMatch` in `src/features/matches/matchesApi.ts`) and
+  `ByTournamentSection` (lines 143-202, data from `useTournaments(sport)` → `Tournament` rows). Neither shows
+  sport or scoring mode today, and both are already server-filtered to the active sport, so a row only needs
+  to know its own `tennis_scoring_mode`, not its sport, to decide what badge (if any) to render.
+- `listRecentCompletedMatches` already joins `tournaments!inner(name, sport, court_count)` for the tournament
+  name/court-count fields, so adding `tennis_scoring_mode` there is a one-line `select` change plus one new
+  field on `RecentCompletedMatch`. `ByTournamentSection`'s `Tournament` rows (`Tables<'tournaments'>`) pick up
+  the new column for free once `database.types.ts` is regenerated — no query change needed there, only a
+  render change in `ByTournamentSection`.
+- Migration naming convention (confirmed via live `list_migrations`): `phase<N>_<snake_case_description>` —
+  most recent are `phase24_multi_court_schema`, `phase24_multi_court_rpcs`,
+  `phase24_drop_old_overloads_and_sequence_index`, `phase25_player_name_unique_ci`,
+  `phase25_remove_player_from_sport`, `phase25_migration_c_check_and_cleanup`. This feature uses `phase26_...`
+  names. Unlike Phase 24/25, it needs no merge-time/destructive migration — the new column is nullable and
+  additive, so it can ship in a single pass, independently of Phase 25's (not-yet-shipped) app-code steps.
+- The "Standard"/"Freestyle" labels are literal English per explicit decision — no `scoringMode.standard`/
+  `scoringMode.freestyle` i18n keys for the labels themselves; only a `scoringModeLabel` field-legend key is
+  worth adding for consistency with other field labels (e.g. `tournaments.form.pointsPerGameLabel`).
+
+1. [x] **Migration A — schema (additive only).** Via Supabase MCP `apply_migration`: add
+   `tournaments.tennis_scoring_mode text NULL CHECK (tennis_scoring_mode IN ('standard', 'freestyle'))`, then
+   backfill `update tournaments set tennis_scoring_mode = 'standard' where sport = 'tennis'` (Standard/fixed-4
+   was the only possible prior state for every existing Tennis row). Name it `phase26_tennis_scoring_mode_column`.
+   _Test:_ `execute_sql` — pre-check 0 tennis rows already have a non-null value in some other shape; after
+   the migration, every tennis row reads back `'standard'`, every badminton row reads back `NULL`; an insert
+   attempting `'freestyle_mode'` or any other string is rejected by the CHECK; `get_advisors` shows no new
+   advisory classes.
+   **Done (2026-10-12):** applied as `phase26_tennis_scoring_mode_column` on the live project
+   (`ceaisqynlsrqgiabegvv`). Pre-check found 0 existing Tennis tournaments (only 10 Badminton rows), so the
+   backfill was a no-op; post-migration query confirms all 10 Badminton rows read `tennis_scoring_mode =
+   NULL`. Verified the CHECK rejects an invalid value via a disposable insert attempt (`'bogus_value'`), which
+   errored with `23514 check_violation` and left no row behind (confirmed 0 leaked rows afterward).
+   `get_advisors` (security + performance) shows only the project's pre-existing baseline findings (expected
+   `SECURITY DEFINER` RPCs, `app_secrets` RLS-no-policy, two unindexed FKs) — no new advisory introduced.
+2. [x] **Migration B — `create_tournament` RPC (modify via `CREATE OR REPLACE`, no new overload).** Add one
+   new parameter `p_tennis_scoring_mode text DEFAULT NULL` appended after the existing params (so old
+   positional/named calls, if any are still live, keep working unchanged — do not repeat Phase 24's mistake of
+   needing a separate cleanup migration to drop overloads), and insert it into the new
+   `tennis_scoring_mode` column alongside the existing columns. Name it
+   `phase26_create_tournament_scoring_mode`. _Test:_ `execute_sql`/anon-key integration call — a Tennis call
+   with `p_tennis_scoring_mode = 'standard'` and one with `'freestyle'` both round-trip correctly; a Badminton
+   call with `p_tennis_scoring_mode = NULL` (the default) still inserts `NULL`; an old-style call omitting the
+   new argument entirely still succeeds and writes `NULL`; `get_advisors` unchanged (only the existing expected
+   anon `SECURITY DEFINER` advisory for this function, same class as before).
+   **Done (2026-10-12):** plain `CREATE OR REPLACE` would have left the old 8-arg function alongside a new
+   9-arg one (Postgres matches by full argument-type list, not just name — exactly Phase 24's overload trap),
+   so this instead ran `DROP FUNCTION create_tournament(text,text,integer,integer,text,integer,text,integer)`
+   immediately followed by `CREATE FUNCTION` with the 9th param, in one `phase26_create_tournament_scoring_mode`
+   migration. Verified live: `pg_proc` shows exactly one `create_tournament` overload afterward (the new 9-arg
+   one); `information_schema.routine_privileges` shows the same grantees as before (`PUBLIC`/`anon`/
+   `authenticated`/`postgres`/`service_role`, all `EXECUTE`) since Postgres re-grants `EXECUTE` to `PUBLIC` by
+   default on function creation. Ran a disposable anon-key integration test
+   (`supabase.rpc('create_tournament', ...)` directly, using `testWritePassphrase`): Tennis+`'standard'` and
+   Tennis+`'freestyle'` both round-tripped; Badminton with `p_tennis_scoring_mode: null` wrote `NULL`; an
+   old-style call omitting the key entirely also succeeded and wrote `NULL`; a wrong-passphrase call was still
+   rejected. `get_advisors` (security) shows the same 12 anon-callable / 11 authenticated-callable
+   `SECURITY DEFINER` findings as before, just `create_tournament`'s listed signature now has 9 args — no new
+   advisory class or count. Fixture cleanup: deleted all 4 disposable tournaments via the UUID-regex pass
+   (`tournaments.name ~ '[0-9a-f]{8}-...'`), re-queried to confirm 0 leftover and the table back to exactly
+   the pre-existing 10 Badminton rows; the disposable test file itself was deleted, never committed.
+3. [x] **Regenerate `src/lib/database.types.ts`** via Supabase MCP `generate_typescript_types`. _Test:_
+   `npx tsc -b` — no new errors; `Tables<'tournaments'>['tennis_scoring_mode']` is `string | null`.
+   **Done (2026-10-12):** regenerated from the live project and confirmed `Tables<'tournaments'>
+   ['tennis_scoring_mode']` is exactly `string | null` (verified with a standalone `tsc --strict` check: `null`
+   and `'standard'` assignable, a numeric value correctly rejected). Regenerating surfaced that the `Row` type
+   requires every column as a key (even nullable ones), which broke 7 pre-existing test fixtures that construct
+   a full mock `Tournament` object without the new column: `TournamentDetail.test.tsx`,
+   `TournamentDetailRoute.test.tsx`, `useCancelTournament.test.tsx`, `useCreateTournamentWithFirstDraw.test.tsx`,
+   `ActivePage.test.tsx`, `CreateTournamentPage.test.tsx`, `HistoryPage.test.tsx` — all are `sport: 'badminton'`
+   fixtures, so each got `tennis_scoring_mode: null` added next to its existing `point_cap` line; re-ran all 7
+   files afterward (109 tests, all passing).
+   **Correction (made while reconciling with `origin/main`, 2026-10-12):** at the time this step ran, the
+   local checkout was stale — 12 commits behind `origin/main` — so `playersApi.ts` still had the old
+   `delete_player` call and this surfaced as a `tsc -b` error once the regenerated types reflected the live
+   DB (which already had Phase 25's migrations applied on a separate, not-yet-pulled branch). This was
+   misread at the time as a live production incident and "hotfixed" locally; it wasn't one — Phase 25 was
+   already fully and correctly shipped on `origin/main` (steps 1-13, including this exact
+   `delete_player` → `remove_player_from_sport` switch, done properly with the two-variant Remove dialog,
+   `playerErrors.ts`, `useSportMembers`, etc.). The local hotfix was superseded entirely by `git stash` +
+   `fast-forward pull` + conflict resolution in favor of the real Phase 25 code before this work was
+   committed — see the top-level git history, not a note in this phase.
+4. [x] **Client API layer.** `src/features/tournaments/tournamentsApi.ts`: extend `CreateTournamentInput`
+   with `tennis_scoring_mode?: 'standard' | 'freestyle' | null`; `createTournament` passes it through as
+   `p_tennis_scoring_mode: input.tennis_scoring_mode ?? null` in the `.rpc()` call. _Test:_ extend
+   `tournamentsApi.integration.test.ts` against the live project — creating a Tennis tournament with
+   `tennis_scoring_mode: 'standard'` and with `'freestyle'` both return a row whose `tennis_scoring_mode`
+   matches; creating a Badminton tournament without the field returns `tennis_scoring_mode: null`; controller
+   runs the UUID-regex fixture cleanup afterwards per the operational note at the top of this file.
+   **Done (2026-10-12):** `CreateTournamentInput` and `createTournament` updated exactly as specified; `npx
+   tsc -b` stayed clean. Added the two new cases to `tournamentsApi.integration.test.ts` (standard/freestyle
+   round-trip for Tennis, `null` for Badminton) — ran the full file live (14 tests, all passing). Controller
+   ran the UUID-regex fixture cleanup afterwards: found and deleted 13 leftover tournaments / 15 players (full
+   suite run, not just the 2 new tests — expected per the operational note, since most of this file's cleanup
+   blocks use plain anon deletes that silently no-op); re-queried to confirm 0 UUID-matching rows remain and
+   totals are back to baseline (10 tournaments, real club data, matches/match_participants/match_games/
+   tournament_participants counts unchanged from before this run).
+5. [x] **i18n.** Add `tournaments.form.scoringModeLabel` (a field legend, e.g. "Scoring mode") to `en.json` and
+   `th.json` with real Thai for the legend text only — the "Standard"/"Freestyle" option labels themselves
+   stay hardcoded English literals in the component, per the explicit decision, and are **not** added as i18n
+   keys. _Test:_ `npx vitest run src/i18n` — en/th key sets still identical (one key added to both); no new
+   placeholders.
+   **Done (2026-10-12):** added `"scoringModeLabel": "Scoring mode"` (en) / `"โหมดการนับคะแนน"` (th) right
+   before `pointsPerGameLabel` in both files, matching the UI ordering. `npx vitest run src/i18n` — 2 files,
+   43 tests, all passing (identical key sets, placeholder parity). `tsc -b` and `npm run lint` stayed clean.
+6. [x] **Create form UI.** `src/pages/CreateTournamentPage.tsx`: new state
+   `tennisScoringMode: 'standard' | 'freestyle'` defaulting to `'standard'`; a 2-option radio/toggle control
+   (literal labels "Standard" / "Freestyle", legend from `t('tournaments.form.scoringModeLabel')`) rendered
+   only when `isTennis`, placed above/near the Points per game field; redefine
+   `effectivePointsPerGame = isTennis && tennisScoringMode === 'standard' ? TENNIS_POINTS_PER_GAME :
+   pointsPerGame`; the Points per game `NumberStepper`'s `disabled` becomes
+   `isTennis && tennisScoringMode === 'standard'` (Freestyle behaves identically to Badminton's field — blank
+   by default, same stepper, same `computePointCap` formula, no new min/max); `handleSubmit`'s `mutate()`
+   payload includes `tennis_scoring_mode: isTennis ? tennisScoringMode : null`. _Test:_ extend
+   `CreateTournamentPage.test.tsx` — Standard case (the existing "disables the Points per game field at a
+   fixed value of 4" test still passes unmodified, now also asserting the payload carries
+   `tennis_scoring_mode: 'standard'`); new Freestyle case (selecting Freestyle enables the field, starts
+   blank, a typed value flows into both the field and the `createTournament` payload along with
+   `tennis_scoring_mode: 'freestyle'`); Badminton case (no radio/toggle control rendered at all, and the
+   payload has no `tennis_scoring_mode` key or an explicit `null`).
+   **Done (2026-10-12):** implemented exactly as specified, as a plain native `fieldset`/radio pair (no new
+   shared component — only one usage site) with a new `.scoring-mode-options` CSS rule in `index.css`. Updated
+   the existing Standard-mode test's payload assertion and added the two new cases (Badminton-shows-no-control,
+   Freestyle-round-trip); all 10 tests in `CreateTournamentPage.test.tsx` pass, `tsc -b`/`lint` clean, full
+   non-integration suite (403 tests) passes. Also manually verified live via Playwright against the dev server
+   on the real project: Badminton shows no control; Tennis defaults to Standard with Points-per-game disabled
+   at 4 and "Deuce cap: 6"; clicking Freestyle enables the field, clears it to blank, and the Deuce cap line
+   correctly disappears until a value is typed.
+7. [x] **History badges.** `src/features/matches/matchesApi.ts`: `listRecentCompletedMatches`'s select grows
+   to `tournaments!inner(name, sport, court_count, tennis_scoring_mode)`, and `RecentCompletedMatch` gains a
+   `tennisScoringMode: 'standard' | 'freestyle' | null` field populated from the joined row. `useTournaments`
+   needs no change (its `Tournament` rows already carry `sport` and, after step 3, `tennis_scoring_mode`).
+   `src/pages/HistoryPage.tsx`: in `ByMatchSection`, render a small badge/text "Standard" or "Freestyle" next
+   to a row's label when `row.tennisScoringMode` is non-null (nothing rendered for Badminton rows, where it's
+   `null`); in `ByTournamentSection`, render the same badge next to a row when `tournament.tennis_scoring_mode`
+   is non-null. Labels stay the same hardcoded English literals as the create form, not run through `t()`.
+   _Test:_ extend `HistoryPage.test.tsx` — a completed Tennis match in Standard mode shows a "Standard" badge,
+   one in Freestyle mode shows "Freestyle", a completed Badminton match shows neither; same three cases for
+   `ByTournamentSection` rows (including the already-covered cancelled-tournament row, which must keep showing
+   its cancelled badge alongside or without the new one as appropriate).
+   **Done (2026-10-12):** implemented via a shared `ScoringModeBadge({ mode })` component in `HistoryPage.tsx`
+   (returns `null` when `mode` is `null`), used in both sections; the DB's generic `string | null` column type
+   is cast to the literal union at each call site. Fixing the type ripple also required adding
+   `tennisScoringMode` to `RoundsPlayedListProps` in `TournamentDetail.tsx` (the Manage screen's "delete last
+   match" quick-undo builds a `RecentCompletedMatch`-shaped object too; no badge is rendered there — out of
+   this step's scope, just satisfying the type) and to the `DeleteMatchConfirmModal.test.tsx` fixture. Added 4
+   new cases to `HistoryPage.test.tsx` (no badge for Badminton, Standard badge x2 — match + tournament,
+   Freestyle badge x2, Cancelled+Freestyle shown together) — all 17 tests in the file pass, `tsc -b`/`lint`
+   clean, full non-integration suite (407 tests) passes. Live-verified via Playwright against the dev server
+   on the real project: created two disposable Tennis tournaments (Standard/Freestyle) through the real
+   `createTournament` API, confirmed the History → By tournament section renders "Standard" and "Freestyle"
+   badges exactly as designed, then deleted both fixture rows (verified 0 leftover, back to the 10-Badminton
+   baseline).
+8. [x] **Non-change documentation for scoring internals.** No code change: `computePointCap`
+   (`src/features/tournaments/computePointCap.ts`) and `validateGameScore`
+   (`src/features/matches/validateGameScore.ts`) already operate purely on whatever `points_per_game` value is
+   resolved and have zero knowledge of `tennis_scoring_mode`; their existing test suites are the proof and need
+   no new cases. _Test:_ none (explicitly confirming no regression risk here, to avoid a future contributor
+   assuming these need updating).
+   **Done (2026-10-12):** re-read both files — `computePointCap(pointsPerGame: number)` and
+   `validateGameScore(score1, score2, { pointsPerGame, winBy, cap })` take only numbers, with no `sport` or
+   mode parameter anywhere; `grep -rn "sport"` over both files returns nothing. `validateGameScore.test.ts`
+   (10 tests) still passes unmodified, confirming no regression. No `computePointCap.test.ts` exists (it's
+   covered indirectly via the "Deuce cap: N" assertions in `CreateTournamentPage.test.tsx`/
+   `TournamentDetail.test.tsx`), consistent with not needing new cases here. No files touched for this step.
+9. [x] **Docs.** Flip `docs/SPEC.md`'s 2026-10-12 note (and the "Not yet implemented as of this note" marker
+   on the revised §4/§9 passages) to implemented; update `CLAUDE.md`'s "Project status" section to mention
+   Phase 26 shipped, consistent with how Phase 24/25's docs steps are written; tick this phase's boxes with
+   outcomes. _Test:_ none (docs-only).
+   **Done (2026-10-12):** `docs/SPEC.md`'s 2026-10-12 note's trailing "Not yet implemented as of this note"
+   flipped to "Implemented (Phase 26 in `docs/PLAN.md`)". `CLAUDE.md`'s "Project status" originally got a
+   (now-retracted — see step 10's note) "Phase 25 is NOT shipped" callout at this point, written against a
+   stale local checkout; once reconciled with `origin/main` (which already had Phase 25 fully shipped),
+   CLAUDE.md instead got a proper "Phase 25, per-sport membership" shipped paragraph alongside Phase 26's,
+   and the lede now reads "Phases 1-26 ... complete and shipped."
+10. [x] **Full regression + live verification.** `npm run build`, `npm run lint`, the full `npx vitest run`
+    (integration included). Then a Playwright pass on the dev server against the real Supabase project using
+    disposable tournaments: create a Tennis tournament in Standard mode (Points per game field disabled,
+    value 4; after a match is played and completed, its row in History shows a "Standard" badge in both
+    sections); create one in Freestyle mode (field editable, a custom value e.g. 7 accepted and used; History
+    shows "Freestyle" after a match completes); confirm Badminton is completely unaffected throughout (no
+    scoring-mode control visible on create, no badge anywhere in History for Badminton rows, old Badminton
+    tournaments and matches unchanged). Finish with the mandatory integration-test fixture cleanup (UUID-regex
+    pass over all tables, re-queried to zero) per the operational note at the top of this file.
+    **Done (2026-10-12):** `npm run build` (tsc -b + vite build) succeeded; `npm run lint` clean; full
+    `npx vitest run` (63 files, 447 tests, integration included) all passed against the live project. Built a
+    disposable fixture via the real API (2 Tennis players, a Standard tournament + a Freestyle tournament
+    at `points_per_game: 7`, one completed singles match in each) and verified live in the browser: History's
+    By-match section showed the completed Standard match with a "Standard" badge and the completed Freestyle
+    match with a "Freestyle" badge; By-tournament showed the same badges for both tournaments. Switched to the
+    Badminton workspace and confirmed its entire real History (10 tournaments, 115 matches, all existing
+    "Manually adjusted"/"Cancelled" badges intact) shows no Standard/Freestyle badge anywhere, and the Create
+    form shows no scoring-mode control at all for Badminton. Ran the mandatory UUID-regex + literal-name
+    fixture cleanup afterward across `players`/`tournaments` (cascading to `matches`/`match_games`/
+    `match_participants`/`tournament_participants`); re-queried every one of the 6 tables and confirmed exact
+    baseline counts (17 players, 10 tournaments, 115 matches, 113 match_games, 460 match_participants, 89
+    tournament_participants) with 0 leftover fixture rows. **Phase 26 is fully shipped — all 10 steps done.**
+
+    **Git sync note (2026-10-12, found when asked to commit):** the local checkout this entire phase was
+    built on turned out to be 12 commits behind `origin/main` — `origin/main` already had Phase 25
+    (per-sport membership) fully shipped (steps 1-13, including the exact `delete_player` →
+    `remove_player_from_sport` switch this phase's step 2 had re-discovered and "hotfixed" locally,
+    believing it was a live incident — see the retraction on step 2/3/9's notes above and on Phase 25's
+    "Risks / notes"). Resolved via `git stash -u` (saving all of this phase's uncommitted work, including
+    the two untracked files), `git pull --ff-only origin main` (clean fast-forward), then `git stash pop`:
+    5 real conflicts (`CLAUDE.md`, `docs/SPEC.md`, `playersApi.ts`, `PlayerList.tsx`, `PlayerList.test.tsx`,
+    plus a rename/delete conflict on `useRemovePlayerFromSport.ts`) — all resolved by keeping Phase 25's
+    real implementation (`git checkout --ours`) for the player-removal files (this phase's local version
+    was a strict subset, fully superseded) and hand-merging the two docs. `CreateTournamentPage.tsx` and
+    `CreateTournamentPage.test.tsx` (touched heavily by both phases) auto-merged with **zero** conflicts —
+    verified by reading the merged file, not just trusting the auto-merge. One real fixture bug surfaced
+    by the post-merge full-suite run: this phase's two brand-new tests (not present on either side of the
+    merge, so git had nothing to merge them against) still used the plain `players`/`listPlayers` fixture
+    for a Tennis scenario, instead of Phase 25's `tennisPlayers` fixture — now that the participant
+    checklist is `useSportMembers(sport!)`-filtered, a badminton-level-only fixture renders zero Tennis
+    participants. Fixed the one affected test ("freestyle mode leaves Points per game editable") to use
+    `tennisPlayers`/`makeStats(id, 'tennis')`, matching the pattern Phase 25 already applied to the
+    sibling "disables the Points per game field" test. Re-ran `tsc -b` (clean), `npm run lint` (clean), and
+    the full suite with `--testTimeout=30000` (522 tests, all passing — the default 5s timeout produced
+    the same spurious live-project timeouts Phase 25's own step 13 note already documented; confirmed
+    transient by re-running the affected files alone under the longer timeout) before committing.
+
+**Risks / notes for this phase:**
+- Badminton must stay provably unaffected: its create flow never reads or writes `tennis_scoring_mode`, no
+  control is rendered for it, and render code in History must gate on the row actually having a non-null
+  `tennis_scoring_mode` (which is already sport-scoped), never on `sport === 'tennis'` truthiness alone, so a
+  future sport can't accidentally inherit the badge.
+- `CREATE OR REPLACE ... create_tournament` with a new trailing `DEFAULT NULL` parameter is chosen specifically
+  to avoid Phase 24's overload-cleanup pain (that phase had to ship a separate migration just to drop old
+  overloads after introducing new ones); verify in step 2's test that an old-style call (positional or named,
+  omitting the new argument) still resolves to exactly one overload and succeeds.
+- This phase is independent of Phase 25 (different concern — per-sport membership vs. tennis scoring — no
+  ordering dependency) and can ship before or after Phase 25's app-code steps land.
+- The new column's CHECK only constrains *non-null* values, and NULL is valid for both sports, so there is no
+  backfill-ordering hazard like Phase 25's Migration C; still, re-verify the pre-migration count of tennis rows
+  before backfilling, as a sanity check rather than a safety requirement.
+- Component tests assert real rendered copy, so land the new hardcoded "Standard"/"Freestyle" strings together
+  with the UI step (step 6) rather than deferring them — there is no separate translated-copy step to get
+  ahead of here, since the labels are intentionally not localized.

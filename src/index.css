@@ -643,6 +643,20 @@ button.danger {
   cursor: not-allowed;
 }
 
+/* ---------- Tennis scoring mode (Standard / Freestyle) ---------- */
+
+.scoring-mode-options {
+  display: flex;
+  gap: 16px;
+}
+
+.scoring-mode-options label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
 /* ---------- Home (sport picker) ---------- */
 
 .home-page {

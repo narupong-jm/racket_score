@@ -140,6 +140,7 @@ const tournament: Tournament = {
   points_per_game: 21,
   win_by: 2,
   point_cap: 30,
+  tennis_scoring_mode: null,
   status: 'active',
   court_count: 1,
   created_at: '2026-01-01T00:00:00Z',
@@ -237,6 +238,7 @@ describe('CreateTournamentPage', () => {
           points_per_game: 21,
           sport: 'badminton',
           court_count: 1,
+          tennis_scoring_mode: null,
         },
         'test-passphrase',
       )
@@ -615,6 +617,104 @@ describe('CreateTournamentPage', () => {
           points_per_game: 4,
           sport: 'tennis',
           court_count: 1,
+          tennis_scoring_mode: 'standard',
+        },
+        'test-passphrase',
+      )
+    })
+  })
+
+  it('tennis: does not show the Standard/Freestyle control for badminton', async () => {
+    vi.mocked(useSportModule.useSport).mockReturnValue({
+      sport: 'badminton',
+      setSport: vi.fn(),
+    })
+    vi.mocked(playersApi.listPlayers).mockResolvedValue(players)
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue(
+      players.map((p) => makeStats(p.id)),
+    )
+
+    renderPage()
+    await screen.findByLabelText(/name/i)
+
+    expect(screen.queryByText('Standard')).not.toBeInTheDocument()
+    expect(screen.queryByText('Freestyle')).not.toBeInTheDocument()
+    expect(
+      screen.queryByText('Scoring mode', { exact: false }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('tennis: freestyle mode leaves Points per game editable, blank by default', async () => {
+    vi.mocked(useSportModule.useSport).mockReturnValue({
+      sport: 'tennis',
+      setSport: vi.fn(),
+    })
+    vi.mocked(playersApi.listPlayers).mockResolvedValue(tennisPlayers)
+    vi.mocked(playersApi.listPlayerStats).mockResolvedValue(
+      tennisPlayers.map((p) => makeStats(p.id, 'tennis')),
+    )
+    vi.mocked(tournamentsApi.createTournament).mockResolvedValue({
+      ...tournament,
+      sport: 'tennis',
+      points_per_game: 7,
+      tennis_scoring_mode: 'freestyle',
+    })
+    vi.mocked(tournamentsApi.addParticipant).mockResolvedValue({
+      tournament_id: 't1',
+      player_id: 'p1',
+      joined_at: '2026-01-01T00:00:00Z',
+      status: 'active',
+      match_count_offset: 0,
+    })
+    vi.mocked(useDrawInputsModule.assembleDrawInputs).mockResolvedValue({
+      candidates: [],
+      pairingHistory: { opponentPairs: new Set(), teammatePairs: new Set() },
+    })
+    vi.mocked(generateNextMatchModule.generateNextMatch).mockReturnValue({
+      ok: true,
+      participants: [
+        { playerId: 'p1', team: 1 },
+        { playerId: 'p2', team: 1 },
+        { playerId: 'p3', team: 2 },
+        { playerId: 'p4', team: 2 },
+      ],
+    })
+    vi.mocked(matchesApi.listMatches).mockResolvedValue([])
+
+    const user = userEvent.setup()
+    renderPage()
+
+    await user.type(await screen.findByLabelText(/name/i), 'Tennis Freestyle')
+    await user.click(screen.getByRole('radio', { name: 'Doubles' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Alice' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Bob' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Carol' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Dave' }))
+    await user.type(screen.getByLabelText('Games per match'), '3')
+
+    const pointsPerGameInput = screen.getByLabelText('Points per game')
+    expect(pointsPerGameInput).toBeDisabled()
+    expect(pointsPerGameInput).toHaveValue(4)
+
+    await user.click(screen.getByRole('radio', { name: 'Freestyle' }))
+
+    expect(pointsPerGameInput).toBeEnabled()
+    expect(pointsPerGameInput).toHaveValue(null)
+
+    await user.type(pointsPerGameInput, '7')
+
+    await user.click(screen.getByRole('button', { name: /create tournament/i }))
+
+    await waitFor(() => {
+      expect(tournamentsApi.createTournament).toHaveBeenCalledWith(
+        {
+          name: 'Tennis Freestyle',
+          type: 'doubles',
+          games_per_match: 3,
+          points_per_game: 7,
+          sport: 'tennis',
+          court_count: 1,
+          tennis_scoring_mode: 'freestyle',
         },
         'test-passphrase',
       )

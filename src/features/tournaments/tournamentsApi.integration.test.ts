@@ -83,6 +83,67 @@ describe('tournamentsApi (real project, anon key)', () => {
   })
 })
 
+describe('createTournament: tennis_scoring_mode (real project, anon key)', () => {
+  const runId = crypto.randomUUID()
+
+  it('round-trips standard and freestyle for a tennis tournament', async () => {
+    const standard = await createTournament(
+      {
+        name: `Tennis Scoring Mode Standard ${runId}`,
+        type: 'singles',
+        sport: 'tennis',
+        games_per_match: 1,
+        points_per_game: 4,
+        court_count: 1,
+        tennis_scoring_mode: 'standard',
+      },
+      testWritePassphrase,
+    )
+    const freestyle = await createTournament(
+      {
+        name: `Tennis Scoring Mode Freestyle ${runId}`,
+        type: 'singles',
+        sport: 'tennis',
+        games_per_match: 1,
+        points_per_game: 7,
+        court_count: 1,
+        tennis_scoring_mode: 'freestyle',
+      },
+      testWritePassphrase,
+    )
+
+    try {
+      expect(standard.tennis_scoring_mode).toBe('standard')
+      expect(freestyle.tennis_scoring_mode).toBe('freestyle')
+    } finally {
+      await supabase
+        .from('tournaments')
+        .delete()
+        .in('id', [standard.id, freestyle.id])
+    }
+  })
+
+  it('a badminton tournament created without the field has tennis_scoring_mode: null', async () => {
+    const badminton = await createTournament(
+      {
+        name: `Tennis Scoring Mode Badminton ${runId}`,
+        type: 'singles',
+        sport: 'badminton',
+        games_per_match: 1,
+        points_per_game: 21,
+        court_count: 1,
+      },
+      testWritePassphrase,
+    )
+
+    try {
+      expect(badminton.tennis_scoring_mode).toBeNull()
+    } finally {
+      await supabase.from('tournaments').delete().eq('id', badminton.id)
+    }
+  })
+})
+
 describe('cancelTournament (real project, anon key)', () => {
   const runId = crypto.randomUUID()
 
