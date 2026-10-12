@@ -212,11 +212,11 @@ surfaced real pre-existing errors once actually run.
   `remove_player_from_sport(p_id, p_sport, p_passphrase)` nulls that sport's level column, or deletes
   the person row outright if it was their last sport, replacing `delete_player` for this purpose; new/
   renamed names must be unique across the whole system regardless of sport (`findNameConflict`
-  pre-check client-side, a friendly `name_taken` rejection server-side). **Still pending (Phase 25
-  step 13, not yet applied as of this note):** the merge-time destructive migration that drops the
-  now-unused `delete_player` RPC and adds `CHECK (badminton_self_selected_level IS NOT NULL OR
-  tennis_self_selected_level IS NOT NULL)` — until then `delete_player` still exists live but has no
-  app-layer caller. Displayed everywhere with a **generated placeholder avatar** (initials +
+  pre-check client-side, a friendly `name_taken` rejection server-side). Phase 25 step 13's merge-time
+  destructive migration has run: `delete_player` is dropped from the live DB (it no longer exists at
+  all, not just unused by the app) and `CHECK (badminton_self_selected_level IS NOT NULL OR
+  tennis_self_selected_level IS NOT NULL)` is enforced at the database level. Displayed everywhere
+  with a **generated placeholder avatar** (initials +
   name-derived color) — there is no photo upload or `players.photo`/`avatar_url` column; don't add
   one without the user explicitly asking, per `docs/SPEC.md` §3's deferral.
 - **Doubles pairs/teams are never persisted** — every tournament re-pairs individuals from the pool.
