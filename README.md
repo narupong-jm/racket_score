@@ -66,8 +66,11 @@ works identically per sport.
   algorithm](#matchmaking-algorithm) below
 - Singles **or** doubles per tournament, with configurable games-per-match
   and points-per-game (entered via a −/+ stepper or typed directly, blank
-  by default). Points-per-game is fixed at 4 for Tennis rather than
-  organizer-entered — shown disabled/faded in the Create Tournament form.
+  by default). **Tennis adds a Standard/Freestyle scoring-mode choice** at
+  creation: Standard fixes points-per-game at 4 (shown disabled/faded in
+  the Create Tournament form); Freestyle makes it organizer-entered, just
+  like Badminton. The chosen mode shows as a small "Standard"/"Freestyle"
+  badge in both History sections next to that tournament's rows.
 - Deuce cap auto-computed from the BWF 21→30 ratio:
   `round(pointsPerGame * 30 / 21)`
 - Two win-rate-based scoreboards: per-tournament and an overall
@@ -106,9 +109,14 @@ These are deliberate design choices, not missing features:
 - **Tennis uses the same rally-point scoring engine as badminton**, not
   real tennis rules — no sets, no 40-40/advantage deuce, no tie-break at 6
   games. Organizers configure games-per-match the same way for either
-  sport; points-per-game is organizer-entered for Badminton but **fixed at
-  4 for Tennis** (shown disabled in the Create Tournament form rather than
-  editable). The deuce-cap formula applies identically either way.
+  sport. Points-per-game is always organizer-entered for Badminton; for
+  Tennis the organizer additionally picks a scoring mode at creation —
+  **Standard** fixes it at 4, **Freestyle** makes it organizer-entered just
+  like Badminton (a Tennis tournament created before this choice existed
+  is treated as Standard). The deuce-cap formula applies identically
+  either way, and the Overall Scoreboard needs no special-casing for it —
+  win rate and total points scored already don't depend on a fixed
+  points-per-game, since Badminton has always varied it too.
 - **No user accounts.** Anyone with the link can browse all data — this is
   meant for private, trusted club use. Writes (creating/editing/recording
   anything) require a single shared passphrase, prompted for once per browser
@@ -256,11 +264,18 @@ of a sport *is* having a non-null level in it, which is also what the
 Tournament checklist and Add-participant picker a person shows up in).
 `remove_player_from_sport(p_id, p_sport, p_passphrase)` nulls that sport's
 level column, or deletes the person row outright if it was their only
-sport. **Pending a merge-time migration** (Phase 25 in
-[`docs/PLAN.md`](docs/PLAN.md), not yet applied as of this note): dropping
-the now-superseded `delete_player` RPC, and adding
-`CHECK (badminton_self_selected_level IS NOT NULL OR
-tennis_self_selected_level IS NOT NULL)`.
+sport — this replaced the old `delete_player` RPC, which no longer exists.
+A `CHECK (badminton_self_selected_level IS NOT NULL OR
+tennis_self_selected_level IS NOT NULL)` constraint enforces that every
+player stays a member of at least one sport (Phase 25 in
+[`docs/PLAN.md`](docs/PLAN.md), fully shipped).
+
+**Tennis scoring mode:** `tournaments.tennis_scoring_mode` is a nullable
+`'standard' | 'freestyle'` column — always `NULL` for Badminton, set for
+every Tennis tournament (existing Tennis rows backfilled to `'standard'`).
+`create_tournament`'s RPC signature carries a 9th `p_tennis_scoring_mode`
+parameter for it (Phase 26 in [`docs/PLAN.md`](docs/PLAN.md), fully
+shipped).
 
 Multi-court support adds `tournaments.court_count` (1–8) and
 `matches.court_number`. A match with `status = 'queued'` is the one **in
